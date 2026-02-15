@@ -1,0 +1,1410 @@
+#!/usr/bin/env bash
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  KoalaClaw - OpenClaw Multi-Agent Deployment Tool           ║
+# ║  https://github.com/alicanti/koalaclaw                     ║
+# ║  by Alican Tilki (@alicanti)                                ║
+# ╚══════════════════════════════════════════════════════════════╝
+set -euo pipefail
+
+VERSION="1.0.0"
+DEFAULT_INSTALL_DIR="/opt/koalaclaw"
+DEFAULT_START_PORT=3001
+DEFAULT_SUBNET="172.30.0.0/24"
+DEFAULT_GATEWAY_IP="172.30.0.1"
+DEFAULT_CADDY_IP="172.30.0.100"
+DEFAULT_AGENT_IP_PREFIX="172.30.0.1"  # agents: .11, .12, .13 ...
+STATE_FILE=".koalaclaw.state"
+CREDENTIALS_FILE=".credentials"
+LOG_FILE="/var/log/koalaclaw-install.log"
+OPENCLAW_IMAGE="alpine/openclaw:latest"
+CADDY_IMAGE="caddy:2-alpine"
+MIN_RAM_MB=1024
+MIN_DISK_MB=5120
+INTERNAL_PORT=18789
+
+# ═══════════════════════════════════════
+# COLORS
+# ═══════════════════════════════════════
+if [[ -t 1 ]] && [[ "${NO_COLOR:-}" != "1" ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    WHITE='\033[1;37m'
+    DIM='\033[2m'
+    BOLD='\033[1m'
+    NC='\033[0m'
+else
+    RED='' GREEN='' YELLOW='' BLUE='' CYAN='' WHITE='' DIM='' BOLD='' NC=''
+fi
+
+# ═══════════════════════════════════════
+# LOGGING
+# ═══════════════════════════════════════
+_log() { echo -e "$1" | tee -a "$LOG_FILE" 2>/dev/null || echo -e "$1"; }
+_info()    { _log "${GREEN}  ✓${NC} $1"; }
+_warn()    { _log "${YELLOW}  ⚠${NC} $1"; }
+_error()   { _log "${RED}  ✗${NC} $1"; }
+_step()    { _log "${CYAN}  →${NC} $1"; }
+_header()  { _log "\n${BOLD}${WHITE}  ─── $1 ───${NC}\n"; }
+_spinner() {
+    local pid=$1 msg=$2
+    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r${CYAN}  %s${NC} %s" "${spin:i++%10:1}" "$msg"
+        sleep 0.1
+    done
+    printf "\r"
+}
+
+# ═══════════════════════════════════════
+# BANNER
+# ═══════════════════════════════════════
+_banner() {
+    echo -e "${CYAN}"
+    cat << 'KOALA'
+  ⢀⠔⠊⠉⠑⢄⠀⠀⣀⣀⠤⠤⠤⢀⣀⠀⠀⣀⠔⠋⠉⠒⡄⠀
+  ⡎⠀⠀⠀⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠀⠀⠀⠘⡄
+  ⣧⢢⠀⠀⠀⠀⠀⠀⠀⠀⣀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⢈⣆⡗
+  ⠘⡇⠀⢀⠆⠀⠀⣀⠀⢰⣿⣿⣧⠀⢀⡀⠀⠀⠘⡆⠀⠈⡏⠀
+  ⠀⠑⠤⡜⠀⠀⠈⠋⠀⢸⣿⣿⣿⠀⠈⠃⠀⠀⠀⠸⡤⠜⠀⠀
+  ⠀⠀⠀⣇⠀⠀⠀⠀⠀⠢⣉⢏⣡⠀⠀⠀⠀⠀⠀⢠⠇⠀⠀⠀
+  ⠀⠀⠀⠈⠢⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡤⠋⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⢨⠃⠀⢀⠀⢀⠔⡆⠀⠀⠀⠀⠻⡄⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⡎⠀⠀⠧⠬⢾⠊⠀⠀⢀⡇⠀⠀⠟⢆⠀⠀⠀⠀
+  ⠀⠀⠀⠀⢀⡇⠀⠀⡞⠀⠀⢣⣀⡠⠊⠀⠀⠀⢸⠈⣆⡀⠀⠀
+  ⠀⠀⡠⠒⢸⠀⠀⠀⡇⡠⢤⣯⠅⠀⠀⠀⢀⡴⠃⠀⢸⠘⢤⠀
+  ⠀⢰⠁⠀⢸⠀⠀⠀⣿⠁⠀⠙⡟⠒⠒⠉⠀⠀⠀⠀⠀⡇⡎⠀
+  ⠀⠘⣄⠀⠸⡆⠀⠀⣿⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⢀⠟⠁⠀
+  ⠀⠀⠘⠦⣀⣷⣀⡼⠽⢦⡀⠀⠀⢀⣀⣀⣀⠤⠄⠒⠁⠀⠀⠀
+KOALA
+    echo -e "${NC}"
+    echo -e "  ${RED}🦞${NC} ${BOLD}${GREEN}K O A L A C L A W${NC} ${RED}🦞${NC}"
+    echo ""
+    echo -e "  ${WHITE}█▄▀ █▀█ ▄▀█ █   ▄▀█ █▀▀ █   ▄▀█ █ █ █${NC}"
+    echo -e "  ${WHITE}█ █ █▄█ █▀█ █▄▄ █▀█ █▄▄ █▄▄ █▀█ ▀▄▀▄▀${NC}"
+    echo ""
+    echo -e "  ${DIM}Multi-Agent Deployment Tool  v${VERSION}${NC}"
+    echo -e "  ${DIM}by Alican Tilki (@alicanti)${NC}"
+    echo -e "  ${DIM}github.com/alicanti/koalaclaw${NC}"
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# STATE MANAGEMENT
+# ═══════════════════════════════════════
+_state_path() { echo "${INSTALL_DIR}/${STATE_FILE}"; }
+_state_exists() { [[ -f "$(_state_path)" ]]; }
+
+_load_state() {
+    if ! _state_exists; then
+        _error "No KoalaClaw installation found at ${INSTALL_DIR}"
+        _error "Run: sudo $0 install"
+        exit 1
+    fi
+    # Source state variables
+    # State is a simple key=value bash file
+    source "$(_state_path)"
+}
+
+_save_state() {
+    cat > "$(_state_path)" << STATEEOF
+# KoalaClaw State File - DO NOT EDIT MANUALLY
+KOALACLAW_VERSION="${VERSION}"
+INSTALL_DIR="${INSTALL_DIR}"
+SERVER_IP="${SERVER_IP}"
+AGENT_COUNT=${AGENT_COUNT}
+START_PORT=${START_PORT}
+SUBNET="${SUBNET}"
+CADDY_IP="${CADDY_IP}"
+MODEL="${MODEL}"
+PROVIDER="${PROVIDER}"
+API_KEY="${API_KEY}"
+CREATED_AT="${CREATED_AT:-$(date -Iseconds)}"
+UPDATED_AT="$(date -Iseconds)"
+$(for i in $(seq 1 "$AGENT_COUNT"); do
+    eval "echo \"TOKEN_${i}=\${TOKEN_${i}}\""
+done)
+STATEEOF
+    chmod 600 "$(_state_path)"
+}
+
+# ═══════════════════════════════════════
+# PREREQUISITES
+# ═══════════════════════════════════════
+_check_os() {
+    _step "Checking operating system..."
+    if [[ ! -f /etc/os-release ]]; then
+        _error "Cannot detect OS. This script requires Ubuntu 22.04/24.04."
+        exit 1
+    fi
+    source /etc/os-release
+    if [[ "$ID" != "ubuntu" ]] && [[ "$ID" != "debian" ]]; then
+        _warn "Detected ${ID} ${VERSION_ID}. This script is tested on Ubuntu 22.04/24.04."
+        _warn "Continuing anyway, but things may break."
+    else
+        _info "OS: ${PRETTY_NAME}"
+    fi
+}
+
+_check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        _error "This script must be run as root (use sudo)"
+        exit 1
+    fi
+}
+
+_check_internet() {
+    _step "Checking internet connectivity..."
+    if ! ping -c 1 -W 3 8.8.8.8 &>/dev/null && ! ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+        _error "No internet connectivity. Docker images cannot be pulled."
+        exit 1
+    fi
+    if ! curl -sf --max-time 5 https://registry-1.docker.io/v2/ &>/dev/null && \
+       ! curl -sf --max-time 5 https://hub.docker.com &>/dev/null; then
+        _warn "Docker Hub may not be reachable. Pull might fail."
+    else
+        _info "Internet connectivity OK"
+    fi
+}
+
+_check_ram() {
+    _step "Checking available memory..."
+    local total_mb
+    total_mb=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo)
+    local free_mb
+    free_mb=$(awk '/MemAvailable/ {printf "%.0f", $2/1024}' /proc/meminfo)
+
+    if (( total_mb < MIN_RAM_MB )); then
+        _error "Insufficient RAM: ${total_mb}MB total (minimum ${MIN_RAM_MB}MB)"
+        _error "Each agent needs ~300-500MB. Consider adding swap."
+        exit 1
+    fi
+
+    local needed_mb=$(( AGENT_COUNT * 400 + 200 ))  # agents + caddy
+    if (( free_mb < needed_mb )); then
+        _warn "Low available memory: ${free_mb}MB free, ~${needed_mb}MB needed for ${AGENT_COUNT} agents"
+        _warn "Agents may crash under load. Consider adding swap or reducing agent count."
+    else
+        _info "Memory: ${free_mb}MB available / ${total_mb}MB total"
+    fi
+}
+
+_check_disk() {
+    _step "Checking disk space..."
+    local free_mb
+    free_mb=$(df -BM "${INSTALL_DIR%/*}" 2>/dev/null | awk 'NR==2 {gsub(/M/,"",$4); print $4}')
+    if [[ -z "$free_mb" ]]; then
+        free_mb=$(df -BM / | awk 'NR==2 {gsub(/M/,"",$4); print $4}')
+    fi
+
+    if (( free_mb < MIN_DISK_MB )); then
+        _error "Insufficient disk space: ${free_mb}MB free (minimum ${MIN_DISK_MB}MB)"
+        exit 1
+    fi
+    _info "Disk: ${free_mb}MB available"
+}
+
+_check_ports() {
+    _step "Checking port availability..."
+    local conflict=false
+    for i in $(seq 0 $(( AGENT_COUNT - 1 ))); do
+        local port=$(( START_PORT + i ))
+        if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
+           netstat -tlnp 2>/dev/null | grep -q ":${port} "; then
+            _error "Port ${port} is already in use"
+            conflict=true
+        fi
+    done
+    if $conflict; then
+        _error "Free the conflicting ports or choose a different starting port."
+        exit 1
+    fi
+    _info "Ports ${START_PORT}-$(( START_PORT + AGENT_COUNT - 1 )) available"
+}
+
+_check_subnet() {
+    _step "Checking Docker network subnet..."
+    if docker network ls --format '{{.Name}}' 2>/dev/null | grep -q koala-net; then
+        _warn "Docker network 'koala-net' already exists (will be recreated)"
+    fi
+    # Check if subnet conflicts with existing networks
+    local existing
+    existing=$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' \
+        $(docker network ls -q) 2>/dev/null | tr '\n' ' ')
+    if echo "$existing" | grep -q "${SUBNET}"; then
+        # Try alternate subnets
+        for alt in "172.31.0.0/24" "172.29.0.0/24" "172.28.0.0/24" "10.99.0.0/24"; do
+            if ! echo "$existing" | grep -q "${alt}"; then
+                _warn "Subnet ${SUBNET} conflicts. Using ${alt} instead."
+                SUBNET="$alt"
+                local prefix="${alt%.*}"
+                CADDY_IP="${prefix}.100"
+                DEFAULT_AGENT_IP_PREFIX="${prefix}.1"
+                return
+            fi
+        done
+        _error "Cannot find a free subnet. Please specify manually."
+        exit 1
+    fi
+    _info "Subnet ${SUBNET} available"
+}
+
+_check_firewall() {
+    _step "Checking firewall..."
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        _warn "UFW firewall is active"
+        local end_port=$(( START_PORT + AGENT_COUNT - 1 ))
+        echo ""
+        read -rp "  Open ports ${START_PORT}-${end_port} in UFW? [Y/n]: " fw_answer
+        fw_answer="${fw_answer:-Y}"
+        if [[ "${fw_answer,,}" == "y" ]]; then
+            ufw allow "${START_PORT}:${end_port}/tcp" &>/dev/null
+            _info "UFW: ports ${START_PORT}-${end_port} opened"
+        else
+            _warn "Ports not opened. External access may not work."
+        fi
+    else
+        _info "No active firewall detected"
+    fi
+}
+
+# ═══════════════════════════════════════
+# DOCKER INSTALLATION
+# ═══════════════════════════════════════
+_check_docker() {
+    _step "Checking Docker..."
+    if command -v docker &>/dev/null; then
+        local docker_version
+        docker_version=$(docker --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
+        _info "Docker ${docker_version} found"
+
+        # Check compose v2
+        if docker compose version &>/dev/null; then
+            local compose_version
+            compose_version=$(docker compose version --short 2>/dev/null)
+            _info "Docker Compose ${compose_version} found"
+        else
+            _warn "Docker Compose v2 not found. Installing..."
+            _install_compose
+        fi
+
+        # Ensure docker is running
+        if ! docker info &>/dev/null; then
+            _step "Starting Docker service..."
+            systemctl enable --now docker &>/dev/null
+            sleep 2
+            if ! docker info &>/dev/null; then
+                _error "Docker is installed but not running. Try: systemctl start docker"
+                exit 1
+            fi
+        fi
+        return
+    fi
+
+    echo ""
+    read -rp "  Docker not found. Install Docker CE? [Y/n]: " install_answer
+    install_answer="${install_answer:-Y}"
+    if [[ "${install_answer,,}" != "y" ]]; then
+        _error "Docker is required. Aborting."
+        exit 1
+    fi
+    _install_docker
+}
+
+_install_docker() {
+    _header "Installing Docker CE"
+    apt-get update -qq
+    apt-get install -y -qq ca-certificates curl gnupg lsb-release >/dev/null 2>&1
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    local codename
+    codename=$(. /etc/os-release && echo "$VERSION_CODENAME" 2>/dev/null || echo "jammy")
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${codename} stable" \
+        > /etc/apt/sources.list.d/docker.list
+
+    apt-get update -qq
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+
+    systemctl enable --now docker &>/dev/null
+    sleep 2
+
+    if ! docker info &>/dev/null; then
+        _error "Docker installation failed."
+        exit 1
+    fi
+    _info "Docker CE installed successfully"
+}
+
+_install_compose() {
+    apt-get update -qq
+    apt-get install -y -qq docker-compose-plugin >/dev/null 2>&1
+    if docker compose version &>/dev/null; then
+        _info "Docker Compose v2 installed"
+    else
+        _error "Failed to install Docker Compose v2"
+        exit 1
+    fi
+}
+
+# ═══════════════════════════════════════
+# INSTALL DEPENDENCIES
+# ═══════════════════════════════════════
+_install_deps() {
+    _step "Checking dependencies..."
+    local missing=()
+    for cmd in curl openssl python3; do
+        if ! command -v "$cmd" &>/dev/null; then
+            missing+=("$cmd")
+        fi
+    done
+    if ! command -v ss &>/dev/null && ! command -v netstat &>/dev/null; then
+        missing+=("iproute2")
+    fi
+
+    if (( ${#missing[@]} > 0 )); then
+        _step "Installing: ${missing[*]}"
+        apt-get update -qq
+        apt-get install -y -qq "${missing[@]}" >/dev/null 2>&1
+        _info "Dependencies installed"
+    else
+        _info "All dependencies present"
+    fi
+}
+
+# ═══════════════════════════════════════
+# DETECT SERVER IP
+# ═══════════════════════════════════════
+_detect_server_ip() {
+    local ip
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    if [[ -z "$ip" ]]; then
+        ip=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7; exit}')
+    fi
+    echo "${ip:-127.0.0.1}"
+}
+
+# ═══════════════════════════════════════
+# API KEY VALIDATION
+# ═══════════════════════════════════════
+_validate_api_key() {
+    local provider="$1" key="$2"
+    _step "Validating API key..."
+
+    case "$provider" in
+        openai)
+            local response
+            response=$(curl -sf --max-time 10 \
+                -H "Authorization: Bearer ${key}" \
+                "https://api.openai.com/v1/models" 2>/dev/null) || {
+                _error "Invalid API key or cannot reach OpenAI API"
+                return 1
+            }
+
+            # Check for error
+            if echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if 'data' in d else 1)" 2>/dev/null; then
+                _info "API key valid"
+
+                # Check billing
+                local billing
+                billing=$(curl -sf --max-time 10 \
+                    -X POST "https://api.openai.com/v1/chat/completions" \
+                    -H "Authorization: Bearer ${key}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' 2>/dev/null)
+
+                if echo "$billing" | grep -q "insufficient_quota"; then
+                    _warn "API key has no billing credits. Chat will not work until you add credits."
+                    _warn "Add credits at: https://platform.openai.com/account/billing"
+                fi
+                return 0
+            else
+                _error "API key is invalid"
+                return 1
+            fi
+            ;;
+        anthropic)
+            local response
+            response=$(curl -sf --max-time 10 \
+                -H "x-api-key: ${key}" \
+                -H "anthropic-version: 2023-06-01" \
+                "https://api.anthropic.com/v1/models" 2>/dev/null)
+            if [[ $? -eq 0 ]]; then
+                _info "Anthropic API key valid"
+                return 0
+            else
+                _error "Invalid Anthropic API key"
+                return 1
+            fi
+            ;;
+        *)
+            _warn "Cannot validate key for provider: ${provider}. Skipping validation."
+            return 0
+            ;;
+    esac
+}
+
+_list_models() {
+    local provider="$1" key="$2"
+    case "$provider" in
+        openai)
+            curl -sf --max-time 10 \
+                -H "Authorization: Bearer ${key}" \
+                "https://api.openai.com/v1/models" 2>/dev/null | \
+            python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    models = sorted([m['id'] for m in d.get('data',[]) if any(x in m['id'] for x in ['gpt','o1','o3','o4'])])
+    for i,m in enumerate(models,1):
+        print(f'    {i}) {m}')
+except:
+    pass
+" 2>/dev/null
+            ;;
+        anthropic)
+            echo "    1) claude-opus-4-6"
+            echo "    2) claude-sonnet-4-5"
+            echo "    3) claude-haiku-3-5"
+            ;;
+    esac
+}
+
+# ═══════════════════════════════════════
+# FILE GENERATORS
+# ═══════════════════════════════════════
+_generate_compose() {
+    local compose_file="${INSTALL_DIR}/docker-compose.yml"
+    _step "Generating docker-compose.yml..."
+
+    cat > "$compose_file" << 'COMPOSE_HEADER'
+services:
+COMPOSE_HEADER
+
+    # Agent services
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local agent_ip="${DEFAULT_AGENT_IP_PREFIX}${i}"
+        eval "local token=\${TOKEN_${i}}"
+        local port=$(( START_PORT + i - 1 ))
+
+        cat >> "$compose_file" << AGENT_EOF
+  koala-agent-${i}:
+    image: ${OPENCLAW_IMAGE}
+    container_name: koala-agent-${i}
+    restart: unless-stopped
+    environment:
+      - OPENCLAW_GATEWAY_TOKEN=${token}
+      - OPENCLAW_STATE_DIR=/state
+AGENT_EOF
+
+        # Provider-specific env vars
+        case "$PROVIDER" in
+            openai)     echo "      - OPENAI_API_KEY=${API_KEY}" >> "$compose_file" ;;
+            anthropic)  echo "      - ANTHROPIC_API_KEY=${API_KEY}" >> "$compose_file" ;;
+            *)          echo "      - OPENAI_API_KEY=${API_KEY}" >> "$compose_file" ;;
+        esac
+
+        cat >> "$compose_file" << AGENT_EOF2
+    volumes:
+      - ./data/koala-agent-${i}:/state
+    networks:
+      koala-net:
+        ipv4_address: ${agent_ip}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "--header=Authorization: Bearer ${token}", "http://127.0.0.1:${INTERNAL_PORT}/__openclaw__/canvas/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+AGENT_EOF2
+    done
+
+    # Caddy service
+    cat >> "$compose_file" << CADDY_HEAD
+  caddy:
+    image: ${CADDY_IMAGE}
+    container_name: koala-caddy
+    restart: unless-stopped
+    depends_on:
+CADDY_HEAD
+
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        cat >> "$compose_file" << DEP_EOF
+      koala-agent-${i}:
+        condition: service_healthy
+DEP_EOF
+    done
+
+    echo "    ports:" >> "$compose_file"
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        echo "      - \"${port}:${port}\"" >> "$compose_file"
+    done
+
+    cat >> "$compose_file" << CADDY_TAIL
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      koala-net:
+        ipv4_address: ${CADDY_IP}
+
+networks:
+  koala-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET}
+          gateway: ${SUBNET%.*}.1
+
+volumes:
+  caddy_data:
+  caddy_config:
+CADDY_TAIL
+
+    _info "docker-compose.yml created"
+}
+
+_generate_caddyfile() {
+    local caddy_file="${INSTALL_DIR}/Caddyfile"
+    _step "Generating Caddyfile..."
+
+    > "$caddy_file"
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        eval "local token=\${TOKEN_${i}}"
+
+        cat >> "$caddy_file" << CADDY_EOF
+:${port} {
+	reverse_proxy koala-agent-${i}:${INTERNAL_PORT} {
+		header_up Authorization "Bearer ${token}"
+		header_up X-Forwarded-Proto "https"
+	}
+	log {
+		output stderr
+		level WARN
+	}
+}
+
+CADDY_EOF
+    done
+    _info "Caddyfile created (${AGENT_COUNT} ports)"
+}
+
+_generate_agent_configs() {
+    _step "Generating agent configurations..."
+
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local agent_dir="${INSTALL_DIR}/data/koala-agent-${i}"
+        local auth_dir="${agent_dir}/agents/main/agent"
+        local port=$(( START_PORT + i - 1 ))
+        eval "local token=\${TOKEN_${i}}"
+
+        mkdir -p "$auth_dir"
+
+        # openclaw.json
+        python3 -c "
+import json
+cfg = {
+    'agents': {
+        'defaults': {
+            'model': {
+                'primary': '${MODEL}'
+            }
+        }
+    },
+    'gateway': {
+        'port': ${INTERNAL_PORT},
+        'bind': 'lan',
+        'controlUi': {
+            'allowedOrigins': ['http://${SERVER_IP}:${port}'],
+            'allowInsecureAuth': True,
+            'dangerouslyDisableDeviceAuth': True
+        },
+        'auth': {
+            'token': '${token}'
+        },
+        'trustedProxies': ['${CADDY_IP}']
+    }
+}
+with open('${agent_dir}/openclaw.json', 'w') as f:
+    json.dump(cfg, f, indent=4)
+"
+
+        # auth-profiles.json
+        local provider_id="${PROVIDER}"
+        python3 -c "
+import json
+data = {
+    'version': 1,
+    'profiles': {
+        '${provider_id}': {
+            'type': 'api_key',
+            'provider': '${provider_id}',
+            'key': '${API_KEY}'
+        }
+    }
+}
+with open('${auth_dir}/auth-profiles.json', 'w') as f:
+    json.dump(data, f, indent=2)
+"
+    done
+
+    # Fix permissions
+    chown -R 1000:1000 "${INSTALL_DIR}/data/"
+    chmod -R u+rwX,g+rwX,o-rwx "${INSTALL_DIR}/data/"
+
+    _info "Agent configs created (${AGENT_COUNT} agents)"
+}
+
+_generate_credentials() {
+    local creds_file="${INSTALL_DIR}/${CREDENTIALS_FILE}"
+    _step "Saving credentials..."
+
+    cat > "$creds_file" << CREDS_HEADER
+# ╔══════════════════════════════════════════════════════╗
+# ║  KoalaClaw Credentials                              ║
+# ║  Generated: $(date)              ║
+# ║  KEEP THIS FILE SECURE                              ║
+# ╚══════════════════════════════════════════════════════╝
+
+Server: ${SERVER_IP}
+Model: ${MODEL}
+Provider: ${PROVIDER}
+Install Dir: ${INSTALL_DIR}
+
+CREDS_HEADER
+
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        eval "local token=\${TOKEN_${i}}"
+        cat >> "$creds_file" << CRED_AGENT
+Agent ${i}:
+  URL:   http://${SERVER_IP}:${port}/#token=${token}
+  Token: ${token}
+  Port:  ${port}
+
+CRED_AGENT
+    done
+
+    chmod 600 "$creds_file"
+    _info "Credentials saved to ${creds_file}"
+}
+
+# ═══════════════════════════════════════
+# DEPLOY
+# ═══════════════════════════════════════
+_deploy() {
+    _header "Deploying"
+
+    cd "${INSTALL_DIR}"
+
+    _step "Pulling Docker images..."
+    docker compose pull --quiet 2>&1 | tail -1
+    _info "Images pulled"
+
+    _step "Starting containers..."
+    docker compose up -d 2>&1 | tail -5
+    _info "Containers started"
+
+    _wait_healthy
+    _verify_endpoints
+}
+
+_wait_healthy() {
+    _step "Waiting for healthchecks (up to 90s)..."
+    local timeout=90
+    local elapsed=0
+    local all_healthy=false
+
+    while (( elapsed < timeout )); do
+        local healthy_count=0
+        local total=${AGENT_COUNT}
+
+        for i in $(seq 1 "$AGENT_COUNT"); do
+            local status
+            status=$(docker inspect --format='{{.State.Health.Status}}' "koala-agent-${i}" 2>/dev/null || echo "unknown")
+            if [[ "$status" == "healthy" ]]; then
+                (( healthy_count++ ))
+            fi
+        done
+
+        printf "\r  ${CYAN}⏳${NC} ${healthy_count}/${total} agents healthy (${elapsed}s)"
+
+        if (( healthy_count == total )); then
+            all_healthy=true
+            break
+        fi
+
+        sleep 3
+        (( elapsed += 3 ))
+    done
+    echo ""
+
+    if $all_healthy; then
+        _info "All ${AGENT_COUNT} agents healthy"
+    else
+        _warn "Not all agents became healthy within ${timeout}s"
+        _warn "Check logs: docker compose -f ${INSTALL_DIR}/docker-compose.yml logs"
+    fi
+}
+
+_verify_endpoints() {
+    _step "Verifying endpoints..."
+    local all_ok=true
+
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        local code
+        code=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 5 \
+            "http://127.0.0.1:${port}/__openclaw__/canvas/" 2>/dev/null || echo "000")
+        if [[ "$code" == "200" ]]; then
+            _info "Agent ${i} :${port} → HTTP ${code}"
+        else
+            _error "Agent ${i} :${port} → HTTP ${code}"
+            all_ok=false
+        fi
+    done
+
+    if ! $all_ok; then
+        _warn "Some endpoints failed. Check: docker compose logs"
+    fi
+}
+
+# ═══════════════════════════════════════
+# PRINT SUMMARY
+# ═══════════════════════════════════════
+_print_summary() {
+    echo ""
+    echo -e "  ${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
+    echo -e "  ${BOLD}${GREEN}  ✅ KoalaClaw deployed successfully!${NC}"
+    echo -e "  ${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${BOLD}Access URLs:${NC}"
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        eval "local token=\${TOKEN_${i}}"
+        echo -e "    ${CYAN}Agent ${i}:${NC} http://${SERVER_IP}:${port}/#token=${token}"
+    done
+    echo ""
+    echo -e "  ${DIM}Credentials: ${INSTALL_DIR}/${CREDENTIALS_FILE}${NC}"
+    echo -e "  ${DIM}Model: ${MODEL}${NC}"
+    echo ""
+    echo -e "  ${BOLD}Quick commands:${NC}"
+    echo -e "    ${DIM}koalaclaw status${NC}        # Check health"
+    echo -e "    ${DIM}koalaclaw credentials${NC}   # Show access URLs"
+    echo -e "    ${DIM}koalaclaw logs [N]${NC}      # View agent logs"
+    echo -e "    ${DIM}koalaclaw add-agent${NC}     # Add more agents"
+    echo -e "    ${DIM}koalaclaw backup${NC}        # Backup data"
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# COMMAND: INSTALL
+# ═══════════════════════════════════════
+cmd_install() {
+    _banner
+    _check_root
+
+    # Check existing installation
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    if [[ -f "${INSTALL_DIR}/${STATE_FILE}" ]]; then
+        _warn "Existing KoalaClaw installation found at ${INSTALL_DIR}"
+        echo ""
+        read -rp "  Overwrite? (existing data will be preserved) [y/N]: " overwrite
+        if [[ "${overwrite,,}" != "y" ]]; then
+            _info "Aborting. Use 'koalaclaw update' to update or 'koalaclaw uninstall' to remove."
+            exit 0
+        fi
+        # Stop existing
+        cd "${INSTALL_DIR}" && docker compose down 2>/dev/null || true
+    fi
+
+    _header "Prerequisites"
+    _check_os
+    _install_deps
+    _check_internet
+
+    # ─── Interactive Config ───
+    _header "Configuration"
+
+    # Agent count
+    read -rp "  How many agents? [3]: " AGENT_COUNT
+    AGENT_COUNT="${AGENT_COUNT:-3}"
+    if ! [[ "$AGENT_COUNT" =~ ^[0-9]+$ ]] || (( AGENT_COUNT < 1 || AGENT_COUNT > 50 )); then
+        _error "Agent count must be between 1 and 50"
+        exit 1
+    fi
+
+    # Starting port
+    read -rp "  Starting port? [${DEFAULT_START_PORT}]: " START_PORT
+    START_PORT="${START_PORT:-$DEFAULT_START_PORT}"
+
+    # Install directory
+    read -rp "  Install directory? [${DEFAULT_INSTALL_DIR}]: " INSTALL_DIR
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+
+    # Server IP
+    local detected_ip
+    detected_ip=$(_detect_server_ip)
+    read -rp "  Server IP [${detected_ip}]: " SERVER_IP
+    SERVER_IP="${SERVER_IP:-$detected_ip}"
+
+    # Provider
+    echo ""
+    echo -e "  ${BOLD}AI Provider:${NC}"
+    echo "    1) OpenAI"
+    echo "    2) Anthropic"
+    echo "    3) Custom (OpenAI-compatible)"
+    read -rp "  Choice [1]: " provider_choice
+    provider_choice="${provider_choice:-1}"
+
+    case "$provider_choice" in
+        1) PROVIDER="openai" ;;
+        2) PROVIDER="anthropic" ;;
+        3) PROVIDER="openai" ;;
+        *) PROVIDER="openai" ;;
+    esac
+
+    # API Key
+    echo ""
+    while true; do
+        read -rp "  ${PROVIDER^} API Key: " API_KEY
+        if [[ -z "$API_KEY" ]]; then
+            _error "API key is required"
+            continue
+        fi
+        if _validate_api_key "$PROVIDER" "$API_KEY"; then
+            break
+        fi
+        read -rp "  Try again? [Y/n]: " retry
+        if [[ "${retry,,}" == "n" ]]; then
+            _warn "Continuing with unvalidated key"
+            break
+        fi
+    done
+
+    # Model selection
+    echo ""
+    echo -e "  ${BOLD}Available models:${NC}"
+    _list_models "$PROVIDER" "$API_KEY"
+    echo ""
+    local default_model="openai/gpt-4o"
+    [[ "$PROVIDER" == "anthropic" ]] && default_model="anthropic/claude-sonnet-4-5"
+    read -rp "  Model (full name, e.g. openai/gpt-5.2) [${default_model}]: " MODEL
+    MODEL="${MODEL:-$default_model}"
+
+    # Subnet
+    SUBNET="${DEFAULT_SUBNET}"
+    CADDY_IP="${DEFAULT_CADDY_IP}"
+
+    # ─── Checks ───
+    _header "System Checks"
+    _check_ram
+    _check_disk
+    _check_docker
+    _check_ports
+    _check_subnet
+    _check_firewall
+
+    # ─── Generate ───
+    _header "Generating Configuration"
+
+    mkdir -p "${INSTALL_DIR}"
+    touch "$LOG_FILE" 2>/dev/null || LOG_FILE="${INSTALL_DIR}/install.log"
+
+    # Generate tokens
+    _step "Generating tokens..."
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        eval "TOKEN_${i}=$(openssl rand -hex 32)"
+    done
+    _info "${AGENT_COUNT} tokens generated"
+
+    CREATED_AT="$(date -Iseconds)"
+    _save_state
+    _generate_compose
+    _generate_caddyfile
+    _generate_agent_configs
+    _generate_credentials
+
+    # ─── Deploy ───
+    _deploy
+    _print_summary
+
+    # Symlink for easy access
+    if [[ ! -f /usr/local/bin/koalaclaw ]]; then
+        local script_path
+        script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+        ln -sf "$script_path" /usr/local/bin/koalaclaw 2>/dev/null || true
+    fi
+}
+
+# ═══════════════════════════════════════
+# COMMAND: ADD-AGENT
+# ═══════════════════════════════════════
+cmd_add_agent() {
+    _banner
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    local old_count=$AGENT_COUNT
+    read -rp "  How many agents to add? [1]: " add_count
+    add_count="${add_count:-1}"
+
+    local new_total=$(( old_count + add_count ))
+    echo -e "  ${DIM}Current: ${old_count} agents → New total: ${new_total} agents${NC}"
+    echo ""
+
+    # Same key?
+    read -rp "  Use same API key? [Y/n]: " same_key
+    if [[ "${same_key,,}" == "n" ]]; then
+        read -rp "  New API key: " API_KEY
+        _validate_api_key "$PROVIDER" "$API_KEY" || true
+    fi
+
+    # Same model?
+    read -rp "  Use same model (${MODEL})? [Y/n]: " same_model
+    if [[ "${same_model,,}" == "n" ]]; then
+        read -rp "  New model: " MODEL
+    fi
+
+    # Generate new tokens
+    for i in $(seq $(( old_count + 1 )) "$new_total"); do
+        eval "TOKEN_${i}=$(openssl rand -hex 32)"
+    done
+
+    AGENT_COUNT=$new_total
+    START_PORT="${START_PORT}"
+
+    # Check new ports
+    _check_ports
+    _check_ram
+
+    # Regenerate everything
+    _header "Regenerating Configuration"
+    _save_state
+    _generate_compose
+    _generate_caddyfile
+    _generate_agent_configs
+    _generate_credentials
+
+    # Redeploy
+    _header "Deploying"
+    cd "${INSTALL_DIR}"
+    docker compose up -d 2>&1 | tail -5
+    _wait_healthy
+    _verify_endpoints
+
+    echo ""
+    echo -e "  ${GREEN}✅ ${add_count} agent(s) added (total: ${new_total})${NC}"
+    echo ""
+    for i in $(seq $(( old_count + 1 )) "$new_total"); do
+        local port=$(( START_PORT + i - 1 ))
+        eval "local token=\${TOKEN_${i}}"
+        echo -e "  ${CYAN}Agent ${i}:${NC} http://${SERVER_IP}:${port}/#token=${token}"
+    done
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# COMMAND: REMOVE-AGENT
+# ═══════════════════════════════════════
+cmd_remove_agent() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    local agent_id="${1:-}"
+    if [[ -z "$agent_id" ]]; then
+        read -rp "  Which agent to remove? (1-${AGENT_COUNT}): " agent_id
+    fi
+
+    if (( agent_id < 1 || agent_id > AGENT_COUNT )); then
+        _error "Invalid agent ID. Must be between 1 and ${AGENT_COUNT}."
+        exit 1
+    fi
+
+    if (( AGENT_COUNT <= 1 )); then
+        _error "Cannot remove the last agent. Use 'koalaclaw uninstall' instead."
+        exit 1
+    fi
+
+    local port=$(( START_PORT + agent_id - 1 ))
+    _warn "This will remove Agent ${agent_id} (port ${port})"
+    _warn "Agent data in data/koala-agent-${agent_id}/ will be preserved."
+    read -rp "  Proceed? [y/N]: " confirm
+    if [[ "${confirm,,}" != "y" ]]; then
+        _info "Cancelled."
+        exit 0
+    fi
+
+    # Stop specific agent
+    cd "${INSTALL_DIR}"
+    docker compose stop "koala-agent-${agent_id}" 2>/dev/null || true
+    docker compose rm -f "koala-agent-${agent_id}" 2>/dev/null || true
+
+    # Shift tokens down
+    for i in $(seq "$agent_id" $(( AGENT_COUNT - 1 ))); do
+        local next=$(( i + 1 ))
+        eval "TOKEN_${i}=\${TOKEN_${next}}"
+    done
+    unset "TOKEN_${AGENT_COUNT}"
+
+    AGENT_COUNT=$(( AGENT_COUNT - 1 ))
+
+    # Regenerate
+    _save_state
+    _generate_compose
+    _generate_caddyfile
+    _generate_credentials
+
+    # Redeploy
+    docker compose up -d 2>&1 | tail -3
+    _wait_healthy
+
+    _info "Agent ${agent_id} removed. Remaining: ${AGENT_COUNT} agents."
+}
+
+# ═══════════════════════════════════════
+# COMMAND: STATUS
+# ═══════════════════════════════════════
+cmd_status() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    echo ""
+    echo -e "  ${BOLD}KoalaClaw Status${NC}"
+    echo -e "  ${DIM}────────────────────────────────────────${NC}"
+    echo -e "  Server:  ${SERVER_IP}"
+    echo -e "  Agents:  ${AGENT_COUNT}"
+    echo -e "  Model:   ${MODEL}"
+    echo -e "  Dir:     ${INSTALL_DIR}"
+    echo ""
+
+    cd "${INSTALL_DIR}"
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        local status health
+        status=$(docker inspect --format='{{.State.Status}}' "koala-agent-${i}" 2>/dev/null || echo "not found")
+        health=$(docker inspect --format='{{.State.Health.Status}}' "koala-agent-${i}" 2>/dev/null || echo "unknown")
+
+        local code
+        code=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 3 \
+            "http://127.0.0.1:${port}/__openclaw__/canvas/" 2>/dev/null || echo "000")
+
+        local status_icon="${RED}✗${NC}"
+        [[ "$health" == "healthy" && "$code" == "200" ]] && status_icon="${GREEN}✓${NC}"
+
+        echo -e "  ${status_icon} Agent ${i}  :${port}  container=${status}  health=${health}  http=${code}"
+    done
+
+    # Caddy
+    local caddy_status
+    caddy_status=$(docker inspect --format='{{.State.Status}}' "koala-caddy" 2>/dev/null || echo "not found")
+    echo -e "  ${DIM}  Caddy    container=${caddy_status}${NC}"
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# COMMAND: CREDENTIALS
+# ═══════════════════════════════════════
+cmd_credentials() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    echo ""
+    echo -e "  ${BOLD}KoalaClaw Access URLs${NC}"
+    echo -e "  ${DIM}────────────────────────────────────────${NC}"
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local port=$(( START_PORT + i - 1 ))
+        eval "local token=\${TOKEN_${i}}"
+        echo -e "  ${CYAN}Agent ${i}:${NC} http://${SERVER_IP}:${port}/#token=${token}"
+    done
+    echo ""
+    echo -e "  ${DIM}Full credentials: ${INSTALL_DIR}/${CREDENTIALS_FILE}${NC}"
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# COMMAND: LOGS
+# ═══════════════════════════════════════
+cmd_logs() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+    cd "${INSTALL_DIR}"
+
+    local agent_id="${1:-}"
+    if [[ -n "$agent_id" ]]; then
+        docker compose logs --tail=50 -f "koala-agent-${agent_id}"
+    else
+        docker compose logs --tail=50 -f
+    fi
+}
+
+# ═══════════════════════════════════════
+# COMMAND: UPDATE
+# ═══════════════════════════════════════
+cmd_update() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    _header "Updating KoalaClaw"
+    cd "${INSTALL_DIR}"
+
+    _step "Pulling latest images..."
+    docker compose pull --quiet
+    _info "Images updated"
+
+    _step "Recreating containers..."
+    docker compose up -d --force-recreate 2>&1 | tail -5
+    _wait_healthy
+    _verify_endpoints
+
+    # Version check
+    local oc_version
+    oc_version=$(docker exec koala-agent-1 node openclaw.mjs --version 2>/dev/null || echo "unknown")
+    _info "OpenClaw version: ${oc_version}"
+}
+
+# ═══════════════════════════════════════
+# COMMAND: BACKUP
+# ═══════════════════════════════════════
+cmd_backup() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    local backup_file="${INSTALL_DIR}/koalaclaw-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+
+    _step "Stopping containers..."
+    cd "${INSTALL_DIR}"
+    docker compose stop 2>/dev/null
+
+    _step "Creating backup..."
+    tar czf "$backup_file" \
+        -C "${INSTALL_DIR}" \
+        data/ \
+        "${STATE_FILE}" \
+        "${CREDENTIALS_FILE}" \
+        docker-compose.yml \
+        Caddyfile \
+        2>/dev/null
+
+    _step "Restarting containers..."
+    docker compose start 2>/dev/null
+
+    local size
+    size=$(du -h "$backup_file" | cut -f1)
+    _info "Backup created: ${backup_file} (${size})"
+}
+
+# ═══════════════════════════════════════
+# COMMAND: RESTORE
+# ═══════════════════════════════════════
+cmd_restore() {
+    _check_root
+    local backup_file="${1:-}"
+    if [[ -z "$backup_file" || ! -f "$backup_file" ]]; then
+        _error "Usage: koalaclaw restore <backup-file.tar.gz>"
+        exit 1
+    fi
+
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+
+    _warn "This will overwrite the current installation at ${INSTALL_DIR}"
+    read -rp "  Proceed? [y/N]: " confirm
+    if [[ "${confirm,,}" != "y" ]]; then
+        exit 0
+    fi
+
+    # Stop existing
+    if [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
+        cd "${INSTALL_DIR}" && docker compose down 2>/dev/null || true
+    fi
+
+    _step "Restoring from backup..."
+    mkdir -p "${INSTALL_DIR}"
+    tar xzf "$backup_file" -C "${INSTALL_DIR}"
+    chown -R 1000:1000 "${INSTALL_DIR}/data/"
+
+    _step "Starting containers..."
+    cd "${INSTALL_DIR}"
+    docker compose up -d 2>&1 | tail -5
+
+    _load_state
+    _wait_healthy
+    _verify_endpoints
+
+    _info "Restore complete"
+}
+
+# ═══════════════════════════════════════
+# COMMAND: UNINSTALL
+# ═══════════════════════════════════════
+cmd_uninstall() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        _error "No installation found at ${INSTALL_DIR}"
+        exit 1
+    fi
+
+    _warn "This will remove all KoalaClaw containers and configuration."
+    read -rp "  Also delete agent data? [y/N]: " delete_data
+    read -rp "  Proceed with uninstall? [y/N]: " confirm
+
+    if [[ "${confirm,,}" != "y" ]]; then
+        exit 0
+    fi
+
+    cd "${INSTALL_DIR}"
+    _step "Stopping and removing containers..."
+    docker compose down -v 2>/dev/null || true
+
+    if [[ "${delete_data,,}" == "y" ]]; then
+        _step "Removing all data..."
+        rm -rf "${INSTALL_DIR}"
+        _info "All data removed"
+    else
+        _step "Removing configuration (data preserved)..."
+        rm -f docker-compose.yml Caddyfile "${STATE_FILE}" "${CREDENTIALS_FILE}"
+        _info "Config removed. Agent data preserved at ${INSTALL_DIR}/data/"
+    fi
+
+    rm -f /usr/local/bin/koalaclaw 2>/dev/null || true
+    _info "KoalaClaw uninstalled"
+}
+
+# ═══════════════════════════════════════
+# COMMAND: DRY-RUN
+# ═══════════════════════════════════════
+cmd_dry_run() {
+    echo ""
+    echo -e "  ${BOLD}KoalaClaw Dry Run${NC}"
+    echo -e "  ${DIM}This shows what would happen without making changes.${NC}"
+    echo ""
+    echo "  Would perform:"
+    echo "    1. Check OS, RAM (min ${MIN_RAM_MB}MB), Disk (min ${MIN_DISK_MB}MB)"
+    echo "    2. Install Docker CE + Compose v2 (if missing)"
+    echo "    3. Install curl, openssl, python3 (if missing)"
+    echo "    4. Ask: agent count, port, provider, API key, model"
+    echo "    5. Generate: docker-compose.yml, Caddyfile, openclaw.json per agent"
+    echo "    6. Set file permissions (uid 1000)"
+    echo "    7. Pull images: ${OPENCLAW_IMAGE}, ${CADDY_IMAGE}"
+    echo "    8. Start containers, wait for healthchecks"
+    echo "    9. Verify HTTP 200 on each port"
+    echo "   10. Save credentials to ${DEFAULT_INSTALL_DIR}/${CREDENTIALS_FILE}"
+    echo ""
+    echo "  Estimated disk usage: ~2GB (images) + ~50MB per agent (data)"
+    echo "  Estimated RAM usage: ~400MB per agent + ~50MB for Caddy"
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# USAGE
+# ═══════════════════════════════════════
+_usage() {
+    _banner
+    echo -e "  ${BOLD}Usage:${NC} koalaclaw <command> [options]"
+    echo ""
+    echo -e "  ${BOLD}Commands:${NC}"
+    echo -e "    ${GREEN}install${NC}          Interactive setup (Docker + agents + Caddy)"
+    echo -e "    ${GREEN}add-agent${NC}        Add more agents to existing setup"
+    echo -e "    ${GREEN}remove-agent${NC} ${DIM}[N]${NC} Remove an agent"
+    echo -e "    ${GREEN}status${NC}           Show health of all agents"
+    echo -e "    ${GREEN}credentials${NC}      Show access URLs and tokens"
+    echo -e "    ${GREEN}logs${NC} ${DIM}[N]${NC}         View logs (all or specific agent)"
+    echo -e "    ${GREEN}update${NC}           Pull latest images and restart"
+    echo -e "    ${GREEN}backup${NC}           Create a backup archive"
+    echo -e "    ${GREEN}restore${NC} ${DIM}<file>${NC}  Restore from backup"
+    echo -e "    ${GREEN}uninstall${NC}        Remove everything"
+    echo -e "    ${GREEN}dry-run${NC}          Show what install would do"
+    echo ""
+    echo -e "  ${BOLD}Options:${NC}"
+    echo -e "    ${DIM}--install-dir <path>${NC}  Override install directory"
+    echo -e "    ${DIM}--no-color${NC}            Disable colors"
+    echo -e "    ${DIM}--version${NC}             Show version"
+    echo -e "    ${DIM}--help${NC}                Show this help"
+    echo ""
+    echo -e "  ${BOLD}Examples:${NC}"
+    echo -e "    ${DIM}sudo ./koalaclaw.sh install${NC}"
+    echo -e "    ${DIM}sudo koalaclaw add-agent${NC}"
+    echo -e "    ${DIM}sudo koalaclaw status${NC}"
+    echo -e "    ${DIM}sudo koalaclaw logs 1${NC}"
+    echo ""
+}
+
+# ═══════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════
+main() {
+    # Parse global flags
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --install-dir)
+                INSTALL_DIR="$2"
+                shift 2
+                ;;
+            --no-color)
+                NO_COLOR=1
+                RED='' GREEN='' YELLOW='' BLUE='' CYAN='' WHITE='' DIM='' BOLD='' NC=''
+                shift
+                ;;
+            --version|-v)
+                echo "KoalaClaw v${VERSION}"
+                exit 0
+                ;;
+            --help|-h)
+                _usage
+                exit 0
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        install)        cmd_install "$@" ;;
+        add-agent)      cmd_add_agent "$@" ;;
+        remove-agent)   cmd_remove_agent "$@" ;;
+        status)         cmd_status "$@" ;;
+        credentials)    cmd_credentials "$@" ;;
+        logs)           cmd_logs "$@" ;;
+        update)         cmd_update "$@" ;;
+        backup)         cmd_backup "$@" ;;
+        restore)        cmd_restore "$@" ;;
+        uninstall)      cmd_uninstall "$@" ;;
+        dry-run)        cmd_dry_run "$@" ;;
+        "")             _usage ;;
+        *)
+            _error "Unknown command: ${cmd}"
+            echo ""
+            _usage
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
+
