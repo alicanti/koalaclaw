@@ -719,7 +719,32 @@ _deploy() {
     _info "Containers started"
 
     _wait_healthy
+    _reset_device_identity
     _verify_endpoints
+}
+
+_reset_device_identity() {
+    _step "Resetting device identity for CLI pairing..."
+    # OpenClaw requires device pairing for CLI→Gateway communication.
+    # Stale device identity files cause "pairing required" errors.
+    # Removing them forces a fresh auto-pairing on next local connection.
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        docker exec "koala-agent-${i}" sh -c \
+            "rm -rf /state/identity/device.json /state/devices/ 2>/dev/null" || true
+    done
+
+    # Trigger auto-pairing by connecting once from localhost
+    sleep 2
+    local paired=0
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        eval "local token=\${TOKEN_${i}}"
+        if docker exec "koala-agent-${i}" node openclaw.mjs devices list \
+            --url "ws://127.0.0.1:${INTERNAL_PORT}" \
+            --token "${token}" &>/dev/null; then
+            (( paired++ ))
+        fi
+    done
+    _info "Device pairing: ${paired}/${AGENT_COUNT} agents paired"
 }
 
 _wait_healthy() {
@@ -1005,6 +1030,7 @@ cmd_add_agent() {
     cd "${INSTALL_DIR}"
     docker compose up -d 2>&1 | tail -5
     _wait_healthy
+    _reset_device_identity
     _verify_endpoints
 
     echo ""
@@ -1174,6 +1200,7 @@ cmd_update() {
     _step "Recreating containers..."
     docker compose up -d --force-recreate 2>&1 | tail -5
     _wait_healthy
+    _reset_device_identity
     _verify_endpoints
 
     # Version check

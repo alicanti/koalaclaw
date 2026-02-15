@@ -354,9 +354,25 @@ Each agent needs ~400MB RAM. For 10 agents, ensure at least 5GB RAM.
 | 502 Bad Gateway | Wait 30s for healthchecks. Run `koalaclaw status` |
 | Empty chat responses | Check API billing credits |
 | "device identity required" | Ensure URL has `#token=TOKEN` |
+| "pairing required" | Reset device identity (see below) |
 | "untrusted proxy" | Caddy must have static IP in `trustedProxies` |
 | Port already in use | Choose different starting port during install |
 | Docker pull fails | Check internet / DNS connectivity |
+
+### "pairing required" — CLI commands fail
+
+OpenClaw uses device pairing for CLI→Gateway auth. Stale device files cause this error.
+
+```bash
+# Reset device identity inside the container
+docker exec koala-agent-1 sh -c "rm -rf /state/identity/device.json /state/devices/"
+
+# Re-pair via localhost (auto-approved)
+docker exec koala-agent-1 node openclaw.mjs devices list \
+  --url ws://127.0.0.1:18789 --token <YOUR_TOKEN>
+```
+
+> **Important:** Must connect via `127.0.0.1`, not the Docker network IP. Only localhost connections get auto-approved pairing. KoalaClaw's `install`, `add-agent`, and `update` commands handle this automatically.
 
 For detailed logs:
 ```bash

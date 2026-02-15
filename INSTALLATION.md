@@ -484,7 +484,37 @@ All containers should show `(healthy)`.
 
 ---
 
-## 10. Verify
+## 10. Reset Device Identity (Required)
+
+OpenClaw uses device pairing for CLI→Gateway communication. After a fresh deploy, stale device identity files can cause `"pairing required"` errors that block CLI commands and browser connections.
+
+**Reset device identity and trigger auto-pairing:**
+
+```bash
+for i in 1 2 3; do
+  # Remove stale device identity
+  docker exec koala-agent-$i sh -c "rm -rf /state/identity/device.json /state/devices/"
+  
+  # Trigger auto-pairing via localhost (auto-approved)
+  TOKEN=$(grep "OPENCLAW_GATEWAY_TOKEN" docker-compose.yml | sed -n "${i}p" | cut -d= -f2)
+  docker exec koala-agent-$i node openclaw.mjs devices list \
+    --url ws://127.0.0.1:18789 --token "$TOKEN"
+done
+```
+
+> **Why localhost?** OpenClaw auto-approves pairing requests from `127.0.0.1`. Connections from Docker network IPs (e.g. `172.30.0.11`) are not considered "local" and require manual approval.
+
+Verify pairing works:
+```bash
+docker exec koala-agent-1 node openclaw.mjs gateway status \
+  --url ws://127.0.0.1:18789 --token <TOKEN1>
+```
+
+Expected: `RPC probe: ok`
+
+---
+
+## 11. Verify
 
 ```bash
 # HTTP endpoint test
@@ -498,7 +528,7 @@ Expected output: `HTTP 200` for each port.
 
 ---
 
-## 11. Browser Access
+## 12. Browser Access
 
 Access the Control UI by passing the token in the URL hash:
 
@@ -786,6 +816,17 @@ sudo bash setup.sh
 - `trustedProxies` must contain Caddy's **exact IP** (not a CIDR range): `["172.30.0.100"]`
 - Static IP must be assigned in the Docker network config.
 
+### "pairing required"
+CLI commands (`gateway status`, `devices list`, `cron`) fail with `"pairing required"`.
+- **Cause:** Stale device identity files from a previous session.
+- **Fix:** Reset device identity and re-pair via localhost:
+  ```bash
+  docker exec koala-agent-1 sh -c "rm -rf /state/identity/device.json /state/devices/"
+  docker exec koala-agent-1 node openclaw.mjs devices list \
+    --url ws://127.0.0.1:18789 --token <TOKEN>
+  ```
+- Must connect via `127.0.0.1` (not Docker network IP) for auto-approve to work.
+
 ### "No API key found"
 - `OPENAI_API_KEY` environment variable must be set in docker-compose.yml.
 - `auth-profiles.json` must use the correct format (version + profiles + type + provider + key).
@@ -825,6 +866,8 @@ docker compose up -d
 4. **Tokens are passed via URL hash:** `http://IP:PORT/#token=TOKEN`. The hash fragment is never sent to the server — only the browser JavaScript reads it for WebSocket authentication.
 
 5. **Caddy `header_up Authorization`** works for HTTP requests only. WebSocket authentication is handled client-side by the browser JavaScript using the `#token=` URL hash.
+
+6. **Device identity must be reset after fresh deploy.** OpenClaw generates a device keypair on first CLI connection. Stale files from previous sessions cause `"pairing required"` errors. Always delete `/state/identity/device.json` and `/state/devices/` after deploying, then reconnect via `ws://127.0.0.1:18789` (localhost) to trigger auto-pairing.
 
 ---
 
