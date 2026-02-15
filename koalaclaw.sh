@@ -1345,6 +1345,376 @@ cmd_dry_run() {
 }
 
 # ═══════════════════════════════════════
+# COMMAND: SKILLS
+# ═══════════════════════════════════════
+_get_agent_token() {
+    local agent_id="$1"
+    eval "echo \${TOKEN_${agent_id}}"
+}
+
+_exec_openclaw() {
+    local agent_id="$1"
+    shift
+    local token
+    token=$(_get_agent_token "$agent_id")
+    docker exec "koala-agent-${agent_id}" node openclaw.mjs "$@" \
+        --url "ws://127.0.0.1:${INTERNAL_PORT}" \
+        --token "${token}" 2>&1
+}
+
+cmd_skills() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    local subcmd="${1:-}"
+    shift || true
+
+    case "$subcmd" in
+        list)       cmd_skills_list "$@" ;;
+        status)     cmd_skills_status "$@" ;;
+        enable)     cmd_skills_enable "$@" ;;
+        disable)    cmd_skills_disable "$@" ;;
+        add)        cmd_skills_add "$@" ;;
+        remove)     cmd_skills_remove "$@" ;;
+        ""|--help)  cmd_skills_help ;;
+        *)
+            _error "Unknown skills command: ${subcmd}"
+            cmd_skills_help
+            exit 1
+            ;;
+    esac
+}
+
+cmd_skills_help() {
+    echo ""
+    echo -e "  ${BOLD}Usage:${NC} koalaclaw skills <command> [options]"
+    echo ""
+    echo -e "  ${BOLD}Commands:${NC}"
+    echo -e "    ${GREEN}list${NC}                          List all available bundled skills"
+    echo -e "    ${GREEN}status${NC} ${DIM}[agent-id]${NC}             Show enabled skills per agent"
+    echo -e "    ${GREEN}enable${NC} ${DIM}<skill> [agent-id]${NC}     Enable a skill (all agents or specific)"
+    echo -e "    ${GREEN}disable${NC} ${DIM}<skill> [agent-id]${NC}    Disable a skill"
+    echo -e "    ${GREEN}add${NC} ${DIM}<path> [agent-id]${NC}         Add a custom skill from a directory"
+    echo -e "    ${GREEN}remove${NC} ${DIM}<skill> [agent-id]${NC}     Remove a custom skill"
+    echo ""
+    echo -e "  ${BOLD}Examples:${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills list${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills enable github${NC}        ${DIM}# all agents${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills enable weather 2${NC}     ${DIM}# agent 2 only${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills disable coding-agent${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills add ./my-skill${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills status${NC}"
+    echo ""
+}
+
+cmd_skills_list() {
+    echo ""
+    echo -e "  ${BOLD}Available Bundled Skills${NC}"
+    echo -e "  ${DIM}────────────────────────────────────────${NC}"
+
+    # Get skill list from container
+    local skills
+    skills=$(docker exec koala-agent-1 ls /app/skills/ 2>/dev/null)
+
+    if [[ -z "$skills" ]]; then
+        _error "Cannot read skills from container"
+        return
+    fi
+
+    # Categorize skills
+    local -A categories
+    categories=(
+        ["Productivity"]="apple-notes apple-reminders bear-notes notion obsidian things-mac trello"
+        ["Coding"]="coding-agent github skill-creator"
+        ["Communication"]="discord slack imsg voice-call"
+        ["Media"]="openai-image-gen openai-whisper openai-whisper-api spotify-player songsee video-frames camsnap gifgrep"
+        ["AI / Models"]="gemini oracle summarize model-usage clawhub"
+        ["Browser / Web"]="canvas peekaboo blogwatcher"
+        ["System"]="tmux healthcheck session-logs weather nano-pdf"
+        ["Smart Home"]="openhue sonoscli"
+        ["Security"]="1password"
+        ["Other"]="food-order gog goplaces himalaya mcporter nano-banana-pro ordercli sag eightctl blucli bluebubbles sherpa-onnx-tts songsee wacli"
+    )
+
+    for category in "Productivity" "Coding" "Communication" "Media" "AI / Models" "Browser / Web" "System" "Smart Home" "Security" "Other"; do
+        echo ""
+        echo -e "  ${CYAN}${category}:${NC}"
+        for skill in ${categories[$category]}; do
+            if echo "$skills" | grep -q "^${skill}$"; then
+                # Read emoji from SKILL.md
+                local emoji
+                emoji=$(docker exec koala-agent-1 sh -c "grep -o '\"emoji\": \"[^\"]*\"' /app/skills/${skill}/SKILL.md 2>/dev/null | head -1 | cut -d'\"' -f4")
+                emoji="${emoji:-📦}"
+                local desc
+                desc=$(docker exec koala-agent-1 sh -c "grep '^description:' /app/skills/${skill}/SKILL.md 2>/dev/null | head -1 | sed 's/description: //' | sed 's/\"//g' | head -c 60")
+                desc="${desc:-No description}"
+                echo -e "    ${emoji}  ${WHITE}${skill}${NC}  ${DIM}${desc}${NC}"
+            fi
+        done
+    done
+    echo ""
+
+    # Count
+    local count
+    count=$(echo "$skills" | wc -l | tr -d ' ')
+    echo -e "  ${DIM}Total: ${count} bundled skills${NC}"
+    echo ""
+}
+
+cmd_skills_status() {
+    local agent_id="${1:-}"
+
+    echo ""
+    echo -e "  ${BOLD}Skills Status${NC}"
+    echo -e "  ${DIM}────────────────────────────────────────${NC}"
+
+    local agents_to_check
+    if [[ -n "$agent_id" ]]; then
+        agents_to_check="$agent_id"
+    else
+        agents_to_check=$(seq 1 "$AGENT_COUNT")
+    fi
+
+    for i in $agents_to_check; do
+        echo ""
+        echo -e "  ${CYAN}Agent ${i}:${NC}"
+
+        # Get enabled skills from config
+        local config_skills
+        config_skills=$(docker exec "koala-agent-${i}" python3 -c "
+import json
+try:
+    cfg = json.load(open('/state/openclaw.json'))
+    skills = cfg.get('skills', {}).get('entries', {})
+    ab = cfg.get('skills', {}).get('allowBundled', [])
+    if skills:
+        for name, conf in skills.items():
+            status = 'enabled' if conf.get('enabled', True) else 'disabled'
+            print(f'  {name}: {status}')
+    elif ab:
+        for name in ab:
+            print(f'  {name}: allowed')
+    else:
+        print('  (all bundled skills available, none explicitly configured)')
+except Exception as e:
+    print(f'  Error: {e}')
+" 2>/dev/null)
+        echo "$config_skills"
+
+        # Check workspace custom skills
+        local custom
+        custom=$(docker exec "koala-agent-${i}" sh -c \
+            "find /home/node/.openclaw/workspace/skills -name SKILL.md 2>/dev/null | head -10")
+        if [[ -n "$custom" ]]; then
+            echo -e "    ${GREEN}Custom skills:${NC}"
+            echo "$custom" | while read -r path; do
+                local name
+                name=$(basename "$(dirname "$path")")
+                echo -e "      📝 ${name}"
+            done
+        fi
+    done
+    echo ""
+}
+
+cmd_skills_enable() {
+    local skill_name="${1:-}"
+    local agent_id="${2:-}"
+
+    if [[ -z "$skill_name" ]]; then
+        _error "Usage: koalaclaw skills enable <skill-name> [agent-id]"
+        exit 1
+    fi
+
+    # Verify skill exists
+    if ! docker exec koala-agent-1 test -d "/app/skills/${skill_name}" 2>/dev/null; then
+        _error "Skill '${skill_name}' not found in bundled skills"
+        _step "Run 'koalaclaw skills list' to see available skills"
+        exit 1
+    fi
+
+    local agents_to_update
+    if [[ -n "$agent_id" ]]; then
+        agents_to_update="$agent_id"
+        _step "Enabling '${skill_name}' on agent ${agent_id}..."
+    else
+        agents_to_update=$(seq 1 "$AGENT_COUNT")
+        _step "Enabling '${skill_name}' on all ${AGENT_COUNT} agents..."
+    fi
+
+    for i in $agents_to_update; do
+        docker exec "koala-agent-${i}" python3 -c "
+import json
+path = '/state/openclaw.json'
+with open(path) as f:
+    cfg = json.load(f)
+if 'skills' not in cfg:
+    cfg['skills'] = {}
+if 'entries' not in cfg['skills']:
+    cfg['skills']['entries'] = {}
+cfg['skills']['entries']['${skill_name}'] = {'enabled': True}
+with open(path, 'w') as f:
+    json.dump(cfg, f, indent=4)
+" 2>/dev/null
+        _info "Agent ${i}: '${skill_name}' enabled"
+    done
+    echo ""
+}
+
+cmd_skills_disable() {
+    local skill_name="${1:-}"
+    local agent_id="${2:-}"
+
+    if [[ -z "$skill_name" ]]; then
+        _error "Usage: koalaclaw skills disable <skill-name> [agent-id]"
+        exit 1
+    fi
+
+    local agents_to_update
+    if [[ -n "$agent_id" ]]; then
+        agents_to_update="$agent_id"
+        _step "Disabling '${skill_name}' on agent ${agent_id}..."
+    else
+        agents_to_update=$(seq 1 "$AGENT_COUNT")
+        _step "Disabling '${skill_name}' on all ${AGENT_COUNT} agents..."
+    fi
+
+    for i in $agents_to_update; do
+        docker exec "koala-agent-${i}" python3 -c "
+import json
+path = '/state/openclaw.json'
+with open(path) as f:
+    cfg = json.load(f)
+if 'skills' not in cfg:
+    cfg['skills'] = {}
+if 'entries' not in cfg['skills']:
+    cfg['skills']['entries'] = {}
+cfg['skills']['entries']['${skill_name}'] = {'enabled': False}
+with open(path, 'w') as f:
+    json.dump(cfg, f, indent=4)
+" 2>/dev/null
+        _info "Agent ${i}: '${skill_name}' disabled"
+    done
+    echo ""
+}
+
+cmd_skills_add() {
+    local skill_path="${1:-}"
+    local agent_id="${2:-}"
+
+    if [[ -z "$skill_path" ]]; then
+        _error "Usage: koalaclaw skills add <path-to-skill-dir> [agent-id]"
+        _step "The directory must contain a SKILL.md file"
+        exit 1
+    fi
+
+    # Validate
+    if [[ ! -d "$skill_path" ]]; then
+        _error "Directory not found: ${skill_path}"
+        exit 1
+    fi
+    if [[ ! -f "${skill_path}/SKILL.md" ]]; then
+        _error "No SKILL.md found in ${skill_path}"
+        _step "A skill directory must contain a SKILL.md file"
+        _step "See: https://docs.openclaw.ai/skills"
+        exit 1
+    fi
+
+    local skill_name
+    skill_name=$(basename "$skill_path")
+
+    local agents_to_update
+    if [[ -n "$agent_id" ]]; then
+        agents_to_update="$agent_id"
+    else
+        agents_to_update=$(seq 1 "$AGENT_COUNT")
+    fi
+
+    _step "Adding custom skill '${skill_name}'..."
+
+    for i in $agents_to_update; do
+        # Copy skill to workspace
+        local ws_skills="/home/node/.openclaw/workspace/skills"
+        docker exec "koala-agent-${i}" mkdir -p "${ws_skills}/${skill_name}" 2>/dev/null
+
+        # Copy files into container
+        docker cp "${skill_path}/." "koala-agent-${i}:${ws_skills}/${skill_name}/"
+        docker exec "koala-agent-${i}" chown -R node:node "${ws_skills}/${skill_name}" 2>/dev/null
+
+        # Also add extraDirs to config if not present
+        docker exec "koala-agent-${i}" python3 -c "
+import json
+path = '/state/openclaw.json'
+with open(path) as f:
+    cfg = json.load(f)
+if 'skills' not in cfg:
+    cfg['skills'] = {}
+if 'load' not in cfg['skills']:
+    cfg['skills']['load'] = {}
+dirs = cfg['skills']['load'].get('extraDirs', [])
+ws = '/home/node/.openclaw/workspace/skills'
+if ws not in dirs:
+    dirs.append(ws)
+    cfg['skills']['load']['extraDirs'] = dirs
+if 'entries' not in cfg['skills']:
+    cfg['skills']['entries'] = {}
+cfg['skills']['entries']['${skill_name}'] = {'enabled': True}
+with open(path, 'w') as f:
+    json.dump(cfg, f, indent=4)
+" 2>/dev/null
+
+        _info "Agent ${i}: custom skill '${skill_name}' added"
+    done
+    echo ""
+}
+
+cmd_skills_remove() {
+    local skill_name="${1:-}"
+    local agent_id="${2:-}"
+
+    if [[ -z "$skill_name" ]]; then
+        _error "Usage: koalaclaw skills remove <skill-name> [agent-id]"
+        exit 1
+    fi
+
+    local agents_to_update
+    if [[ -n "$agent_id" ]]; then
+        agents_to_update="$agent_id"
+    else
+        agents_to_update=$(seq 1 "$AGENT_COUNT")
+    fi
+
+    _warn "This will remove custom skill '${skill_name}' from workspace"
+    read -rp "  Proceed? [y/N]: " confirm
+    if [[ "${confirm,,}" != "y" ]]; then
+        exit 0
+    fi
+
+    for i in $agents_to_update; do
+        local ws_skill="/home/node/.openclaw/workspace/skills/${skill_name}"
+        docker exec "koala-agent-${i}" rm -rf "${ws_skill}" 2>/dev/null
+
+        # Disable in config
+        docker exec "koala-agent-${i}" python3 -c "
+import json
+path = '/state/openclaw.json'
+with open(path) as f:
+    cfg = json.load(f)
+entries = cfg.get('skills', {}).get('entries', {})
+if '${skill_name}' in entries:
+    del entries['${skill_name}']
+    cfg['skills']['entries'] = entries
+    with open(path, 'w') as f:
+        json.dump(cfg, f, indent=4)
+" 2>/dev/null
+
+        _info "Agent ${i}: '${skill_name}' removed"
+    done
+    echo ""
+}
+
+# ═══════════════════════════════════════
 # USAGE
 # ═══════════════════════════════════════
 _usage() {
@@ -1357,6 +1727,7 @@ _usage() {
     echo -e "    ${GREEN}remove-agent${NC} ${DIM}[N]${NC} Remove an agent"
     echo -e "    ${GREEN}status${NC}           Show health of all agents"
     echo -e "    ${GREEN}credentials${NC}      Show access URLs and tokens"
+    echo -e "    ${GREEN}skills${NC}           Manage agent skills (list/enable/disable/add)"
     echo -e "    ${GREEN}logs${NC} ${DIM}[N]${NC}         View logs (all or specific agent)"
     echo -e "    ${GREEN}update${NC}           Pull latest images and restart"
     echo -e "    ${GREEN}backup${NC}           Create a backup archive"
@@ -1374,6 +1745,8 @@ _usage() {
     echo -e "    ${DIM}sudo ./koalaclaw.sh install${NC}"
     echo -e "    ${DIM}sudo koalaclaw add-agent${NC}"
     echo -e "    ${DIM}sudo koalaclaw status${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills list${NC}"
+    echo -e "    ${DIM}sudo koalaclaw skills enable github${NC}"
     echo -e "    ${DIM}sudo koalaclaw logs 1${NC}"
     echo ""
 }
@@ -1417,6 +1790,7 @@ main() {
         remove-agent)   cmd_remove_agent "$@" ;;
         status)         cmd_status "$@" ;;
         credentials)    cmd_credentials "$@" ;;
+        skills)         cmd_skills "$@" ;;
         logs)           cmd_logs "$@" ;;
         update)         cmd_update "$@" ;;
         backup)         cmd_backup "$@" ;;

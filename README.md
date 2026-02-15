@@ -120,6 +120,12 @@ Internet / LAN
 | `remove-agent [N]` | Remove a specific agent |
 | `status` | Show health of all agents |
 | `credentials` | Display access URLs and tokens |
+| `skills list` | List all 50+ available bundled skills |
+| `skills enable <name>` | Enable a skill on all or specific agent |
+| `skills disable <name>` | Disable a skill |
+| `skills add <path>` | Add a custom skill from a directory |
+| `skills remove <name>` | Remove a custom skill |
+| `skills status` | Show enabled skills per agent |
 | `logs [N]` | View logs (all agents or specific) |
 | `update` | Pull latest OpenClaw images and restart |
 | `backup` | Create a backup archive |
@@ -138,6 +144,18 @@ sudo koalaclaw status
 
 # Add 2 more agents
 sudo koalaclaw add-agent
+
+# List available skills
+sudo koalaclaw skills list
+
+# Enable GitHub skill on all agents
+sudo koalaclaw skills enable github
+
+# Enable weather skill on agent 2 only
+sudo koalaclaw skills enable weather 2
+
+# Add a custom skill
+sudo koalaclaw skills add ./my-custom-skill
 
 # View agent 1 logs
 sudo koalaclaw logs 1
@@ -270,6 +288,47 @@ Connect agents to messaging platforms:
 
 ### Skills (50+)
 Built-in capabilities including: `coding-agent`, `github`, `notion`, `trello`, `openai-image-gen`, `weather`, `spotify-player`, `voice-call`, `1password`, and more.
+
+```bash
+# List all available skills
+sudo koalaclaw skills list
+
+# Enable/disable per agent
+sudo koalaclaw skills enable github
+sudo koalaclaw skills disable coding-agent 2
+```
+
+### Custom Skills
+
+Create your own skill — just a folder with a `SKILL.md`:
+
+```
+my-skill/
+└── SKILL.md
+```
+
+```markdown
+---
+name: my-skill
+description: "My custom skill for doing cool things"
+metadata: { "openclaw": { "emoji": "🚀" } }
+---
+
+# My Skill
+
+Instructions for the AI agent on how to use this skill.
+
+## Example
+
+\`\`\`bash
+curl -s https://api.example.com/data
+\`\`\`
+```
+
+```bash
+# Add to all agents
+sudo koalaclaw skills add ./my-skill
+```
 
 ### Browser Automation
 Headless Chrome for web scraping, screenshots, form filling, and more.
