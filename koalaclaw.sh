@@ -123,7 +123,9 @@ _list_roles() {
         fi
     done
     
-    printf '%s\n' "${roles[@]}" | sort
+    if (( ${#roles[@]} > 0 )); then
+        printf '%s\n' "${roles[@]}" | sort
+    fi
 }
 
 _get_role_info() {
@@ -137,15 +139,16 @@ _get_role_info() {
         role_dir="${REPO_DIR:-${INSTALL_DIR:-/opt/koalaclaw}/repo}/roles/${role}"
     fi
     if [[ ! -f "${role_dir}/IDENTITY.md" ]]; then
-        return 1
+        echo "🐨 ${role}"
+        return 0
     fi
     
     # Extract name and emoji from IDENTITY.md
     local name emoji
-    name=$(grep -E "^\\*\\*Name:\\*\\*" "${role_dir}/IDENTITY.md" | sed 's/.*\*\*Name:\*\* //' | head -1)
-    emoji=$(grep -E "^\\*\\*Emoji:\\*\\*" "${role_dir}/IDENTITY.md" | sed 's/.*\*\*Emoji:\*\* //' | head -1)
+    name=$(grep -E "^\*\*Name:\*\*" "${role_dir}/IDENTITY.md" 2>/dev/null | sed 's/.*\*\*Name:\*\* //' | head -1)
+    emoji=$(grep -E "^\*\*Emoji:\*\*" "${role_dir}/IDENTITY.md" 2>/dev/null | sed 's/.*\*\*Emoji:\*\* //' | head -1)
     
-    echo "${emoji} ${name}"
+    echo "${emoji:-🐨} ${name:-${role}}"
 }
 
 _select_role() {
@@ -162,7 +165,7 @@ _select_role() {
         roles_dir="${REPO_DIR:-${INSTALL_DIR:-/opt/koalaclaw}/repo}/roles"
     fi
     if [[ ! -d "$roles_dir" ]]; then
-        _warn "Roles directory not found. Using default role."
+        _warn "Roles directory not found. Using default role." >&2
         echo "coder-koala"
         return 0
     fi
@@ -171,21 +174,22 @@ _select_role() {
     mapfile -t roles < <(_list_roles)
     
     if (( ${#roles[@]} == 0 )); then
-        _warn "No roles found. Using default role."
+        _warn "No roles found. Using default role." >&2
         echo "coder-koala"
         return 0
     fi
     
-    echo ""
-    echo -e "  ${BOLD}${prompt_text}:${NC}"
+    # Print menu to stderr so it doesn't pollute stdout (which is the return value)
+    echo "" >&2
+    echo -e "  ${BOLD}${prompt_text}:${NC}" >&2
     local idx=1
     for role in "${roles[@]}"; do
         local info
         info=$(_get_role_info "$role")
-        printf "    %2d) %s\n" "$idx" "$info"
+        printf "    %2d) %s\n" "$idx" "$info" >&2
         (( idx++ ))
     done
-    echo ""
+    echo "" >&2
     
     while true; do
         read -rp "  Choice [1]: " choice
@@ -194,7 +198,7 @@ _select_role() {
             echo "${roles[$((choice - 1))]}"
             return 0
         fi
-        _error "Invalid choice. Enter a number between 1 and ${#roles[@]}"
+        _error "Invalid choice. Enter a number between 1 and ${#roles[@]}" >&2
     done
 }
 
@@ -358,6 +362,7 @@ _check_disk() {
 _check_ports() {
     _step "Checking port availability..."
     local conflict=false
+    # Check agent ports
     for i in $(seq 0 $(( AGENT_COUNT - 1 ))); do
         local port=$(( START_PORT + i ))
         if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
@@ -366,11 +371,17 @@ _check_ports() {
             conflict=true
         fi
     done
+    # Check admin API port
+    if ss -tlnp 2>/dev/null | grep -q ":${ADMIN_API_PORT} " || \
+       netstat -tlnp 2>/dev/null | grep -q ":${ADMIN_API_PORT} "; then
+        _error "Port ${ADMIN_API_PORT} (Web UI) is already in use"
+        conflict=true
+    fi
     if $conflict; then
         _error "Free the conflicting ports or choose a different starting port."
         exit 1
     fi
-    _info "Ports ${START_PORT}-$(( START_PORT + AGENT_COUNT - 1 )) available"
+    _info "Ports ${START_PORT}-$(( START_PORT + AGENT_COUNT - 1 )) + ${ADMIN_API_PORT} available"
 }
 
 _check_subnet() {
@@ -509,30 +520,45 @@ _clone_repo() {
 
     # Check if git is available
     if ! command -v git &>/dev/null; then
+        _step "Installing git..."
+        apt-get update -qq 2>/dev/null
         apt-get install -y -qq git >/dev/null 2>&1
     fi
 
     if [[ -d "${REPO_DIR}/.git" ]]; then
         _step "Updating existing repo..."
-        cd "${REPO_DIR}" && git pull --quiet 2>/dev/null || true
+        cd "${REPO_DIR}"
+        git pull --quiet 2>/dev/null || _warn "Git pull failed, using existing files"
         cd "${INSTALL_DIR}"
     else
         _step "Cloning KoalaClaw repo..."
         rm -rf "${REPO_DIR}" 2>/dev/null
-        git clone --depth 1 "${GITHUB_REPO}" "${REPO_DIR}" 2>/dev/null
+        if git clone --depth 1 "${GITHUB_REPO}" "${REPO_DIR}" 2>&1 | tail -2; then
+            _info "Repo cloned successfully"
+        else
+            _warn "Git clone failed, trying tarball download..."
+        fi
     fi
 
+    # Fallback: download tarball if git clone failed
     if [[ ! -d "${REPO_DIR}/roles" ]]; then
-        _warn "Repo clone failed. Trying direct download..."
+        _step "Downloading via tarball..."
         mkdir -p "${REPO_DIR}"
-        curl -fsSL "https://github.com/alicanti/koalaclaw/archive/refs/heads/main.tar.gz" \
-            | tar xz --strip-components=1 -C "${REPO_DIR}" 2>/dev/null
+        if curl -fsSL "https://github.com/alicanti/koalaclaw/archive/refs/heads/main.tar.gz" \
+            | tar xz --strip-components=1 -C "${REPO_DIR}" 2>/dev/null; then
+            _info "Tarball downloaded successfully"
+        else
+            _warn "Tarball download also failed"
+        fi
     fi
 
     if [[ -d "${REPO_DIR}/roles" ]]; then
-        _info "Platform files ready (${REPO_DIR})"
+        local role_count
+        role_count=$(ls -d "${REPO_DIR}/roles/"*/ 2>/dev/null | wc -l)
+        _info "Platform files ready: ${role_count} roles, UI, skills, workflows"
     else
         _warn "Could not download platform files. Roles and Web UI will not be available."
+        _warn "You can manually clone: git clone ${GITHUB_REPO} ${REPO_DIR}"
     fi
 }
 
@@ -587,19 +613,39 @@ UIEOF
 _install_deps() {
     _step "Checking dependencies..."
     local missing=()
+    local apt_packages=()
+    
     for cmd in curl openssl python3 git; do
         if ! command -v "$cmd" &>/dev/null; then
             missing+=("$cmd")
+            # Map command names to apt package names
+            case "$cmd" in
+                python3) apt_packages+=("python3") ;;
+                *)       apt_packages+=("$cmd") ;;
+            esac
         fi
     done
     if ! command -v ss &>/dev/null && ! command -v netstat &>/dev/null; then
-        missing+=("iproute2")
+        missing+=("ss")
+        apt_packages+=("iproute2")
     fi
 
     if (( ${#missing[@]} > 0 )); then
         _step "Installing: ${missing[*]}"
-        apt-get update -qq
-        apt-get install -y -qq "${missing[@]}" >/dev/null 2>&1
+        apt-get update -qq 2>/dev/null
+        apt-get install -y -qq "${apt_packages[@]}" >/dev/null 2>&1
+        # Verify
+        local still_missing=false
+        for cmd in curl openssl python3 git; do
+            if ! command -v "$cmd" &>/dev/null; then
+                _error "Failed to install: $cmd"
+                still_missing=true
+            fi
+        done
+        if $still_missing; then
+            _error "Some dependencies could not be installed. Check apt sources."
+            exit 1
+        fi
         _info "Dependencies installed"
     else
         _info "All dependencies present"
@@ -844,8 +890,8 @@ _generate_agent_configs() {
 
         mkdir -p "$auth_dir"
         
-        # Apply role to agent
-        _apply_role_to_agent "$i" "$role"
+        # Apply role to agent (non-fatal if role not found)
+        _apply_role_to_agent "$i" "$role" || true
 
         # openclaw.json
         local cdp_port=$(( 18792 + i - 1 ))
@@ -1242,14 +1288,12 @@ cmd_install() {
     _install_deps
     _check_internet
 
-    # ─── Clone Repo (roles, ui, admin-api) ───
-    _header "Platform Files"
-    mkdir -p "${INSTALL_DIR}"
-    REPO_DIR="${INSTALL_DIR}/repo"
-    _clone_repo
-
     # ─── Interactive Config ───
     _header "Configuration"
+
+    # Install directory (ask first so we can clone repo there)
+    read -rp "  Install directory? [${DEFAULT_INSTALL_DIR}]: " INSTALL_DIR
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 
     # Agent count
     read -rp "  How many agents? [3]: " AGENT_COUNT
@@ -1262,10 +1306,6 @@ cmd_install() {
     # Starting port
     read -rp "  Starting port? [${DEFAULT_START_PORT}]: " START_PORT
     START_PORT="${START_PORT:-$DEFAULT_START_PORT}"
-
-    # Install directory
-    read -rp "  Install directory? [${DEFAULT_INSTALL_DIR}]: " INSTALL_DIR
-    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 
     # Server IP
     local detected_ip
@@ -1330,10 +1370,15 @@ cmd_install() {
     _check_subnet
     _check_firewall
 
+    # ─── Clone Repo (roles, ui, admin-api) ───
+    _header "Platform Files"
+    mkdir -p "${INSTALL_DIR}"
+    REPO_DIR="${INSTALL_DIR}/repo"
+    _clone_repo
+
     # ─── Generate ───
     _header "Generating Configuration"
 
-    mkdir -p "${INSTALL_DIR}"
     touch "$LOG_FILE" 2>/dev/null || LOG_FILE="${INSTALL_DIR}/install.log"
 
     # Generate tokens and select roles
