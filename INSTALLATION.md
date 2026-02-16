@@ -1,6 +1,41 @@
-# OpenClaw Multi-Agent Setup Guide
+# KoalaClaw Installation Guide
 
-> Deploy 3 isolated OpenClaw agents behind a Caddy reverse proxy on a fresh Ubuntu 24.04 server.
+> Deploy N specialized AI agents with an isometric office Web UI on a fresh Ubuntu 24.04 server.
+> Includes 19 agent roles, workflow pipelines, monitoring, and gamification.
+
+## Quick Install (Automated)
+
+The fastest way to install KoalaClaw on a fresh Ubuntu server:
+
+```bash
+# Download the installer
+curl -fsSL https://raw.githubusercontent.com/alicanti/koalaclaw/main/koalaclaw.sh -o koalaclaw.sh
+chmod +x koalaclaw.sh
+
+# Run interactive install (handles everything)
+sudo ./koalaclaw.sh install
+```
+
+The installer will:
+1. Check system requirements (OS, RAM, disk, ports)
+2. Install Docker CE + Compose v2 if missing
+3. Ask how many agents you want (1-50)
+4. Let you select a role for each agent (19 roles available)
+5. Ask for your AI provider and API key
+6. Validate the key and list available models
+7. Generate all config files, tokens, and deploy
+8. Set up the Web UI on port 3099
+
+After install, start the Web UI:
+```bash
+cd /opt/koalaclaw
+python3 admin-api.py &
+# Open http://SERVER_IP:3099 in your browser
+```
+
+## Manual Install (Step by Step)
+
+If you prefer to set things up manually, follow the sections below.
 
 ## Architecture
 
@@ -1595,3 +1630,200 @@ docker compose logs --tail=100 koala-agent-1
 # OpenClaw internal log file (inside container)
 docker exec koala-agent-1 cat /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
 ```
+
+---
+
+## Web UI Setup
+
+KoalaClaw includes a web-based management dashboard.
+
+### Prerequisites
+
+- Python 3.8+ (usually pre-installed on Ubuntu 24.04)
+- The KoalaClaw repo files (`ui/`, `roles/`, `admin-api.py`)
+
+### Installation
+
+```bash
+# Clone the repo (or copy files to server)
+git clone https://github.com/alicanti/koalaclaw.git /opt/koalaclaw-ui
+cd /opt/koalaclaw-ui
+
+# Start the Admin API (serves UI + REST API on port 3099)
+python3 admin-api.py &
+
+# Open in browser
+# http://SERVER_IP:3099
+```
+
+### What the Web UI Provides
+
+| Feature | Description |
+|---------|-------------|
+| Isometric Office | Visual representation of all agents at their desks |
+| Admin Panel | Agent list, status, skill toggles, quick actions |
+| Chat Bar | Send messages to any agent with streaming responses |
+| Live Logs | Real-time, color-coded, filterable log stream |
+| Workflows | Chain agents together (Blog Post, Product Launch, etc.) |
+| Monitoring | CPU/RAM metrics, alert thresholds, cron jobs |
+| Gamification | XP, levels (1-50), achievements, leaderboard, cosmetics |
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | System status (online agents, model, version) |
+| `/api/agents` | GET | All agents with live container status |
+| `/api/agents/{id}/logs` | GET | Recent logs for an agent |
+| `/api/roles` | GET | All 19 available roles |
+| `/api/stats` | GET | Docker container resource usage |
+| `/api/config` | GET | System configuration (safe, no secrets) |
+| `/api/agents/chat` | POST | Send a message to an agent |
+
+### Running as a Service
+
+To keep the Web UI running after logout:
+
+```bash
+# Create systemd service
+cat > /etc/systemd/system/koalaclaw-ui.service << 'EOF'
+[Unit]
+Description=KoalaClaw Web UI
+After=network.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/koalaclaw-ui
+ExecStart=/usr/bin/python3 admin-api.py
+Restart=always
+User=root
+Environment=KOALACLAW_INSTALL_DIR=/opt/koalaclaw
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now koalaclaw-ui
+```
+
+### Firewall
+
+If UFW is active, open port 3099:
+
+```bash
+sudo ufw allow 3099/tcp
+```
+
+---
+
+## Agent Roles
+
+KoalaClaw includes 19 pre-built agent roles. During installation, you select a role for each agent.
+
+### Role Files
+
+Each role is defined in `roles/<role-name>/`:
+
+| File | Purpose |
+|------|---------|
+| `IDENTITY.md` | Name, emoji, personality, speaking style |
+| `SOUL.md` | Mission, core rules, boundaries, decision framework |
+| `skills.json` | Which OpenClaw skills to enable |
+| `channels.json` | Messaging channel configuration |
+| `desk.json` | Office desk decorations for the Web UI |
+| `gamification.json` | XP skill tree and achievement definitions |
+
+### Available Roles
+
+**Core (6):** CoderKoala, MarketerKoala, StrategyKoala, CustomerKoala, GenerativeKoala, ResearchKoala
+
+**Extended (6):** DataKoala, DevOpsKoala, FinanceKoala, ContentKoala, SecurityKoala, SchedulerKoala
+
+**Advanced (6):** TranslatorKoala, LegalKoala, HRKoala, SalesKoala, QAKoala, DesignKoala
+
+**Custom (1):** CustomKoala (user-defined)
+
+### Creating a Custom Role
+
+```bash
+mkdir -p roles/my-custom-role
+# Create IDENTITY.md, SOUL.md, skills.json, desk.json, gamification.json
+# See any existing role as a template
+```
+
+---
+
+## Custom Skills
+
+KoalaClaw includes 12 pre-built custom skill templates in `custom-skills/`:
+
+| Skill | Used By | API |
+|-------|---------|-----|
+| twitter-api | MarketerKoala | Twitter API v2 |
+| reddit-api | MarketerKoala | Reddit OAuth |
+| email-responder | CustomerKoala, SalesKoala, HRKoala | IMAP/SMTP |
+| replicate-api | GenerativeKoala | Replicate |
+| elevenlabs-tts | GenerativeKoala | ElevenLabs |
+| web-scraper | ResearchKoala | Readability + fetch |
+| csv-analyzer | DataKoala | Python/Node |
+| server-monitor | DevOpsKoala | /proc, ss, df |
+| crypto-tracker | FinanceKoala | CoinGecko |
+| seo-writer | ContentKoala | Google Search |
+| vuln-scanner | SecurityKoala | nmap, SSL check |
+| calendar-sync | SchedulerKoala | CalDAV / Google Calendar |
+
+### Adding a Custom Skill
+
+Create a folder with a `SKILL.md`:
+
+```bash
+mkdir -p custom-skills/my-skill
+cat > custom-skills/my-skill/SKILL.md << 'EOF'
+# My Custom Skill
+
+## Description
+What this skill does.
+
+## Capabilities
+- Capability 1
+- Capability 2
+
+## Usage
+Instructions for the AI agent.
+EOF
+
+# Add to agents
+sudo koalaclaw skills add ./custom-skills/my-skill
+```
+
+---
+
+## Workflow Pipelines
+
+KoalaClaw includes 4 preset workflow pipelines in `workflows/`:
+
+1. **Blog Post Pipeline** — Research → Write → SEO → Social Media
+2. **Customer Onboarding** — Welcome Email → Schedule Call → CRM Entry
+3. **Security Audit** — Port Scan → SSL Check → Config Review → Compliance Report
+4. **Product Launch** — Strategy → Content → Marketing → Sales → Schedule
+
+Workflows are accessible from the Web UI via the "Workflows" button.
+
+### Creating a Custom Workflow
+
+```json
+{
+  "name": "My Workflow",
+  "description": "Description of what this workflow does",
+  "steps": [
+    {"agent_role": "research-koala", "task": "Research {{topic}}"},
+    {"agent_role": "content-koala", "task": "Write about findings", "input_from": [0]}
+  ],
+  "variables": {
+    "topic": "What to research"
+  }
+}
+```
+
+Save as `workflows/my-workflow.json`.

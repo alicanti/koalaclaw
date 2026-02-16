@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Review": {"unlocksAt": 1, "description": "Basic design review"},
+    "UX Analysis": {"unlocksAt": 5, "description": "User experience analysis"},
+    "Accessibility": {"unlocksAt": 10, "description": "Accessibility evaluation"},
+    "Advanced": {"unlocksAt": 15, "description": "Advanced design review"},
+    "Master": {"unlocksAt": 20, "description": "Master designer"}
+  },
+  "achievements": [
+    {"id": "first-review", "name": "First Review", "description": "Completed first design review"},
+    {"id": "ux-expert", "name": "UX Expert", "description": "Reviewed 50 designs"},
+    {"id": "accessibility-champion", "name": "Accessibility Champion", "description": "Improved 100 designs"},
+    {"id": "design-master", "name": "Design Master", "description": "Completed 500 reviews"}
+  ]
+}
+

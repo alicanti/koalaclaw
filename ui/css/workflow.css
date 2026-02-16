@@ -1,0 +1,175 @@
+/* Workflow & Kanban Styles - Phase 4 */
+
+.workflow-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    padding: 8px 20px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.tab-btn.active,
+.tab-btn:hover {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    border-color: var(--accent-primary);
+}
+
+.workflow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.workflow-card {
+    padding: 20px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.workflow-card h3 {
+    font-size: 16px;
+    color: var(--accent-primary);
+    margin-bottom: 8px;
+}
+
+.workflow-card p {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.workflow-steps-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.step-badge {
+    padding: 4px 10px;
+    background: var(--bg-primary);
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Kanban Board */
+.kanban-board {
+    margin-bottom: 30px;
+}
+
+.kanban-board h3 {
+    font-size: 16px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.status-badge.running {
+    background: rgba(255, 165, 0, 0.2);
+    color: var(--warning);
+}
+
+.status-badge.completed {
+    background: rgba(0, 212, 170, 0.2);
+    color: var(--success);
+}
+
+.status-badge.error {
+    background: rgba(255, 71, 87, 0.2);
+    color: var(--error);
+}
+
+.kanban-columns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+
+.kanban-column {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 15px;
+    min-height: 100px;
+}
+
+.kanban-column h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.kanban-card {
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.kanban-card.status-pending {
+    border-left-color: var(--text-secondary);
+}
+
+.kanban-card.status-running {
+    border-left-color: var(--warning);
+}
+
+.kanban-card.status-completed {
+    border-left-color: var(--success);
+}
+
+.kanban-card.status-error {
+    border-left-color: var(--error);
+}
+
+.card-emoji {
+    font-size: 18px;
+    margin-right: 8px;
+}
+
+.card-role {
+    font-size: 12px;
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.card-task {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px;
+    font-size: 14px;
+}
+

@@ -1,0 +1,9 @@
+{
+  "enabled": [
+    "coding-agent",
+    "github",
+    "browser"
+  ],
+  "disabled": []
+}
+

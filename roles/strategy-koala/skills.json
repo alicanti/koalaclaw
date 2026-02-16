@@ -1,0 +1,10 @@
+{
+  "enabled": [
+    "notion",
+    "trello",
+    "summarize",
+    "browser"
+  ],
+  "disabled": []
+}
+

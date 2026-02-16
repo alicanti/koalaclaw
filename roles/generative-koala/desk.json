@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "palette", "position": "center", "icon": "🎨"},
+    {"type": "brush", "position": "front", "icon": "🖌️"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "canvas", "position": "back", "icon": "🖼️"},
+    {"type": "sparkles", "position": "left", "icon": "✨"}
+  ],
+  "theme": "creative",
+  "colors": {
+    "primary": "#ff6b9d",
+    "secondary": "#c44569"
+  }
+}
+

@@ -1,0 +1,8 @@
+{
+  "enabled": [
+    "browser",
+    "openai-image-gen"
+  ],
+  "disabled": []
+}
+

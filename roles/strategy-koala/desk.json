@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "whiteboard", "position": "center", "icon": "📋"},
+    {"type": "chart", "position": "front", "icon": "📈"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "books", "position": "back", "icon": "📚"},
+    {"type": "globe", "position": "left", "icon": "🌍"}
+  ],
+  "theme": "professional",
+  "colors": {
+    "primary": "#4a90e2",
+    "secondary": "#2c3e50"
+  }
+}
+

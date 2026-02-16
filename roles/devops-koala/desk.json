@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "gear", "position": "center", "icon": "⚙️"},
+    {"type": "server", "position": "front", "icon": "🖥️"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "rocket", "position": "back", "icon": "🚀"},
+    {"type": "wrench", "position": "left", "icon": "🔧"}
+  ],
+  "theme": "tech",
+  "colors": {
+    "primary": "#00d4ff",
+    "secondary": "#0066cc"
+  }
+}
+

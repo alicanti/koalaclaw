@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Finance": {"unlocksAt": 1, "description": "Basic financial analysis"},
+    "Trading": {"unlocksAt": 5, "description": "Track and analyze trades"},
+    "Portfolio": {"unlocksAt": 10, "description": "Manage portfolios"},
+    "Advanced": {"unlocksAt": 15, "description": "Advanced financial strategies"},
+    "Master": {"unlocksAt": 20, "description": "Master financial analysis"}
+  },
+  "achievements": [
+    {"id": "first-analysis", "name": "First Analysis", "description": "Completed first financial analysis"},
+    {"id": "trader", "name": "Trader", "description": "Tracked 100 trades"},
+    {"id": "portfolio-master", "name": "Portfolio Master", "description": "Managed 10 portfolios"},
+    {"id": "finance-expert", "name": "Finance Expert", "description": "Completed 500 analyses"}
+  ]
+}
+

@@ -1,0 +1,11 @@
+{
+  "enabled": [
+    "coding-agent",
+    "github",
+    "tmux",
+    "browser",
+    "summarize"
+  ],
+  "disabled": []
+}
+

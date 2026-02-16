@@ -1,0 +1,37 @@
+{
+  "name": "Security Audit",
+  "description": "Comprehensive security audit of a target system",
+  "steps": [
+    {
+      "agent_role": "security-koala",
+      "task": "Scan {{target}} for open ports and known vulnerabilities.",
+      "output": "scan_results"
+    },
+    {
+      "agent_role": "security-koala",
+      "task": "Check SSL/TLS configuration for {{target}}.",
+      "output": "ssl_results"
+    },
+    {
+      "agent_role": "devops-koala",
+      "task": "Review server configuration and check for misconfigurations.",
+      "input_from": [0],
+      "output": "config_review"
+    },
+    {
+      "agent_role": "coder-koala",
+      "task": "Review code dependencies for known vulnerabilities.",
+      "output": "dep_audit"
+    },
+    {
+      "agent_role": "legal-koala",
+      "task": "Generate compliance report based on all audit findings.",
+      "input_from": [0, 1, 2, 3],
+      "output": "compliance_report"
+    }
+  ],
+  "variables": {
+    "target": "Target domain or IP to audit"
+  }
+}
+

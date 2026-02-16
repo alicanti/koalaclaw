@@ -1,0 +1,45 @@
+{
+  "name": "Product Launch",
+  "description": "Full product launch pipeline from strategy to execution",
+  "steps": [
+    {
+      "agent_role": "strategy-koala",
+      "task": "Create launch strategy for {{product_name}}: target audience, positioning, timeline.",
+      "output": "launch_strategy"
+    },
+    {
+      "agent_role": "content-koala",
+      "task": "Write product announcement blog post and press release.",
+      "input_from": [0],
+      "output": "content"
+    },
+    {
+      "agent_role": "design-koala",
+      "task": "Review and suggest visual assets needed for the launch.",
+      "input_from": [0],
+      "output": "design_brief"
+    },
+    {
+      "agent_role": "marketer-koala",
+      "task": "Create social media campaign plan and draft posts.",
+      "input_from": [0, 1],
+      "output": "social_campaign"
+    },
+    {
+      "agent_role": "sales-koala",
+      "task": "Prepare sales materials and outreach templates.",
+      "input_from": [0],
+      "output": "sales_materials"
+    },
+    {
+      "agent_role": "scheduler-koala",
+      "task": "Schedule all launch activities on the calendar.",
+      "input_from": [0, 3, 4],
+      "output": "launch_schedule"
+    }
+  ],
+  "variables": {
+    "product_name": "Name of the product being launched"
+  }
+}
+

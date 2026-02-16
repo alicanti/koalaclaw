@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Translation": {"unlocksAt": 1, "description": "Basic translation"},
+    "Localization": {"unlocksAt": 5, "description": "Cultural adaptation"},
+    "Quality": {"unlocksAt": 10, "description": "Quality assurance"},
+    "Expert": {"unlocksAt": 15, "description": "Expert translation"},
+    "Master": {"unlocksAt": 20, "description": "Master translator"}
+  },
+  "achievements": [
+    {"id": "first-translation", "name": "First Translation", "description": "Completed first translation"},
+    {"id": "polyglot", "name": "Polyglot", "description": "Translated to 10 languages"},
+    {"id": "cultural-expert", "name": "Cultural Expert", "description": "Localized 50 documents"},
+    {"id": "translation-master", "name": "Translation Master", "description": "Completed 1000 translations"}
+  ]
+}
+

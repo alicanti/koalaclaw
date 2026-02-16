@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "lock", "position": "center", "icon": "🔒"},
+    {"type": "shield", "position": "front", "icon": "🛡️"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "key", "position": "back", "icon": "🔐"},
+    {"type": "warning", "position": "left", "icon": "⚠️"}
+  ],
+  "theme": "security",
+  "colors": {
+    "primary": "#ff4757",
+    "secondary": "#c44569"
+  }
+}
+

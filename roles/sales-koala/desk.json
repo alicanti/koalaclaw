@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "briefcase", "position": "center", "icon": "💼"},
+    {"type": "chart", "position": "front", "icon": "📈"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "target", "position": "back", "icon": "🎯"},
+    {"type": "handshake", "position": "left", "icon": "🤝"}
+  ],
+  "theme": "professional",
+  "colors": {
+    "primary": "#00d4aa",
+    "secondary": "#006644"
+  }
+}
+

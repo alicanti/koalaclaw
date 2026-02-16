@@ -93,6 +93,132 @@ KOALA
 }
 
 # ═══════════════════════════════════════
+# ROLE MANAGEMENT
+# ═══════════════════════════════════════
+_list_roles() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local roles_dir="${script_dir}/roles"
+    
+    if [[ ! -d "$roles_dir" ]]; then
+        return 1
+    fi
+    
+    local roles=()
+    for role_dir in "${roles_dir}"/*; do
+        if [[ -d "$role_dir" && -f "${role_dir}/IDENTITY.md" ]]; then
+            local role_name
+            role_name=$(basename "$role_dir")
+            roles+=("$role_name")
+        fi
+    done
+    
+    printf '%s\n' "${roles[@]}" | sort
+}
+
+_get_role_info() {
+    local role="$1"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local role_dir="${script_dir}/roles/${role}"
+    
+    if [[ ! -f "${role_dir}/IDENTITY.md" ]]; then
+        return 1
+    fi
+    
+    # Extract name and emoji from IDENTITY.md
+    local name emoji
+    name=$(grep -E "^\\*\\*Name:\\*\\*" "${role_dir}/IDENTITY.md" | sed 's/.*\*\*Name:\*\* //' | head -1)
+    emoji=$(grep -E "^\\*\\*Emoji:\\*\\*" "${role_dir}/IDENTITY.md" | sed 's/.*\*\*Emoji:\*\* //' | head -1)
+    
+    echo "${emoji} ${name}"
+}
+
+_select_role() {
+    local agent_num="${1:-}"
+    local prompt_text="Select role"
+    [[ -n "$agent_num" ]] && prompt_text="Select role for Agent ${agent_num}"
+    
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local roles_dir="${script_dir}/roles"
+    
+    if [[ ! -d "$roles_dir" ]]; then
+        _warn "Roles directory not found. Using default role."
+        echo "coder-koala"
+        return 0
+    fi
+    
+    local roles
+    mapfile -t roles < <(_list_roles)
+    
+    if (( ${#roles[@]} == 0 )); then
+        _warn "No roles found. Using default role."
+        echo "coder-koala"
+        return 0
+    fi
+    
+    echo ""
+    echo -e "  ${BOLD}${prompt_text}:${NC}"
+    local idx=1
+    for role in "${roles[@]}"; do
+        local info
+        info=$(_get_role_info "$role")
+        printf "    %2d) %s\n" "$idx" "$info"
+        (( idx++ ))
+    done
+    echo ""
+    
+    while true; do
+        read -rp "  Choice [1]: " choice
+        choice="${choice:-1}"
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#roles[@]} )); then
+            echo "${roles[$((choice - 1))]}"
+            return 0
+        fi
+        _error "Invalid choice. Enter a number between 1 and ${#roles[@]}"
+    done
+}
+
+_apply_role_to_agent() {
+    local agent_num="$1"
+    local role="$2"
+    local agent_dir="${INSTALL_DIR}/data/koala-agent-${agent_num}"
+    local role_dir
+    
+    # Find role directory (could be in script dir or install dir)
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    role_dir="${script_dir}/roles/${role}"
+    
+    if [[ ! -d "$role_dir" ]]; then
+        _warn "Role directory not found: ${role_dir}. Skipping role application."
+        return 1
+    fi
+    
+    # Create agent identity directory
+    local identity_dir="${agent_dir}/agents/main/agent/identity"
+    mkdir -p "$identity_dir"
+    
+    # Copy role files
+    if [[ -f "${role_dir}/IDENTITY.md" ]]; then
+        cp "${role_dir}/IDENTITY.md" "${identity_dir}/IDENTITY.md"
+    fi
+    if [[ -f "${role_dir}/SOUL.md" ]]; then
+        cp "${role_dir}/SOUL.md" "${identity_dir}/SOUL.md"
+    fi
+    
+    # Apply skills from role
+    if [[ -f "${role_dir}/skills.json" ]]; then
+        # Skills will be applied via OpenClaw config
+        local skills_file="${agent_dir}/role-skills.json"
+        cp "${role_dir}/skills.json" "$skills_file"
+    fi
+    
+    _info "Applied role '${role}' to Agent ${agent_num}"
+}
+
+# ═══════════════════════════════════════
 # STATE MANAGEMENT
 # ═══════════════════════════════════════
 _state_path() { echo "${INSTALL_DIR}/${STATE_FILE}"; }
@@ -126,6 +252,7 @@ CREATED_AT="${CREATED_AT:-$(date -Iseconds)}"
 UPDATED_AT="$(date -Iseconds)"
 $(for i in $(seq 1 "$AGENT_COUNT"); do
     eval "echo \"TOKEN_${i}=\${TOKEN_${i}}\""
+    eval "echo \"ROLE_${i}=\${ROLE_${i}:-coder-koala}\""
 done)
 STATEEOF
     chmod 600 "$(_state_path)"
@@ -610,8 +737,12 @@ _generate_agent_configs() {
         local auth_dir="${agent_dir}/agents/main/agent"
         local port=$(( START_PORT + i - 1 ))
         eval "local token=\${TOKEN_${i}}"
+        eval "local role=\${ROLE_${i}:-coder-koala}"
 
         mkdir -p "$auth_dir"
+        
+        # Apply role to agent
+        _apply_role_to_agent "$i" "$role"
 
         # openclaw.json
         local cdp_port=$(( 18792 + i - 1 ))
@@ -1088,12 +1219,16 @@ cmd_install() {
     mkdir -p "${INSTALL_DIR}"
     touch "$LOG_FILE" 2>/dev/null || LOG_FILE="${INSTALL_DIR}/install.log"
 
-    # Generate tokens
-    _step "Generating tokens..."
+    # Generate tokens and select roles
+    _step "Generating tokens and selecting roles..."
     for i in $(seq 1 "$AGENT_COUNT"); do
         eval "TOKEN_${i}=$(openssl rand -hex 32)"
+        # Select role for each agent
+        local selected_role
+        selected_role=$(_select_role "$i")
+        eval "ROLE_${i}=${selected_role}"
     done
-    _info "${AGENT_COUNT} tokens generated"
+    _info "${AGENT_COUNT} tokens generated and roles assigned"
 
     CREATED_AT="$(date -Iseconds)"
     _save_state
@@ -1144,9 +1279,13 @@ cmd_add_agent() {
         read -rp "  New model: " MODEL
     fi
 
-    # Generate new tokens
+    # Generate new tokens and select roles
     for i in $(seq $(( old_count + 1 )) "$new_total"); do
         eval "TOKEN_${i}=$(openssl rand -hex 32)"
+        # Select role for each new agent
+        local selected_role
+        selected_role=$(_select_role "$i")
+        eval "ROLE_${i}=${selected_role}"
     done
 
     AGENT_COUNT=$new_total

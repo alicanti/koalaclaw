@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "people", "position": "center", "icon": "👥"},
+    {"type": "briefcase", "position": "front", "icon": "💼"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "handshake", "position": "back", "icon": "🤝"},
+    {"type": "heart", "position": "left", "icon": "❤️"}
+  ],
+  "theme": "friendly",
+  "colors": {
+    "primary": "#ff6b9d",
+    "secondary": "#c44569"
+  }
+}
+

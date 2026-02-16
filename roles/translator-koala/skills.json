@@ -1,0 +1,9 @@
+{
+  "enabled": [
+    "summarize",
+    "custom prompt",
+    "browser"
+  ],
+  "disabled": []
+}
+

@@ -1,0 +1,10 @@
+{
+  "enabled": [
+    "calendar-sync",
+    "trello",
+    "cron",
+    "browser"
+  ],
+  "disabled": []
+}
+

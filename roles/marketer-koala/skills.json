@@ -1,0 +1,10 @@
+{
+  "enabled": [
+    "twitter-api",
+    "reddit-api",
+    "browser",
+    "summarize"
+  ],
+  "disabled": []
+}
+

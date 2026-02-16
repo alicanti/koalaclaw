@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Response": {"unlocksAt": 1, "description": "Respond to customer inquiries"},
+    "Troubleshooting": {"unlocksAt": 5, "description": "Solve technical issues"},
+    "Relationship": {"unlocksAt": 10, "description": "Build customer relationships"},
+    "Escalation": {"unlocksAt": 15, "description": "Handle complex escalations"},
+    "Advocacy": {"unlocksAt": 20, "description": "Become customer advocate"}
+  },
+  "achievements": [
+    {"id": "first-response", "name": "First Response", "description": "Responded to first customer"},
+    {"id": "problem-solver", "name": "Problem Solver", "description": "Solved 100 issues"},
+    {"id": "customer-hero", "name": "Customer Hero", "description": "Received 50 positive reviews"},
+    {"id": "support-master", "name": "Support Master", "description": "Handled 1000 tickets"}
+  ]
+}
+

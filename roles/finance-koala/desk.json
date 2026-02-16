@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "money", "position": "center", "icon": "💰"},
+    {"type": "chart", "position": "front", "icon": "📈"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "calculator", "position": "back", "icon": "🔢"},
+    {"type": "briefcase", "position": "left", "icon": "💼"}
+  ],
+  "theme": "professional",
+  "colors": {
+    "primary": "#00d4aa",
+    "secondary": "#006644"
+  }
+}
+

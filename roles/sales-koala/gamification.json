@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Sales": {"unlocksAt": 1, "description": "Basic sales tasks"},
+    "Lead Gen": {"unlocksAt": 5, "description": "Lead generation"},
+    "Pipeline": {"unlocksAt": 10, "description": "Pipeline management"},
+    "Closing": {"unlocksAt": 15, "description": "Deal closing"},
+    "Master": {"unlocksAt": 20, "description": "Master sales professional"}
+  },
+  "achievements": [
+    {"id": "first-lead", "name": "First Lead", "description": "Generated first lead"},
+    {"id": "closer", "name": "Closer", "description": "Closed 10 deals"},
+    {"id": "pipeline-master", "name": "Pipeline Master", "description": "Managed 100 leads"},
+    {"id": "sales-champion", "name": "Sales Champion", "description": "Closed 100 deals"}
+  ]
+}
+

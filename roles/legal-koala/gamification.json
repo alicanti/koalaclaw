@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Review": {"unlocksAt": 1, "description": "Basic legal document review"},
+    "Compliance": {"unlocksAt": 5, "description": "Compliance checking"},
+    "Analysis": {"unlocksAt": 10, "description": "Legal analysis"},
+    "Expert": {"unlocksAt": 15, "description": "Expert legal review"},
+    "Master": {"unlocksAt": 20, "description": "Master legal expert"}
+  },
+  "achievements": [
+    {"id": "first-review", "name": "First Review", "description": "Completed first legal review"},
+    {"id": "compliance-expert", "name": "Compliance Expert", "description": "Ensured 50 compliance items"},
+    {"id": "legal-analyst", "name": "Legal Analyst", "description": "Analyzed 100 documents"},
+    {"id": "legal-master", "name": "Legal Master", "description": "Completed 500 legal tasks"}
+  ]
+}
+

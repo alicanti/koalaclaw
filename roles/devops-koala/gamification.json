@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Ops": {"unlocksAt": 1, "description": "Basic server operations"},
+    "Automation": {"unlocksAt": 5, "description": "Automate deployments"},
+    "Monitoring": {"unlocksAt": 10, "description": "Set up monitoring"},
+    "CI/CD": {"unlocksAt": 15, "description": "Build CI/CD pipelines"},
+    "Architecture": {"unlocksAt": 20, "description": "Design infrastructure"}
+  },
+  "achievements": [
+    {"id": "first-deploy", "name": "First Deploy", "description": "Completed first deployment"},
+    {"id": "automation-master", "name": "Automation Master", "description": "Automated 50 tasks"},
+    {"id": "reliability-hero", "name": "Reliability Hero", "description": "Achieved 99.9% uptime"},
+    {"id": "devops-master", "name": "DevOps Master", "description": "Managed 100 deployments"}
+  ]
+}
+

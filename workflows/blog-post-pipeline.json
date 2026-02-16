@@ -1,0 +1,40 @@
+{
+  "name": "Blog Post Pipeline",
+  "description": "Research, write, optimize, and publish a blog post",
+  "steps": [
+    {
+      "agent_role": "research-koala",
+      "task": "Research topic: {{topic}}. Find key facts, statistics, and sources.",
+      "output": "research_notes"
+    },
+    {
+      "agent_role": "content-koala",
+      "task": "Write a comprehensive blog post based on the research notes.",
+      "input_from": [0],
+      "output": "blog_draft"
+    },
+    {
+      "agent_role": "content-koala",
+      "task": "Optimize the blog post for SEO with target keyword: {{keyword}}",
+      "input_from": [1],
+      "output": "seo_post"
+    },
+    {
+      "agent_role": "design-koala",
+      "task": "Review the blog post and suggest a cover image description.",
+      "input_from": [2],
+      "output": "image_description"
+    },
+    {
+      "agent_role": "marketer-koala",
+      "task": "Create social media posts to promote the blog article.",
+      "input_from": [2],
+      "output": "social_posts"
+    }
+  ],
+  "variables": {
+    "topic": "The topic to research and write about",
+    "keyword": "Primary SEO keyword"
+  }
+}
+

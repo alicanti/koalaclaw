@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Security": {"unlocksAt": 1, "description": "Basic security checks"},
+    "Scanning": {"unlocksAt": 5, "description": "Vulnerability scanning"},
+    "Auditing": {"unlocksAt": 10, "description": "Security audits"},
+    "Penetration": {"unlocksAt": 15, "description": "Penetration testing"},
+    "Master": {"unlocksAt": 20, "description": "Master security expert"}
+  },
+  "achievements": [
+    {"id": "first-scan", "name": "First Scan", "description": "Completed first security scan"},
+    {"id": "vuln-hunter", "name": "Vuln Hunter", "description": "Found 50 vulnerabilities"},
+    {"id": "security-guardian", "name": "Security Guardian", "description": "Fixed 100 security issues"},
+    {"id": "security-master", "name": "Security Master", "description": "Completed 500 security tasks"}
+  ]
+}
+

@@ -1,0 +1,17 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Custom Skill 1": {"unlocksAt": 1, "description": "User-defined skill"},
+    "Custom Skill 2": {"unlocksAt": 5, "description": "User-defined skill"},
+    "Custom Skill 3": {"unlocksAt": 10, "description": "User-defined skill"},
+    "Custom Skill 4": {"unlocksAt": 15, "description": "User-defined skill"},
+    "Custom Skill 5": {"unlocksAt": 20, "description": "User-defined skill"}
+  },
+  "achievements": [
+    {"id": "first-task", "name": "First Task", "description": "Completed first custom task"},
+    {"id": "custom-expert", "name": "Custom Expert", "description": "Completed 50 custom tasks"},
+    {"id": "custom-master", "name": "Custom Master", "description": "Completed 500 custom tasks"}
+  ]
+}
+

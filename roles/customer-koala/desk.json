@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "headset", "position": "center", "icon": "🎧"},
+    {"type": "phone", "position": "front", "icon": "📞"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "smile", "position": "back", "icon": "😊"},
+    {"type": "heart", "position": "left", "icon": "❤️"}
+  ],
+  "theme": "friendly",
+  "colors": {
+    "primary": "#ff6b9d",
+    "secondary": "#c44569"
+  }
+}
+

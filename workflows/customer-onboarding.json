@@ -1,0 +1,28 @@
+{
+  "name": "Customer Onboarding",
+  "description": "Welcome new customer and set up their account",
+  "steps": [
+    {
+      "agent_role": "customer-koala",
+      "task": "Send welcome email to {{customer_email}} with onboarding guide.",
+      "output": "welcome_email"
+    },
+    {
+      "agent_role": "scheduler-koala",
+      "task": "Schedule onboarding call with {{customer_name}} for next available slot.",
+      "input_from": [0],
+      "output": "scheduled_call"
+    },
+    {
+      "agent_role": "sales-koala",
+      "task": "Create CRM entry for {{customer_name}} and add to onboarding pipeline.",
+      "input_from": [0],
+      "output": "crm_entry"
+    }
+  ],
+  "variables": {
+    "customer_name": "Name of the new customer",
+    "customer_email": "Email address of the new customer"
+  }
+}
+

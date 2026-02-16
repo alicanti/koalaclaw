@@ -1,0 +1,9 @@
+{
+  "enabled": [
+    "crypto-tracker",
+    "browser",
+    "summarize"
+  ],
+  "disabled": []
+}
+

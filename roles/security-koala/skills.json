@@ -1,0 +1,9 @@
+{
+  "enabled": [
+    "vuln-scanner",
+    "1password",
+    "browser"
+  ],
+  "disabled": []
+}
+

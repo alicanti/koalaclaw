@@ -21,7 +21,7 @@
 
 <h1>🦞 KoalaClaw 🐨</h1>
 
-<h3>Deploy OpenClaw AI agents on any Ubuntu server<br>with a single command.</h3>
+<h3>AI Agent Management Platform<br>Deploy, manage, and gamify OpenClaw agents with an isometric office UI.</h3>
 
 <br>
 
@@ -35,16 +35,14 @@
 <p>
 <a href="#-quick-start">Quick Start</a> · 
 <a href="#-features">Features</a> · 
+<a href="#-19-agent-roles">Roles</a> · 
 <a href="#-commands">Commands</a> · 
+<a href="#-web-ui">Web UI</a> · 
 <a href="#-architecture">Architecture</a> · 
 <a href="#-faq">FAQ</a>
 </p>
 
 <br>
-
-<img src="https://img.shields.io/badge/🐨_One_Script-→_N_Agents-blue?style=for-the-badge" alt="One Script">
-
-<br><br>
 
 </div>
 
@@ -57,57 +55,93 @@
 curl -fsSL https://raw.githubusercontent.com/alicanti/koalaclaw/main/koalaclaw.sh -o koalaclaw.sh
 chmod +x koalaclaw.sh
 
-# Install (interactive)
+# Install (interactive — asks agent count, roles, API key, model)
 sudo ./koalaclaw.sh install
+
+# Open the Web UI
+# http://SERVER_IP:3099
 ```
 
-That's it. The installer handles **everything** — Docker, networking, reverse proxy, tokens, permissions, healthchecks.
+The installer handles **everything** — Docker, networking, reverse proxy, role assignment, tokens, permissions, healthchecks, and the web dashboard.
 
 ---
 
 ## 🎯 What is KoalaClaw?
 
-KoalaClaw deploys multiple [OpenClaw](https://openclaw.ai) AI agents behind a [Caddy](https://caddyserver.com) reverse proxy on a fresh Ubuntu server. Each agent is fully isolated with its own configuration, auth token, and data directory.
+KoalaClaw is a full AI agent management platform built on [OpenClaw](https://openclaw.ai). It deploys N specialized AI agents behind a [Caddy](https://caddyserver.com) reverse proxy, each with a unique role, personality, and skill set. A web-based isometric office UI lets you manage, chat with, and monitor all agents in real time.
 
 ```
 Internet / LAN
      │
-     ├── :3001 → Caddy → koala-agent-1 (OpenClaw)
-     ├── :3002 → Caddy → koala-agent-2 (OpenClaw)
-     ├── :3003 → Caddy → koala-agent-3 (OpenClaw)
-     └── :300N → Caddy → koala-agent-N (OpenClaw)
+     ├── :3001 → Caddy → 💻 CoderKoala     (coding, review, deploy)
+     ├── :3002 → Caddy → 📣 MarketerKoala  (social media, campaigns)
+     ├── :3003 → Caddy → 🧠 StrategyKoala  (planning, OKRs)
+     ├── :300N → Caddy → 🐨 AnyKoala       (your choice of 19 roles)
+     └── :3099 → Admin API → 🎮 Web UI     (isometric office dashboard)
 ```
-
-### Why?
-
-- **One command** deploys N isolated AI agents on any Ubuntu box
-- **Zero config files** to write manually — the installer generates everything
-- **Scale up/down** anytime with `add-agent` / `remove-agent`
-- **Production-ready** — healthchecks, auto-restart, log rotation, backups
 
 ---
 
 ## ✨ Features
 
-### Installation
-- 🐳 **Auto-installs Docker** CE + Compose v2 if missing
-- 🔍 **Pre-flight checks** — OS, RAM, disk, ports, firewall, subnet, internet
-- 🔑 **API key validation** — tests your key before deploying
-- 📋 **Model discovery** — lists available models for your API key
-- 🛡️ **Firewall handling** — auto-opens UFW ports (with confirmation)
+### 19 Specialized Agent Roles
+Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pre-configured skills, desk decorations, and a gamification skill tree.
 
-### Operations
-- ➕ **Add agents** without downtime (existing agents keep running)
-- ➖ **Remove agents** safely (data preserved)
-- 📊 **Status dashboard** — container health + HTTP checks at a glance
-- 🔄 **One-command updates** — pull latest images and restart
-- 💾 **Backup & restore** — tar.gz archives with all config and data
+### Isometric Office Web UI
+A browser-based dashboard at `:3099` with:
+- **Isometric office** — each agent sits at a desk with role-specific decorations
+- **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping
+- **Admin panel** — agent list, status, skill toggles, quick actions
+- **Chat bar** — talk to any agent with streaming responses
+- **Live logs** — color-coded, filterable, real-time log stream
+- **Workflow pipelines** — chain agents together (Blog Post, Product Launch, Security Audit)
+- **Monitoring dashboard** — CPU/RAM per agent, alerts, cron jobs
+- **Gamification** — XP, levels (1-50), achievements, leaderboard, outfits, desk rewards
 
-### Security
-- 🎲 **Unique tokens** per agent (256-bit, auto-generated)
-- 🔒 **Credentials file** with `chmod 600`
-- 🌐 **Network isolation** — agents have no published ports, only Caddy is exposed
-- 🏠 **Static IPs** in Docker network for reliable `trustedProxies`
+### 12 Custom Skills
+Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-api, elevenlabs-tts, web-scraper, csv-analyzer, server-monitor, crypto-tracker, seo-writer, vuln-scanner, calendar-sync.
+
+### Production-Ready Infrastructure
+- Auto-installs Docker CE + Compose v2
+- Pre-flight checks (OS, RAM, disk, ports, firewall, subnet)
+- API key validation and model discovery
+- Unique 256-bit tokens per agent
+- Network isolation, static IPs, trusted proxies
+- Backup/restore, one-command updates
+- Browser relay (CDP proxy chain) for Chromium automation
+
+---
+
+## 🐨 19 Agent Roles
+
+| # | Role | Emoji | Focus |
+|---|------|-------|-------|
+| 1 | CoderKoala | 💻 | Software development, code review, debugging |
+| 2 | MarketerKoala | 📣 | Social media, campaigns, analytics |
+| 3 | StrategyKoala | 🧠 | Business strategy, OKRs, roadmaps |
+| 4 | CustomerKoala | 🎧 | Customer support, live chat, FAQ |
+| 5 | GenerativeKoala | 🎨 | Image/video/audio generation |
+| 6 | ResearchKoala | 🔬 | Deep research, reports, analysis |
+| 7 | DataKoala | 📊 | Data analysis, charts, SQL |
+| 8 | DevOpsKoala | ⚙️ | Server ops, monitoring, CI/CD |
+| 9 | FinanceKoala | 💰 | Crypto, stocks, portfolio tracking |
+| 10 | ContentKoala | ✍️ | Blog writing, newsletters, SEO |
+| 11 | SecurityKoala | 🔒 | Vulnerability scanning, audits |
+| 12 | SchedulerKoala | 📅 | Calendar, reminders, cron jobs |
+| 13 | TranslatorKoala | 🌍 | Translation, localization |
+| 14 | LegalKoala | ⚖️ | Contract analysis, compliance |
+| 15 | HRKoala | 👥 | Hiring, onboarding, HR tasks |
+| 16 | SalesKoala | 💼 | Lead gen, CRM, proposals |
+| 17 | QAKoala | 🧪 | Testing, bug reports, QA |
+| 18 | DesignKoala | 🎯 | UI/UX feedback, design review |
+| 19 | CustomKoala | 🛠️ | User-defined custom role |
+
+Each role includes:
+- `IDENTITY.md` — name, emoji, personality, speaking style
+- `SOUL.md` — mission, core rules, boundaries, decision framework
+- `skills.json` — pre-configured skill set
+- `desk.json` — office desk decorations for the UI
+- `gamification.json` — XP skill tree and achievements
 
 ---
 
@@ -115,65 +149,48 @@ Internet / LAN
 
 | Command | Description |
 |---------|-------------|
-| `install` | Full interactive setup from scratch |
-| `add-agent` | Add more agents to existing deployment |
+| `install` | Full interactive setup (agents, roles, API key, model) |
+| `add-agent` | Add more agents with role selection |
 | `remove-agent [N]` | Remove a specific agent |
 | `status` | Show health of all agents |
 | `credentials` | Display access URLs and tokens |
-| `skills list` | List all 50+ available bundled skills |
-| `skills enable <name>` | Enable a skill on all or specific agent |
+| `skills list` | List available skills |
+| `skills enable <name>` | Enable a skill on agents |
 | `skills disable <name>` | Disable a skill |
-| `skills add <path>` | Add a custom skill from a directory |
-| `skills remove <name>` | Remove a custom skill |
-| `skills status` | Show enabled skills per agent |
 | `browser status` | Browser relay connection status |
 | `browser tabs` | List attached Chromium tabs |
-| `browser screenshot` | Capture a screenshot |
-| `browser navigate <url>` | Navigate to a URL |
-| `browser relay` | Restart CDP relay forwarders |
-| `logs [N]` | View logs (all agents or specific) |
-| `update` | Pull latest OpenClaw images and restart |
+| `logs [N]` | View logs (all or specific agent) |
+| `update` | Pull latest images and restart |
 | `backup` | Create a backup archive |
 | `restore <file>` | Restore from a backup |
 | `uninstall` | Remove containers and optionally data |
 | `dry-run` | Preview what install would do |
 
-### Examples
+---
 
-```bash
-# Deploy 5 agents with GPT-5.2
-sudo koalaclaw install
+## 🎮 Web UI
 
-# Check everything is running
-sudo koalaclaw status
+The web UI runs on port `3099` and provides a complete management interface:
 
-# Add 2 more agents
-sudo koalaclaw add-agent
+### Isometric Office
+Each agent has a desk in the office. Click an agent to see details, toggle skills, view logs, or open their OpenClaw Canvas.
 
-# List available skills
-sudo koalaclaw skills list
+### Workflow Pipelines
+Chain agents together for complex tasks:
+- **Blog Post Pipeline**: Research → Write → SEO → Social Media
+- **Product Launch**: Strategy → Content → Marketing → Sales
+- **Security Audit**: Scan → Config Review → Compliance Report
+- **Customer Onboarding**: Welcome → Schedule → CRM
 
-# Enable GitHub skill on all agents
-sudo koalaclaw skills enable github
+### Monitoring
+Real-time CPU/RAM metrics per agent, alert thresholds, and cron job management.
 
-# Enable weather skill on agent 2 only
-sudo koalaclaw skills enable weather 2
-
-# Add a custom skill
-sudo koalaclaw skills add ./my-custom-skill
-
-# View agent 1 logs
-sudo koalaclaw logs 1
-
-# Backup before maintenance
-sudo koalaclaw backup
-
-# Update OpenClaw to latest version
-sudo koalaclaw update
-
-# Show access URLs
-sudo koalaclaw credentials
-```
+### Gamification
+- **50 levels** with titles (Junior Koala → Legendary Koala)
+- **11+ achievements** (First Task, Centurion, Marathon Runner...)
+- **10 outfits** that unlock as agents level up
+- **10 desk items** as rewards
+- **Leaderboard** ranking all agents by XP
 
 ---
 
@@ -181,77 +198,73 @@ sudo koalaclaw credentials
 
 ```mermaid
 graph TB
-    subgraph Internet["Internet / LAN"]
-        Browser["Browser<br/>(Control UI)"]
+    subgraph ClientLayer["Browser"]
+        UI[":3099 Web UI"]
+        Canvas[":3001-300N Canvas"]
     end
 
     subgraph Server["Ubuntu Server"]
-        Chromium["Chromium + Relay Extension"]
-        Socat["socat CDP forwarders"]
+        AdminAPI["Python Admin API :3099"]
+        Caddy["Caddy Reverse Proxy"]
+        Socat["socat CDP relay"]
 
-        subgraph Docker["Docker Engine"]
-            subgraph Network["koala-net"]
-                Caddy["Caddy<br/>:3001-300N"]
-                Agent1["Agent 1"]
-                Agent2["Agent 2"]
-                Agent3["Agent N"]
-            end
+        subgraph Docker["Docker koala-net"]
+            A1["Agent 1"]
+            A2["Agent 2"]
+            AN["Agent N"]
         end
     end
 
-    subgraph AI["AI Provider"]
-        API["OpenAI / Anthropic"]
+    subgraph External["External"]
+        AI["OpenAI / Anthropic"]
+        Chromium["Chromium + Relay"]
     end
 
-    Browser -->|":3001-300N"| Caddy
-    Caddy -->|"Bearer Token"| Agent1
-    Caddy -->|"Bearer Token"| Agent2
-    Caddy -->|"Bearer Token"| Agent3
-    Agent1 & Agent2 & Agent3 -->|"API Key"| API
-
-    Chromium <-->|"CDP Relay"| Socat
-    Socat <-->|"Node proxy"| Agent1 & Agent2 & Agent3
-```
-
-### Request Flow
-
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant C as Caddy
-    participant A as Agent
-    participant O as AI Provider
-
-    B->>C: GET :3001/__openclaw__/canvas/
-    C->>A: + Authorization: Bearer TOKEN
-    A-->>B: 200 OK (Control UI)
-
-    B->>C: WebSocket (chat)
-    C->>A: WS + Bearer TOKEN
-    A->>O: POST /v1/chat/completions
-    O-->>A: AI Response
-    A-->>B: Chat message
+    UI --> AdminAPI
+    Canvas --> Caddy
+    Caddy --> A1 & A2 & AN
+    A1 & A2 & AN --> AI
+    Chromium <--> Socat
+    Socat <--> A1 & A2 & AN
 ```
 
 ### File Structure
 
 ```
 /opt/koalaclaw/
-├── koalaclaw.sh           # CLI tool
-├── .koalaclaw.state       # State (tokens, config)
-├── .credentials           # Access URLs & tokens
-├── docker-compose.yml     # Generated
-├── Caddyfile              # Generated
-├── relay-start.sh         # CDP relay startup (systemd)
+├── docker-compose.yml        # Generated
+├── Caddyfile                 # Generated
+├── .koalaclaw.state          # Tokens, roles, config
+├── .credentials              # Access URLs
 └── data/
-    ├── koala-agent-1/
-    │   ├── openclaw.json  # Gateway + browser config
-    │   └── agents/main/agent/
-    │       └── auth-profiles.json
-    ├── koala-agent-2/
-    │   └── ...
     └── koala-agent-N/
-        └── ...
+        ├── openclaw.json     # Gateway config
+        ├── role-skills.json  # Role skill config
+        └── agents/main/agent/
+            ├── auth-profiles.json
+            └── identity/
+                ├── IDENTITY.md
+                └── SOUL.md
+
+GitHub repo:
+├── koalaclaw.sh              # CLI installer
+├── admin-api.py              # Web UI backend
+├── ui/                       # Web UI frontend
+│   ├── index.html
+│   ├── css/                  # 7 CSS modules
+│   └── js/                   # 8 JS modules
+├── roles/                    # 19 role templates
+│   └── <role-name>/
+│       ├── IDENTITY.md
+│       ├── SOUL.md
+│       ├── skills.json
+│       ├── desk.json
+│       └── gamification.json
+├── custom-skills/            # 12 skill templates
+│   └── <skill-name>/SKILL.md
+├── workflows/                # 4 preset pipelines
+├── INSTALLATION.md           # Detailed setup guide
+└── README.md                 # This file
 ```
 
 ---
@@ -265,6 +278,7 @@ sequenceDiagram
 | Disk | 5 GB free |
 | Network | Internet access (Docker Hub + AI API) |
 | Privileges | Root / sudo |
+| Python | 3.8+ (for Admin API) |
 
 Docker is installed automatically if not present.
 
@@ -272,151 +286,62 @@ Docker is installed automatically if not present.
 
 ## 🤖 Supported AI Providers
 
-| Provider | Env Variable | Model Example |
-|----------|-------------|---------------|
-| OpenAI | `OPENAI_API_KEY` | `openai/gpt-5.2` |
-| Anthropic | `ANTHROPIC_API_KEY` | `anthropic/claude-sonnet-4-5` |
-| Custom | `OPENAI_API_KEY` | Any OpenAI-compatible endpoint |
-
-The installer validates your API key and lists available models before deploying.
-
----
-
-## 🔌 OpenClaw Features
-
-Each deployed agent supports the full OpenClaw feature set:
-
-### Channels
-Connect agents to messaging platforms:
-
-| Channel | Setup |
-|---------|-------|
-| Telegram | Bot token via env var |
-| WhatsApp | QR code scan via CLI |
-| Discord | Bot token via env var |
-| Slack | Socket Mode tokens |
-| IRC | Server config |
-| Signal | Linked device |
-
-### Skills (50+)
-Built-in capabilities including: `coding-agent`, `github`, `notion`, `trello`, `openai-image-gen`, `weather`, `spotify-player`, `voice-call`, `1password`, and more.
-
-```bash
-# List all available skills
-sudo koalaclaw skills list
-
-# Enable/disable per agent
-sudo koalaclaw skills enable github
-sudo koalaclaw skills disable coding-agent 2
-```
-
-### Custom Skills
-
-Create your own skill — just a folder with a `SKILL.md`:
-
-```
-my-skill/
-└── SKILL.md
-```
-
-```markdown
----
-name: my-skill
-description: "My custom skill for doing cool things"
-metadata: { "openclaw": { "emoji": "🚀" } }
----
-
-# My Skill
-
-Instructions for the AI agent on how to use this skill.
-
-## Example
-
-\`\`\`bash
-curl -s https://api.example.com/data
-\`\`\`
-```
-
-```bash
-# Add to all agents
-sudo koalaclaw skills add ./my-skill
-```
-
-### Browser Relay
-Control the server's real Chromium browser from Docker agents via CDP relay:
-
-```bash
-# Check attached tabs
-sudo koalaclaw browser tabs
-
-# Navigate
-sudo koalaclaw browser navigate https://example.com
-
-# Screenshot
-sudo koalaclaw browser screenshot
-```
-
-The relay chain (`Extension → socat → Node proxy → CDP relay`) is set up automatically during install and persists across reboots via systemd.
-
-### Cron Jobs
-Schedule recurring tasks for agents.
-
-See [INSTALLATION.md](INSTALLATION.md) for full configuration details.
+| Provider | Model Example |
+|----------|---------------|
+| OpenAI | `openai/gpt-5.2`, `openai/gpt-4.1` |
+| Anthropic | `anthropic/claude-sonnet-4-5` |
+| Custom | Any OpenAI-compatible endpoint |
 
 ---
 
 ## ❓ FAQ
 
 <details>
+<summary><b>How do I start the Web UI?</b></summary>
+
+```bash
+# On the server, after install:
+cd /opt/koalaclaw
+python3 admin-api.py &
+
+# Open in browser:
+# http://SERVER_IP:3099
+```
+
+The Admin API serves both the UI files and the REST endpoints.
+</details>
+
+<details>
+<summary><b>Can I assign different roles to each agent?</b></summary>
+
+Yes! During `install` or `add-agent`, you're prompted to select a role for each agent from the 19 available roles.
+</details>
+
+<details>
 <summary><b>Can I use different models per agent?</b></summary>
 
-Yes! Use `add-agent` and choose a different model, or edit each agent's `openclaw.json` directly:
-
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "openai/gpt-4.1"
-      }
-    }
-  }
-}
-```
+Yes. Use `add-agent` and choose a different model, or edit each agent's `openclaw.json`.
 </details>
 
 <details>
-<summary><b>Can I use different API keys per agent?</b></summary>
+<summary><b>How do I access the OpenClaw Canvas directly?</b></summary>
 
-Yes. Use `add-agent` with `n` when asked "Use same API key?" — or edit `docker-compose.yml` environment variables.
-</details>
-
-<details>
-<summary><b>How do I access the Control UI?</b></summary>
-
-Open in your browser:
 ```
 http://SERVER_IP:3001/#token=YOUR_TOKEN
 ```
-The token is passed via URL hash (never sent to server). Run `koalaclaw credentials` to see all URLs.
+Run `koalaclaw credentials` to see all URLs and tokens.
 </details>
 
 <details>
 <summary><b>How do I add HTTPS?</b></summary>
 
-Put a real domain in front of Caddy, or use Cloudflare Tunnel / Tailscale Funnel. The current setup uses `X-Forwarded-Proto: https` header to satisfy OpenClaw's secure context requirement over plain HTTP.
+Put a real domain in front of Caddy, or use Cloudflare Tunnel / Tailscale Funnel.
 </details>
 
 <details>
 <summary><b>What if my API key has no credits?</b></summary>
 
-The installer warns you during setup. Chat will appear to work (WebSocket connects, messages send) but responses will be empty. Add credits at https://platform.openai.com/account/billing.
-</details>
-
-<details>
-<summary><b>Can I run this on Debian / other distros?</b></summary>
-
-The script is tested on Ubuntu 22.04/24.04. It will attempt to run on Debian with a warning. Other distros are not supported.
+The installer warns you during setup. Add credits at https://platform.openai.com/account/billing.
 </details>
 
 <details>
@@ -426,7 +351,7 @@ The script is tested on Ubuntu 22.04/24.04. It will attempt to run on Debian wit
 sudo koalaclaw add-agent
 # Enter: 7 (to go from 3 to 10)
 ```
-Each agent needs ~400MB RAM. For 10 agents, ensure at least 5GB RAM.
+Each agent needs ~400MB RAM.
 </details>
 
 ---
@@ -438,25 +363,11 @@ Each agent needs ~400MB RAM. For 10 agents, ensure at least 5GB RAM.
 | 502 Bad Gateway | Wait 30s for healthchecks. Run `koalaclaw status` |
 | Empty chat responses | Check API billing credits |
 | "device identity required" | Ensure URL has `#token=TOKEN` |
-| "pairing required" | Reset device identity (see below) |
+| "pairing required" | Run `koalaclaw update` (resets device identity) |
 | "untrusted proxy" | Caddy must have static IP in `trustedProxies` |
 | Port already in use | Choose different starting port during install |
-| Docker pull fails | Check internet / DNS connectivity |
-
-### "pairing required" — CLI commands fail
-
-OpenClaw uses device pairing for CLI→Gateway auth. Stale device files cause this error.
-
-```bash
-# Reset device identity inside the container
-docker exec koala-agent-1 sh -c "rm -rf /state/identity/device.json /state/devices/"
-
-# Re-pair via localhost (auto-approved)
-docker exec koala-agent-1 node openclaw.mjs devices list \
-  --url ws://127.0.0.1:18789 --token <YOUR_TOKEN>
-```
-
-> **Important:** Must connect via `127.0.0.1`, not the Docker network IP. Only localhost connections get auto-approved pairing. KoalaClaw's `install`, `add-agent`, and `update` commands handle this automatically.
+| Web UI not loading | Ensure `python3 admin-api.py` is running on port 3099 |
+| WebSocket disconnects | Check agent container health with `koalaclaw status` |
 
 For detailed logs:
 ```bash
@@ -478,4 +389,3 @@ MIT License. See [LICENSE](LICENSE) for details.
 *Deploy AI agents like a koala with claws.*
 
 </div>
-

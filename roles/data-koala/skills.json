@@ -1,0 +1,10 @@
+{
+  "enabled": [
+    "csv-analyzer",
+    "coding-agent",
+    "browser",
+    "summarize"
+  ],
+  "disabled": []
+}
+

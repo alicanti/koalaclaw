@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "chart", "position": "center", "icon": "📊"},
+    {"type": "calculator", "position": "front", "icon": "🔢"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "graph", "position": "back", "icon": "📈"},
+    {"type": "database", "position": "left", "icon": "💾"}
+  ],
+  "theme": "analytical",
+  "colors": {
+    "primary": "#00d4ff",
+    "secondary": "#0066cc"
+  }
+}
+

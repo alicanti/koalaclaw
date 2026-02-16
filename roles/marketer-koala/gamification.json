@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Post": {"unlocksAt": 1, "description": "Create engaging social media posts"},
+    "Campaign": {"unlocksAt": 5, "description": "Run multi-channel campaigns"},
+    "Analytics": {"unlocksAt": 10, "description": "Analyze metrics and optimize"},
+    "A/B Testing": {"unlocksAt": 15, "description": "Run experiments and tests"},
+    "Growth": {"unlocksAt": 20, "description": "Drive sustainable growth"}
+  },
+  "achievements": [
+    {"id": "first-post", "name": "First Post", "description": "Created first social post"},
+    {"id": "viral", "name": "Viral", "description": "Post reached 10K+ engagement"},
+    {"id": "campaign-master", "name": "Campaign Master", "description": "Ran 10 campaigns"},
+    {"id": "growth-hacker", "name": "Growth Hacker", "description": "Grew followers by 1000%"}
+  ]
+}
+

@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Code": {"unlocksAt": 1, "description": "Write simple functions and scripts"},
+    "Code Review": {"unlocksAt": 5, "description": "Review and improve existing code"},
+    "Architecture": {"unlocksAt": 10, "description": "Design system architecture"},
+    "CI/CD": {"unlocksAt": 15, "description": "Set up automated pipelines"},
+    "System Design": {"unlocksAt": 20, "description": "Design scalable systems"}
+  },
+  "achievements": [
+    {"id": "first-commit", "name": "First Commit", "description": "Made first code commit"},
+    {"id": "bug-squasher", "name": "Bug Squasher", "description": "Fixed 10 bugs"},
+    {"id": "code-reviewer", "name": "Code Reviewer", "description": "Reviewed 50 PRs"},
+    {"id": "deploy-master", "name": "Deploy Master", "description": "Deployed 100 times"}
+  ]
+}
+

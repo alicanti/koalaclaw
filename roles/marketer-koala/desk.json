@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "chart", "position": "center", "icon": "📊"},
+    {"type": "megaphone", "position": "front", "icon": "📣"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "poster", "position": "back", "icon": "📌"},
+    {"type": "lightbulb", "position": "left", "icon": "💡"}
+  ],
+  "theme": "creative",
+  "colors": {
+    "primary": "#ff6b6b",
+    "secondary": "#ffa500"
+  }
+}
+

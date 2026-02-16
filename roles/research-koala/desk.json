@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "microscope", "position": "center", "icon": "🔬"},
+    {"type": "books", "position": "front", "icon": "📚"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "magnifier", "position": "back", "icon": "🔍"},
+    {"type": "chart", "position": "left", "icon": "📊"}
+  ],
+  "theme": "academic",
+  "colors": {
+    "primary": "#6c5ce7",
+    "secondary": "#4834d4"
+  }
+}
+

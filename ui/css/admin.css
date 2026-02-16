@@ -1,0 +1,292 @@
+/* Admin Panel Styles - Phase 3 */
+
+/* Agent Detail Panel (slides in from left) */
+#agent-detail-panel {
+    position: fixed;
+    top: 0;
+    left: -400px;
+    width: 380px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-right: 2px solid var(--accent-primary);
+    z-index: 100;
+    overflow-y: auto;
+    transition: left 0.3s ease;
+    padding: 20px;
+    box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+#agent-detail-panel.visible {
+    left: 0;
+}
+
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.detail-emoji {
+    font-size: 40px;
+}
+
+.detail-info h3 {
+    font-size: 20px;
+    color: var(--accent-primary);
+}
+
+.detail-role {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.btn-close-detail,
+.btn-close-modal {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    margin-left: auto;
+    padding: 5px;
+}
+
+.btn-close-detail:hover,
+.btn-close-modal:hover {
+    color: var(--error);
+}
+
+.detail-section {
+    margin-bottom: 25px;
+}
+
+.detail-section h4 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.detail-item {
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detail-item .label {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.detail-item .value {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.status-online { color: var(--success); }
+.status-offline { color: var(--error); }
+
+/* Skills Toggle */
+.skills-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.skill-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.skill-toggle:hover {
+    background: var(--bg-primary);
+}
+
+.skill-toggle input[type="checkbox"] {
+    accent-color: var(--accent-primary);
+}
+
+.skill-name {
+    color: var(--text-primary);
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.btn-action {
+    padding: 10px 15px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.btn-action:hover {
+    background: var(--bg-primary);
+    border-color: var(--accent-primary);
+}
+
+.btn-action.btn-danger:hover {
+    border-color: var(--error);
+    color: var(--error);
+}
+
+/* Modal Overlay */
+#modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 200;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+#modal-overlay.visible {
+    display: flex;
+}
+
+#modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    font-size: 20px;
+    color: var(--accent-primary);
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.modal-description {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+/* Role Grid */
+.role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.role-card {
+    padding: 15px;
+    background: var(--bg-tertiary);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.role-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.role-emoji {
+    font-size: 32px;
+}
+
+.role-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.role-title {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.modal-note {
+    padding: 15px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border-left: 3px solid var(--warning);
+}
+
+.modal-note p {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.modal-note code {
+    display: block;
+    padding: 8px 12px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    color: var(--accent-primary);
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 13px;
+}
+
+/* Log Viewer in Modal */
+.log-viewer {
+    background: var(--bg-primary);
+    padding: 15px;
+    border-radius: 8px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+

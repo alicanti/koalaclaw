@@ -1,0 +1,10 @@
+{
+  "enabled": [
+    "server-monitor",
+    "tmux",
+    "healthcheck",
+    "browser"
+  ],
+  "disabled": []
+}
+

@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "scales", "position": "center", "icon": "⚖️"},
+    {"type": "document", "position": "front", "icon": "📋"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "scroll", "position": "back", "icon": "📜"},
+    {"type": "warning", "position": "left", "icon": "⚠️"}
+  ],
+  "theme": "professional",
+  "colors": {
+    "primary": "#2c3e50",
+    "secondary": "#34495e"
+  }
+}
+

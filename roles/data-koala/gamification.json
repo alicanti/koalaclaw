@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Analysis": {"unlocksAt": 1, "description": "Perform basic data analysis"},
+    "Visualization": {"unlocksAt": 5, "description": "Create data visualizations"},
+    "Statistics": {"unlocksAt": 10, "description": "Apply statistical methods"},
+    "Advanced": {"unlocksAt": 15, "description": "Advanced analytics"},
+    "Master": {"unlocksAt": 20, "description": "Master data science"}
+  },
+  "achievements": [
+    {"id": "first-analysis", "name": "First Analysis", "description": "Completed first analysis"},
+    {"id": "data-wizard", "name": "Data Wizard", "description": "Analyzed 100 datasets"},
+    {"id": "insight-master", "name": "Insight Master", "description": "Uncovered 50 insights"},
+    {"id": "data-scientist", "name": "Data Scientist", "description": "Completed 500 analyses"}
+  ]
+}
+

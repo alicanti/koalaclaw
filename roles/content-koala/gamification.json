@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Writing": {"unlocksAt": 1, "description": "Write basic content"},
+    "SEO": {"unlocksAt": 5, "description": "Optimize for search engines"},
+    "Strategy": {"unlocksAt": 10, "description": "Develop content strategy"},
+    "Advanced": {"unlocksAt": 15, "description": "Advanced content techniques"},
+    "Master": {"unlocksAt": 20, "description": "Master content creation"}
+  },
+  "achievements": [
+    {"id": "first-article", "name": "First Article", "description": "Published first article"},
+    {"id": "writer", "name": "Writer", "description": "Published 50 articles"},
+    {"id": "seo-master", "name": "SEO Master", "description": "Ranked #1 for 10 keywords"},
+    {"id": "content-king", "name": "Content King", "description": "Published 500 articles"}
+  ]
+}
+

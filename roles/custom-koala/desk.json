@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "tools", "position": "center", "icon": "🛠️"},
+    {"type": "gear", "position": "front", "icon": "⚙️"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "custom", "position": "back", "icon": "✨"},
+    {"type": "sparkles", "position": "left", "icon": "⭐"}
+  ],
+  "theme": "custom",
+  "colors": {
+    "primary": "#6c5ce7",
+    "secondary": "#4834d4"
+  }
+}
+

@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Scheduling": {"unlocksAt": 1, "description": "Basic calendar management"},
+    "Coordination": {"unlocksAt": 5, "description": "Coordinate multiple calendars"},
+    "Automation": {"unlocksAt": 10, "description": "Automate scheduling"},
+    "Optimization": {"unlocksAt": 15, "description": "Optimize schedules"},
+    "Master": {"unlocksAt": 20, "description": "Master scheduling"}
+  },
+  "achievements": [
+    {"id": "first-schedule", "name": "First Schedule", "description": "Scheduled first event"},
+    {"id": "coordinator", "name": "Coordinator", "description": "Coordinated 100 events"},
+    {"id": "time-master", "name": "Time Master", "description": "Managed 10 calendars"},
+    {"id": "scheduler-expert", "name": "Scheduler Expert", "description": "Scheduled 1000 events"}
+  ]
+}
+

@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "test-tube", "position": "center", "icon": "🧪"},
+    {"type": "bug", "position": "front", "icon": "🐛"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "checkmark", "position": "back", "icon": "✅"},
+    {"type": "magnifier", "position": "left", "icon": "🔍"}
+  ],
+  "theme": "analytical",
+  "colors": {
+    "primary": "#00d4ff",
+    "secondary": "#0066cc"
+  }
+}
+

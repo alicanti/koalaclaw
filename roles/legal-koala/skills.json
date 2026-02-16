@@ -1,0 +1,9 @@
+{
+  "enabled": [
+    "nano-pdf",
+    "summarize",
+    "browser"
+  ],
+  "disabled": []
+}
+

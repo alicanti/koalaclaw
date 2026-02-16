@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KoalaClaw - AI Agent Management</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/office.css">
+    <link rel="stylesheet" href="css/characters.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="css/workflow.css">
+    <link rel="stylesheet" href="css/monitoring.css">
+    <link rel="stylesheet" href="css/gamification.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Sidebar: Admin Panel -->
+        <aside class="admin-panel">
+            <div class="admin-header">
+                <h1>🦞 KoalaClaw</h1>
+                <p class="subtitle">AI Agent Management</p>
+            </div>
+            
+            <div class="admin-section">
+                <h2>Agents</h2>
+                <div class="agent-list" id="agent-list">
+                    <!-- Agents will be populated here -->
+                </div>
+                <button class="btn-add-agent" id="btn-add-agent">+ Add Agent</button>
+            </div>
+            
+            <div class="admin-section">
+                <h2>System</h2>
+                <div class="system-info">
+                    <div class="info-item">
+                        <span class="label">Status:</span>
+                        <span class="value" id="system-status">Initializing...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Agents:</span>
+                        <span class="value" id="agent-count">0</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Center: Isometric Office -->
+        <main class="office-container">
+            <div class="office-header">
+                <h2>Koala Office</h2>
+                <div class="office-controls">
+                    <button class="btn-control" onclick="workflowEngine && workflowEngine.showKanbanModal()">📋 Workflows</button>
+                    <button class="btn-control" onclick="monitor && monitor.showDashboard()">📊 Monitor <span id="alert-badge">0</span></button>
+                    <button class="btn-control" onclick="gamification && gamification.showGamificationModal()">🎮 XP</button>
+                    <button class="btn-control" id="btn-refresh">🔄 Refresh</button>
+                </div>
+            </div>
+            <div class="office-floor" id="office-floor">
+                <!-- Isometric office grid will be rendered here -->
+            </div>
+        </main>
+        
+        <!-- Right Sidebar: Live Logs -->
+        <aside class="logs-panel">
+            <div class="logs-header">
+                <h2>Live Logs</h2>
+                <div class="logs-controls">
+                    <button class="btn-control" id="btn-pause-logs">⏸️ Pause</button>
+                    <button class="btn-control" id="btn-clear-logs">🗑️ Clear</button>
+                </div>
+            </div>
+            <div class="logs-content" id="logs-content">
+                <div class="log-entry log-info">
+                    <span class="log-time">00:00:00</span>
+                    <span class="log-agent">System</span>
+                    <span class="log-message">KoalaClaw initialized</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Bottom: Chat Bar -->
+        <div class="chat-bar">
+            <select class="agent-selector" id="agent-selector">
+                <option value="">Select Agent...</option>
+            </select>
+            <input type="text" class="chat-input" id="chat-input" placeholder="Type a message..." disabled>
+            <button class="btn-send" id="btn-send" disabled>Send</button>
+        </div>
+    </div>
+    
+    <!-- Agent Detail Slide Panel -->
+    <div id="agent-detail-panel"></div>
+    
+    <!-- Modal Overlay -->
+    <div id="modal-overlay">
+        <div id="modal-content"></div>
+    </div>
+    
+    <script src="js/websocket.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/workflow.js"></script>
+    <script src="js/monitoring.js"></script>
+    <script src="js/gamification.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/office.js"></script>
+    <script src="js/characters.js"></script>
+</body>
+</html>
+

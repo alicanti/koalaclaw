@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Testing": {"unlocksAt": 1, "description": "Basic test execution"},
+    "Bug Finding": {"unlocksAt": 5, "description": "Find and report bugs"},
+    "Automation": {"unlocksAt": 10, "description": "Test automation"},
+    "Advanced": {"unlocksAt": 15, "description": "Advanced testing"},
+    "Master": {"unlocksAt": 20, "description": "Master QA engineer"}
+  },
+  "achievements": [
+    {"id": "first-test", "name": "First Test", "description": "Executed first test"},
+    {"id": "bug-hunter", "name": "Bug Hunter", "description": "Found 100 bugs"},
+    {"id": "quality-guardian", "name": "Quality Guardian", "description": "Prevented 50 bugs"},
+    {"id": "qa-master", "name": "QA Master", "description": "Completed 1000 tests"}
+  ]
+}
+

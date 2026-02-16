@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Image": {"unlocksAt": 1, "description": "Generate images"},
+    "Video": {"unlocksAt": 5, "description": "Create videos"},
+    "Audio": {"unlocksAt": 10, "description": "Generate audio and TTS"},
+    "Multimedia": {"unlocksAt": 15, "description": "Create complex multimedia"},
+    "Master": {"unlocksAt": 20, "description": "Master all creative formats"}
+  },
+  "achievements": [
+    {"id": "first-image", "name": "First Image", "description": "Generated first image"},
+    {"id": "artist", "name": "Artist", "description": "Created 100 images"},
+    {"id": "filmmaker", "name": "Filmmaker", "description": "Created 10 videos"},
+    {"id": "creative-master", "name": "Creative Master", "description": "Created 1000 assets"}
+  ]
+}
+

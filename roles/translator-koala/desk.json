@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "globe", "position": "center", "icon": "🌍"},
+    {"type": "book", "position": "front", "icon": "📚"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "languages", "position": "back", "icon": "🌐"},
+    {"type": "pen", "position": "left", "icon": "✍️"}
+  ],
+  "theme": "international",
+  "colors": {
+    "primary": "#4a90e2",
+    "secondary": "#2c3e50"
+  }
+}
+

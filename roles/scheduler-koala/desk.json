@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "calendar", "position": "center", "icon": "📅"},
+    {"type": "clock", "position": "front", "icon": "⏰"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "planner", "position": "back", "icon": "📆"},
+    {"type": "checkmark", "position": "left", "icon": "✅"}
+  ],
+  "theme": "organized",
+  "colors": {
+    "primary": "#4a90e2",
+    "secondary": "#2c3e50"
+  }
+}
+

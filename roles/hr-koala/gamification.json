@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic HR": {"unlocksAt": 1, "description": "Basic HR tasks"},
+    "Recruitment": {"unlocksAt": 5, "description": "Recruitment and hiring"},
+    "Onboarding": {"unlocksAt": 10, "description": "Employee onboarding"},
+    "Relations": {"unlocksAt": 15, "description": "Employee relations"},
+    "Master": {"unlocksAt": 20, "description": "Master HR professional"}
+  },
+  "achievements": [
+    {"id": "first-hire", "name": "First Hire", "description": "Helped with first hire"},
+    {"id": "recruiter", "name": "Recruiter", "description": "Recruited 50 candidates"},
+    {"id": "culture-builder", "name": "Culture Builder", "description": "Built positive culture"},
+    {"id": "hr-master", "name": "HR Master", "description": "Completed 500 HR tasks"}
+  ]
+}
+

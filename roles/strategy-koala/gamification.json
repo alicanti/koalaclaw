@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Planning": {"unlocksAt": 1, "description": "Create basic plans and roadmaps"},
+    "Analysis": {"unlocksAt": 5, "description": "Analyze markets and competitors"},
+    "OKR": {"unlocksAt": 10, "description": "Set and track OKRs"},
+    "Strategy": {"unlocksAt": 15, "description": "Develop comprehensive strategies"},
+    "Vision": {"unlocksAt": 20, "description": "Define long-term vision"}
+  },
+  "achievements": [
+    {"id": "first-plan", "name": "First Plan", "description": "Created first strategic plan"},
+    {"id": "goal-achiever", "name": "Goal Achiever", "description": "Achieved 10 OKRs"},
+    {"id": "strategist", "name": "Strategist", "description": "Developed 5 strategies"},
+    {"id": "visionary", "name": "Visionary", "description": "Set long-term vision"}
+  ]
+}
+

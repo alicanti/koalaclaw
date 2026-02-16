@@ -1,0 +1,18 @@
+{
+  "startingLevel": 1,
+  "startingXP": 0,
+  "skillTree": {
+    "Basic Research": {"unlocksAt": 1, "description": "Conduct basic research"},
+    "Deep Dive": {"unlocksAt": 5, "description": "Perform deep analysis"},
+    "Synthesis": {"unlocksAt": 10, "description": "Synthesize complex information"},
+    "Expert": {"unlocksAt": 15, "description": "Become research expert"},
+    "Master": {"unlocksAt": 20, "description": "Master all research methods"}
+  },
+  "achievements": [
+    {"id": "first-research", "name": "First Research", "description": "Completed first research"},
+    {"id": "scholar", "name": "Scholar", "description": "Completed 50 research projects"},
+    {"id": "expert", "name": "Expert", "description": "Cited 100 sources"},
+    {"id": "research-master", "name": "Research Master", "description": "Completed 500 research tasks"}
+  ]
+}
+

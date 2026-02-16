@@ -1,0 +1,15 @@
+{
+  "decorations": [
+    {"type": "monitor", "position": "center", "icon": "🖥️"},
+    {"type": "keyboard", "position": "front", "icon": "⌨️"},
+    {"type": "coffee", "position": "right", "icon": "☕"},
+    {"type": "plant", "position": "left", "icon": "🌱"},
+    {"type": "books", "position": "back", "icon": "📚"}
+  ],
+  "theme": "tech",
+  "colors": {
+    "primary": "#00d4ff",
+    "secondary": "#0066cc"
+  }
+}
+

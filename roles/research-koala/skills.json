@@ -1,0 +1,10 @@
+{
+  "enabled": [
+    "web-scraper",
+    "browser",
+    "nano-pdf",
+    "summarize"
+  ],
+  "disabled": []
+}
+
