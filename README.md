@@ -126,6 +126,11 @@ Internet / LAN
 | `skills add <path>` | Add a custom skill from a directory |
 | `skills remove <name>` | Remove a custom skill |
 | `skills status` | Show enabled skills per agent |
+| `browser status` | Browser relay connection status |
+| `browser tabs` | List attached Chromium tabs |
+| `browser screenshot` | Capture a screenshot |
+| `browser navigate <url>` | Navigate to a URL |
+| `browser relay` | Restart CDP relay forwarders |
 | `logs [N]` | View logs (all agents or specific) |
 | `update` | Pull latest OpenClaw images and restart |
 | `backup` | Create a backup archive |
@@ -177,16 +182,19 @@ sudo koalaclaw credentials
 ```mermaid
 graph TB
     subgraph Internet["Internet / LAN"]
-        Browser["Browser"]
+        Browser["Browser<br/>(Control UI)"]
     end
 
     subgraph Server["Ubuntu Server"]
+        Chromium["Chromium + Relay Extension"]
+        Socat["socat CDP forwarders"]
+
         subgraph Docker["Docker Engine"]
-            subgraph Network["koala-net (172.30.0.0/24)"]
-                Caddy["Caddy<br/>172.30.0.100"]
-                Agent1["Agent 1<br/>172.30.0.11"]
-                Agent2["Agent 2<br/>172.30.0.12"]
-                Agent3["Agent N<br/>172.30.0.1N"]
+            subgraph Network["koala-net"]
+                Caddy["Caddy<br/>:3001-300N"]
+                Agent1["Agent 1"]
+                Agent2["Agent 2"]
+                Agent3["Agent N"]
             end
         end
     end
@@ -200,6 +208,9 @@ graph TB
     Caddy -->|"Bearer Token"| Agent2
     Caddy -->|"Bearer Token"| Agent3
     Agent1 & Agent2 & Agent3 -->|"API Key"| API
+
+    Chromium <-->|"CDP Relay"| Socat
+    Socat <-->|"Node proxy"| Agent1 & Agent2 & Agent3
 ```
 
 ### Request Flow
@@ -231,9 +242,10 @@ sequenceDiagram
 ├── .credentials           # Access URLs & tokens
 ├── docker-compose.yml     # Generated
 ├── Caddyfile              # Generated
+├── relay-start.sh         # CDP relay startup (systemd)
 └── data/
     ├── koala-agent-1/
-    │   ├── openclaw.json
+    │   ├── openclaw.json  # Gateway + browser config
     │   └── agents/main/agent/
     │       └── auth-profiles.json
     ├── koala-agent-2/
@@ -330,8 +342,21 @@ curl -s https://api.example.com/data
 sudo koalaclaw skills add ./my-skill
 ```
 
-### Browser Automation
-Headless Chrome for web scraping, screenshots, form filling, and more.
+### Browser Relay
+Control the server's real Chromium browser from Docker agents via CDP relay:
+
+```bash
+# Check attached tabs
+sudo koalaclaw browser tabs
+
+# Navigate
+sudo koalaclaw browser navigate https://example.com
+
+# Screenshot
+sudo koalaclaw browser screenshot
+```
+
+The relay chain (`Extension → socat → Node proxy → CDP relay`) is set up automatically during install and persists across reboots via systemd.
 
 ### Cron Jobs
 Schedule recurring tasks for agents.

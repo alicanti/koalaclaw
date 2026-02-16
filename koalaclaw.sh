@@ -614,6 +614,7 @@ _generate_agent_configs() {
         mkdir -p "$auth_dir"
 
         # openclaw.json
+        local cdp_port=$(( 18792 + i - 1 ))
         python3 -c "
 import json
 cfg = {
@@ -636,6 +637,19 @@ cfg = {
             'token': '${token}'
         },
         'trustedProxies': ['${CADDY_IP}']
+    },
+    'browser': {
+        'enabled': True,
+        'noSandbox': True,
+        'attachOnly': True,
+        'defaultProfile': 'chrome',
+        'profiles': {
+            'chrome': {
+                'cdpPort': ${cdp_port},
+                'driver': 'extension',
+                'color': '#00AA00'
+            }
+        }
     }
 }
 with open('${agent_dir}/openclaw.json', 'w') as f:
@@ -720,7 +734,132 @@ _deploy() {
 
     _wait_healthy
     _reset_device_identity
+    _setup_browser_relay
     _verify_endpoints
+}
+
+_setup_browser_relay() {
+    _step "Setting up browser relay (CDP proxy)..."
+
+    # Each agent needs a Node.js TCP proxy inside the container to forward
+    # from 0.0.0.0:<cdp_proxy_port> → 127.0.0.1:<cdp_port>
+    # because the CDP relay only binds to localhost inside the container.
+    # Then a host socat forwards host:<cdp_port> → container:<cdp_proxy_port>
+
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local cdp_port=$(( 18792 + i - 1 ))
+        local proxy_port=$(( 18892 + i - 1 ))  # internal proxy port
+
+        # Create Node.js TCP proxy script inside container
+        docker exec "koala-agent-${i}" sh -c "cat > /tmp/cdp-proxy.js << 'PROXYEOF'
+const net = require('net');
+const server = net.createServer((client) => {
+  const target = net.connect(${cdp_port}, '127.0.0.1', () => {
+    client.pipe(target);
+    target.pipe(client);
+  });
+  target.on('error', () => client.destroy());
+  client.on('error', () => target.destroy());
+});
+server.listen(${proxy_port}, '0.0.0.0', () => {
+  console.log('CDP proxy: 0.0.0.0:${proxy_port} -> 127.0.0.1:${cdp_port}');
+});
+PROXYEOF" 2>/dev/null
+
+        # Start the proxy inside container (kill old one first)
+        docker exec "koala-agent-${i}" sh -c \
+            "kill \$(lsof -t -i:${proxy_port} 2>/dev/null) 2>/dev/null; node /tmp/cdp-proxy.js &" 2>/dev/null &
+        disown 2>/dev/null
+
+        # Kill old host socat for this port
+        pkill -f "socat.*${cdp_port}.*${proxy_port}" 2>/dev/null || true
+    done
+
+    sleep 2
+
+    # Install socat on host if needed
+    if ! command -v socat &>/dev/null; then
+        _step "Installing socat..."
+        apt-get install -y -qq socat >/dev/null 2>&1
+    fi
+
+    # Start host socat forwarders
+    local relay_ok=0
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local cdp_port=$(( 18792 + i - 1 ))
+        local proxy_port=$(( 18892 + i - 1 ))
+        local agent_ip="${DEFAULT_AGENT_IP_PREFIX}${i}"
+
+        # Kill old socat
+        pkill -f "socat.*TCP-LISTEN:${cdp_port}" 2>/dev/null || true
+        sleep 0.5
+
+        # Forward host:cdp_port → container_ip:proxy_port
+        nohup socat "TCP-LISTEN:${cdp_port},fork,reuseaddr" \
+            "TCP:${agent_ip}:${proxy_port}" >/dev/null 2>&1 &
+        disown 2>/dev/null
+        (( relay_ok++ ))
+    done
+
+    # Create systemd service for persistence across reboots
+    _create_relay_systemd_service
+
+    _info "Browser relay: ${relay_ok}/${AGENT_COUNT} agents configured"
+    _info "CDP ports: $(seq -s', ' 18792 $(( 18792 + AGENT_COUNT - 1 )))"
+}
+
+_create_relay_systemd_service() {
+    # Create a systemd service to start socat forwarders on boot
+    local service_file="/etc/systemd/system/koalaclaw-relay.service"
+    local script_file="${INSTALL_DIR}/relay-start.sh"
+
+    cat > "$script_file" << RELAYEOF
+#!/bin/bash
+# KoalaClaw CDP Relay - auto-generated
+# Forwards host CDP ports to container Node.js proxies
+
+# Wait for Docker containers to be ready
+sleep 10
+
+RELAYEOF
+
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local cdp_port=$(( 18792 + i - 1 ))
+        local proxy_port=$(( 18892 + i - 1 ))
+        local agent_ip="${DEFAULT_AGENT_IP_PREFIX}${i}"
+
+        cat >> "$script_file" << RELAYAGENT
+# Agent ${i}: start Node proxy inside container
+docker exec -d koala-agent-${i} sh -c "node /tmp/cdp-proxy.js 2>/dev/null &" 2>/dev/null
+
+# Agent ${i}: forward host:${cdp_port} → container:${proxy_port}
+socat TCP-LISTEN:${cdp_port},fork,reuseaddr TCP:${agent_ip}:${proxy_port} &
+
+RELAYAGENT
+    done
+
+    echo "wait" >> "$script_file"
+    chmod +x "$script_file"
+
+    cat > "$service_file" << SVCEOF
+[Unit]
+Description=KoalaClaw CDP Browser Relay
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=${script_file}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    systemctl daemon-reload 2>/dev/null
+    systemctl enable koalaclaw-relay 2>/dev/null
+    _info "Relay systemd service created (persistent across reboots)"
 }
 
 _reset_device_identity() {
@@ -1362,6 +1501,106 @@ _exec_openclaw() {
         --token "${token}" 2>&1
 }
 
+# ═══════════════════════════════════════
+# COMMAND: BROWSER
+# ═══════════════════════════════════════
+cmd_browser() {
+    _check_root
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+    _load_state
+
+    local subcmd="${1:-}"
+    shift || true
+
+    case "$subcmd" in
+        status)     cmd_browser_status "$@" ;;
+        tabs)       cmd_browser_tabs "$@" ;;
+        screenshot) cmd_browser_screenshot "$@" ;;
+        navigate)   cmd_browser_navigate "$@" ;;
+        relay)      cmd_browser_relay "$@" ;;
+        ""|--help)  cmd_browser_help ;;
+        *)
+            _error "Unknown browser command: ${subcmd}"
+            cmd_browser_help
+            exit 1
+            ;;
+    esac
+}
+
+cmd_browser_help() {
+    echo ""
+    echo -e "  ${BOLD}Usage:${NC} koalaclaw browser <command> [options]"
+    echo ""
+    echo -e "  ${BOLD}Commands:${NC}"
+    echo -e "    ${GREEN}status${NC} ${DIM}[agent-id]${NC}               Browser relay status"
+    echo -e "    ${GREEN}tabs${NC} ${DIM}[agent-id]${NC}                 List attached browser tabs"
+    echo -e "    ${GREEN}screenshot${NC} ${DIM}[agent-id]${NC}           Take a screenshot"
+    echo -e "    ${GREEN}navigate${NC} ${DIM}<url> [agent-id]${NC}       Navigate to a URL"
+    echo -e "    ${GREEN}relay${NC}                          Restart CDP relay forwarders"
+    echo ""
+    echo -e "  ${BOLD}Setup:${NC}"
+    echo -e "    1. Install 'OpenClaw Browser Relay' extension in Chromium"
+    echo -e "    2. Open a web page and click the extension icon"
+    echo -e "    3. Extension connects to agent via CDP port"
+    echo ""
+    echo -e "  ${BOLD}CDP Ports:${NC}"
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        local cdp_port=$(( 18792 + i - 1 ))
+        echo -e "    Agent ${i}: localhost:${cdp_port}"
+    done
+    echo ""
+}
+
+cmd_browser_status() {
+    local agent_id="${1:-1}"
+    echo ""
+    echo -e "  ${BOLD}Browser Status — Agent ${agent_id}${NC}"
+    echo -e "  ${DIM}────────────────────────────────────────${NC}"
+    _exec_openclaw "$agent_id" browser status
+    echo ""
+
+    # Check relay chain
+    local cdp_port=$(( 18792 + agent_id - 1 ))
+    local relay_ok="no"
+    if curl -sf --max-time 2 --head "http://127.0.0.1:${cdp_port}/" &>/dev/null; then
+        relay_ok="yes"
+    fi
+    echo -e "  ${DIM}Relay chain (host:${cdp_port}): ${relay_ok}${NC}"
+    echo ""
+}
+
+cmd_browser_tabs() {
+    local agent_id="${1:-1}"
+    echo ""
+    echo -e "  ${BOLD}Browser Tabs — Agent ${agent_id}${NC}"
+    echo -e "  ${DIM}────────────────────────────────────────${NC}"
+    _exec_openclaw "$agent_id" browser tabs
+    echo ""
+}
+
+cmd_browser_screenshot() {
+    local agent_id="${1:-1}"
+    _step "Taking screenshot from Agent ${agent_id}..."
+    _exec_openclaw "$agent_id" browser screenshot
+}
+
+cmd_browser_navigate() {
+    local url="${1:-}"
+    local agent_id="${2:-1}"
+    if [[ -z "$url" ]]; then
+        _error "Usage: koalaclaw browser navigate <url> [agent-id]"
+        exit 1
+    fi
+    _step "Navigating Agent ${agent_id} to ${url}..."
+    _exec_openclaw "$agent_id" browser navigate "$url"
+}
+
+cmd_browser_relay() {
+    _step "Restarting browser relay forwarders..."
+    _setup_browser_relay
+    _info "Relay forwarders restarted"
+}
+
 cmd_skills() {
     _check_root
     INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
@@ -1728,6 +1967,7 @@ _usage() {
     echo -e "    ${GREEN}status${NC}           Show health of all agents"
     echo -e "    ${GREEN}credentials${NC}      Show access URLs and tokens"
     echo -e "    ${GREEN}skills${NC}           Manage agent skills (list/enable/disable/add)"
+    echo -e "    ${GREEN}browser${NC}          Browser relay control (status/tabs/screenshot)"
     echo -e "    ${GREEN}logs${NC} ${DIM}[N]${NC}         View logs (all or specific agent)"
     echo -e "    ${GREEN}update${NC}           Pull latest images and restart"
     echo -e "    ${GREEN}backup${NC}           Create a backup archive"
@@ -1791,6 +2031,7 @@ main() {
         status)         cmd_status "$@" ;;
         credentials)    cmd_credentials "$@" ;;
         skills)         cmd_skills "$@" ;;
+        browser)        cmd_browser "$@" ;;
         logs)           cmd_logs "$@" ;;
         update)         cmd_update "$@" ;;
         backup)         cmd_backup "$@" ;;

@@ -9,46 +9,47 @@
 ```mermaid
 graph TB
     subgraph Internet["Internet / LAN"]
-        Browser["Browser"]
+        Browser["Browser<br/>(Control UI)"]
     end
 
     subgraph Server["Ubuntu 24.04 Server"]
+        Chromium["Chromium + Browser Relay Extension"]
+        Socat["socat forwarders<br/>:18792, :18793, :18794"]
+
         subgraph Docker["Docker Engine"]
             subgraph Network["koala-net (172.30.0.0/24)"]
                 Caddy["Caddy Reverse Proxy<br/>172.30.0.100<br/>Ports: 3001, 3002, 3003"]
 
-                Agent1["koala-agent-1<br/>172.30.0.11<br/>:18789"]
-                Agent2["koala-agent-2<br/>172.30.0.12<br/>:18789"]
-                Agent3["koala-agent-3<br/>172.30.0.13<br/>:18789"]
+                Agent1["koala-agent-1<br/>172.30.0.11<br/>:18789 + CDP :18792"]
+                Agent2["koala-agent-2<br/>172.30.0.12<br/>:18789 + CDP :18793"]
+                Agent3["koala-agent-3<br/>172.30.0.13<br/>:18789 + CDP :18794"]
             end
         end
 
         subgraph Volumes["Persistent Data"]
-            Data1["data/koala-agent-1/<br/>openclaw.json<br/>agents/main/agent/"]
+            Data1["data/koala-agent-1/"]
             Data2["data/koala-agent-2/"]
             Data3["data/koala-agent-3/"]
         end
     end
 
     subgraph OpenAI["OpenAI API"]
-        API["api.openai.com<br/>gpt-5.2"]
+        API["api.openai.com"]
     end
 
-    Browser -->|":3001 HTTP"| Caddy
-    Browser -->|":3002 HTTP"| Caddy
-    Browser -->|":3003 HTTP"| Caddy
+    Browser -->|":3001-3003 HTTP"| Caddy
 
-    Caddy -->|"+ Bearer Token<br/>+ X-Forwarded-Proto"| Agent1
-    Caddy -->|"+ Bearer Token<br/>+ X-Forwarded-Proto"| Agent2
-    Caddy -->|"+ Bearer Token<br/>+ X-Forwarded-Proto"| Agent3
+    Caddy -->|"+ Bearer Token"| Agent1
+    Caddy -->|"+ Bearer Token"| Agent2
+    Caddy -->|"+ Bearer Token"| Agent3
 
-    Agent1 --> Data1
-    Agent2 --> Data2
-    Agent3 --> Data3
+    Agent1 & Agent2 & Agent3 --> Data1 & Data2 & Data3
+    Agent1 & Agent2 & Agent3 -->|"API Key"| API
 
-    Agent1 -->|"OPENAI_API_KEY"| API
-    Agent2 -->|"OPENAI_API_KEY"| API
-    Agent3 -->|"OPENAI_API_KEY"| API
+    Chromium <-->|"Extension WS"| Socat
+    Socat <-->|"Node proxy"| Agent1
+    Socat <-->|"Node proxy"| Agent2
+    Socat <-->|"Node proxy"| Agent3
 ```
 
 ### Request Flow
@@ -1174,9 +1175,115 @@ docker exec koala-agent-1 node openclaw.mjs health
 
 ---
 
-## Browser Automation
+## Browser Relay (Remote Browser Control)
 
-OpenClaw includes a built-in headless browser (Chrome/Chromium) that the agent can control programmatically. This enables web scraping, form filling, screenshots, and more.
+OpenClaw agents in Docker can control a real Chromium browser on the host server through the **Browser Relay** system. This enables web scraping, form filling, screenshots, and interactive browsing.
+
+### Architecture
+
+```mermaid
+sequenceDiagram
+    participant C as Chromium + Extension
+    participant S as socat (host)
+    participant N as Node proxy (container)
+    participant R as CDP Relay (container)
+    participant A as Agent
+
+    Note over C: Extension installed + tab attached
+
+    C->>S: ws://127.0.0.1:18792
+    S->>N: TCP → container:18892
+    N->>R: TCP → 127.0.0.1:18792
+    R->>A: CDP commands available
+
+    A->>R: browser.navigate("google.com")
+    R->>N: CDP protocol
+    N->>S: TCP forward
+    S->>C: Execute in Chromium
+    C-->>A: Result
+```
+
+### Why This Architecture?
+
+The CDP relay inside the container binds to `127.0.0.1` only (security restriction). Docker port exposure forwards to the container's network IP (`172.30.0.x`), not to its loopback. The solution:
+
+1. **Node.js TCP proxy** inside the container: `0.0.0.0:18892` → `127.0.0.1:18792`
+2. **socat** on the host: `0.0.0.0:18792` → `container_ip:18892`
+3. **Extension** connects to `127.0.0.1:18792` on the host
+
+This preserves the Docker bridge network, Caddy routing, and all existing configuration.
+
+### Setup
+
+#### 1. Install the Browser Relay Extension
+
+In the server's Chromium browser:
+- Install **"OpenClaw Browser Relay"** from Chrome Web Store
+- Or install manually from the OpenClaw repository
+
+#### 2. CDP Port Mapping
+
+Each agent gets a unique CDP port:
+
+| Agent | CDP Port | Extension connects to |
+|-------|----------|----------------------|
+| Agent 1 | `18792` | `http://127.0.0.1:18792` |
+| Agent 2 | `18793` | `http://127.0.0.1:18793` |
+| Agent 3 | `18794` | `http://127.0.0.1:18794` |
+
+KoalaClaw sets this up automatically during `install`.
+
+#### 3. Attach a Tab
+
+1. Open Chromium on the server
+2. Navigate to any web page
+3. Click the extension icon on the toolbar → tab becomes "attached"
+4. The agent can now control that tab
+
+#### 4. Verify
+
+```bash
+# Check browser status
+sudo koalaclaw browser status
+
+# List attached tabs
+sudo koalaclaw browser tabs
+
+# Take a screenshot
+sudo koalaclaw browser screenshot
+```
+
+### Browser Configuration in openclaw.json
+
+```json
+{
+    "browser": {
+        "enabled": true,
+        "noSandbox": true,
+        "attachOnly": true,
+        "defaultProfile": "chrome",
+        "profiles": {
+            "chrome": {
+                "cdpPort": 18792,
+                "driver": "extension",
+                "color": "#00AA00"
+            }
+        }
+    }
+}
+```
+
+### Relay Persistence
+
+KoalaClaw creates a systemd service (`koalaclaw-relay`) that automatically restarts the socat forwarders on reboot:
+
+```bash
+# Check relay service
+sudo systemctl status koalaclaw-relay
+
+# Restart relay manually
+sudo koalaclaw browser relay
+```
 
 ### Browser Commands
 
