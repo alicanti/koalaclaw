@@ -6,7 +6,7 @@
 # ╚══════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="2.0.0"
 DEFAULT_INSTALL_DIR="/opt/koalaclaw"
 DEFAULT_START_PORT=3001
 DEFAULT_SUBNET="172.30.0.0/24"
@@ -21,6 +21,9 @@ CADDY_IMAGE="caddy:2-alpine"
 MIN_RAM_MB=1024
 MIN_DISK_MB=5120
 INTERNAL_PORT=18789
+ADMIN_API_PORT=3099
+GITHUB_REPO="https://github.com/alicanti/koalaclaw.git"
+REPO_DIR="${DEFAULT_INSTALL_DIR}/repo"
 
 # ═══════════════════════════════════════
 # COLORS
@@ -100,6 +103,13 @@ _list_roles() {
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local roles_dir="${script_dir}/roles"
     
+    # Also check repo dir and install dir
+    if [[ ! -d "$roles_dir" ]]; then
+        roles_dir="${REPO_DIR:-${INSTALL_DIR:-/opt/koalaclaw}/repo}/roles"
+    fi
+    if [[ ! -d "$roles_dir" ]]; then
+        roles_dir="${INSTALL_DIR:-/opt/koalaclaw}/repo/roles"
+    fi
     if [[ ! -d "$roles_dir" ]]; then
         return 1
     fi
@@ -122,6 +132,10 @@ _get_role_info() {
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local role_dir="${script_dir}/roles/${role}"
     
+    # Also check repo dir
+    if [[ ! -f "${role_dir}/IDENTITY.md" ]]; then
+        role_dir="${REPO_DIR:-${INSTALL_DIR:-/opt/koalaclaw}/repo}/roles/${role}"
+    fi
     if [[ ! -f "${role_dir}/IDENTITY.md" ]]; then
         return 1
     fi
@@ -143,6 +157,10 @@ _select_role() {
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local roles_dir="${script_dir}/roles"
     
+    # Also check repo dir
+    if [[ ! -d "$roles_dir" ]]; then
+        roles_dir="${REPO_DIR:-${INSTALL_DIR:-/opt/koalaclaw}/repo}/roles"
+    fi
     if [[ ! -d "$roles_dir" ]]; then
         _warn "Roles directory not found. Using default role."
         echo "coder-koala"
@@ -186,13 +204,16 @@ _apply_role_to_agent() {
     local agent_dir="${INSTALL_DIR}/data/koala-agent-${agent_num}"
     local role_dir
     
-    # Find role directory (could be in script dir or install dir)
+    # Find role directory (script dir → repo dir → install dir)
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     role_dir="${script_dir}/roles/${role}"
     
     if [[ ! -d "$role_dir" ]]; then
-        _warn "Role directory not found: ${role_dir}. Skipping role application."
+        role_dir="${REPO_DIR:-${INSTALL_DIR}/repo}/roles/${role}"
+    fi
+    if [[ ! -d "$role_dir" ]]; then
+        _warn "Role directory not found for '${role}'. Skipping role application."
         return 1
     fi
     
@@ -385,11 +406,12 @@ _check_firewall() {
         _warn "UFW firewall is active"
         local end_port=$(( START_PORT + AGENT_COUNT - 1 ))
         echo ""
-        read -rp "  Open ports ${START_PORT}-${end_port} in UFW? [Y/n]: " fw_answer
+        read -rp "  Open ports ${START_PORT}-${end_port} + ${ADMIN_API_PORT} (Web UI) in UFW? [Y/n]: " fw_answer
         fw_answer="${fw_answer:-Y}"
         if [[ "${fw_answer,,}" == "y" ]]; then
             ufw allow "${START_PORT}:${end_port}/tcp" &>/dev/null
-            _info "UFW: ports ${START_PORT}-${end_port} opened"
+            ufw allow "${ADMIN_API_PORT}/tcp" &>/dev/null
+            _info "UFW: ports ${START_PORT}-${end_port} + ${ADMIN_API_PORT} opened"
         else
             _warn "Ports not opened. External access may not work."
         fi
@@ -479,12 +501,93 @@ _install_compose() {
 }
 
 # ═══════════════════════════════════════
+# CLONE REPO (roles, ui, admin-api, skills, workflows)
+# ═══════════════════════════════════════
+_clone_repo() {
+    _step "Setting up KoalaClaw platform files..."
+    REPO_DIR="${INSTALL_DIR}/repo"
+
+    # Check if git is available
+    if ! command -v git &>/dev/null; then
+        apt-get install -y -qq git >/dev/null 2>&1
+    fi
+
+    if [[ -d "${REPO_DIR}/.git" ]]; then
+        _step "Updating existing repo..."
+        cd "${REPO_DIR}" && git pull --quiet 2>/dev/null || true
+        cd "${INSTALL_DIR}"
+    else
+        _step "Cloning KoalaClaw repo..."
+        rm -rf "${REPO_DIR}" 2>/dev/null
+        git clone --depth 1 "${GITHUB_REPO}" "${REPO_DIR}" 2>/dev/null
+    fi
+
+    if [[ ! -d "${REPO_DIR}/roles" ]]; then
+        _warn "Repo clone failed. Trying direct download..."
+        mkdir -p "${REPO_DIR}"
+        curl -fsSL "https://github.com/alicanti/koalaclaw/archive/refs/heads/main.tar.gz" \
+            | tar xz --strip-components=1 -C "${REPO_DIR}" 2>/dev/null
+    fi
+
+    if [[ -d "${REPO_DIR}/roles" ]]; then
+        _info "Platform files ready (${REPO_DIR})"
+    else
+        _warn "Could not download platform files. Roles and Web UI will not be available."
+    fi
+}
+
+# ═══════════════════════════════════════
+# ADMIN API (Web UI) SETUP
+# ═══════════════════════════════════════
+_setup_admin_api() {
+    _step "Setting up Web UI (Admin API on port ${ADMIN_API_PORT})..."
+
+    if [[ ! -f "${REPO_DIR}/admin-api.py" ]]; then
+        _warn "admin-api.py not found. Web UI will not be available."
+        return 1
+    fi
+
+    # Create systemd service
+    cat > /etc/systemd/system/koalaclaw-ui.service << UIEOF
+[Unit]
+Description=KoalaClaw Web UI (Admin API)
+After=network.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=${REPO_DIR}
+ExecStart=/usr/bin/python3 ${REPO_DIR}/admin-api.py
+Restart=always
+RestartSec=5
+User=root
+Environment=KOALACLAW_INSTALL_DIR=${INSTALL_DIR}
+Environment=KOALACLAW_API_PORT=${ADMIN_API_PORT}
+
+[Install]
+WantedBy=multi-user.target
+UIEOF
+
+    systemctl daemon-reload
+    systemctl enable koalaclaw-ui &>/dev/null
+    systemctl restart koalaclaw-ui &>/dev/null
+
+    sleep 2
+
+    # Verify it started
+    if systemctl is-active --quiet koalaclaw-ui; then
+        _info "Web UI running on port ${ADMIN_API_PORT}"
+    else
+        _warn "Web UI failed to start. Check: journalctl -u koalaclaw-ui"
+    fi
+}
+
+# ═══════════════════════════════════════
 # INSTALL DEPENDENCIES
 # ═══════════════════════════════════════
 _install_deps() {
     _step "Checking dependencies..."
     local missing=()
-    for cmd in curl openssl python3; do
+    for cmd in curl openssl python3 git; do
         if ! command -v "$cmd" &>/dev/null; then
             missing+=("$cmd")
         fi
@@ -829,6 +932,8 @@ Model: ${MODEL}
 Provider: ${PROVIDER}
 Install Dir: ${INSTALL_DIR}
 
+Web UI: http://${SERVER_IP}:${ADMIN_API_PORT}
+
 CREDS_HEADER
 
     for i in $(seq 1 "$AGENT_COUNT"); do
@@ -1086,11 +1191,17 @@ _print_summary() {
     echo -e "  ${BOLD}${GREEN}  ✅ KoalaClaw deployed successfully!${NC}"
     echo -e "  ${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
     echo ""
-    echo -e "  ${BOLD}Access URLs:${NC}"
+    echo -e "  ${BOLD}🎮 Web UI:${NC}"
+    echo -e "    ${CYAN}http://${SERVER_IP}:${ADMIN_API_PORT}${NC}"
+    echo ""
+    echo -e "  ${BOLD}Agent Canvas URLs:${NC}"
     for i in $(seq 1 "$AGENT_COUNT"); do
         local port=$(( START_PORT + i - 1 ))
         eval "local token=\${TOKEN_${i}}"
-        echo -e "    ${CYAN}Agent ${i}:${NC} http://${SERVER_IP}:${port}/#token=${token}"
+        eval "local role=\${ROLE_${i}:-coder-koala}"
+        local role_info
+        role_info=$(_get_role_info "$role" 2>/dev/null || echo "$role")
+        echo -e "    ${CYAN}Agent ${i}${NC} (${role_info}): http://${SERVER_IP}:${port}/#token=${token}"
     done
     echo ""
     echo -e "  ${DIM}Credentials: ${INSTALL_DIR}/${CREDENTIALS_FILE}${NC}"
@@ -1130,6 +1241,12 @@ cmd_install() {
     _check_os
     _install_deps
     _check_internet
+
+    # ─── Clone Repo (roles, ui, admin-api) ───
+    _header "Platform Files"
+    mkdir -p "${INSTALL_DIR}"
+    REPO_DIR="${INSTALL_DIR}/repo"
+    _clone_repo
 
     # ─── Interactive Config ───
     _header "Configuration"
@@ -1239,6 +1356,11 @@ cmd_install() {
 
     # ─── Deploy ───
     _deploy
+
+    # ─── Web UI ───
+    _header "Web UI"
+    _setup_admin_api
+
     _print_summary
 
     # Symlink for easy access
@@ -1247,6 +1369,10 @@ cmd_install() {
         script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
         ln -sf "$script_path" /usr/local/bin/koalaclaw 2>/dev/null || true
     fi
+
+    # Copy script to install dir for future use
+    cp -f "${BASH_SOURCE[0]}" "${INSTALL_DIR}/koalaclaw.sh" 2>/dev/null || true
+    chmod +x "${INSTALL_DIR}/koalaclaw.sh" 2>/dev/null || true
 }
 
 # ═══════════════════════════════════════
@@ -1257,6 +1383,7 @@ cmd_add_agent() {
     _check_root
     INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
     _load_state
+    REPO_DIR="${INSTALL_DIR}/repo"
 
     local old_count=$AGENT_COUNT
     read -rp "  How many agents to add? [1]: " add_count
@@ -1467,9 +1594,14 @@ cmd_update() {
     _check_root
     INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
     _load_state
+    REPO_DIR="${INSTALL_DIR}/repo"
 
     _header "Updating KoalaClaw"
     cd "${INSTALL_DIR}"
+
+    # Update platform files (roles, ui, admin-api)
+    _step "Updating platform files..."
+    _clone_repo
 
     _step "Pulling latest images..."
     docker compose pull --quiet
@@ -1480,6 +1612,13 @@ cmd_update() {
     _wait_healthy
     _reset_device_identity
     _verify_endpoints
+
+    # Restart Web UI
+    if systemctl is-enabled --quiet koalaclaw-ui 2>/dev/null; then
+        _step "Restarting Web UI..."
+        systemctl restart koalaclaw-ui
+        _info "Web UI restarted"
+    fi
 
     # Version check
     local oc_version
