@@ -245,7 +245,8 @@ class KoalaClawApp {
 
         // Proxy URL: same origin, no cross-origin issues
         // /agent/{id}/ is reverse-proxied to the agent container by admin-api.py
-        const canvasUrl = `/agent/${agent.id}/__openclaw__/canvas/#token=${agent.token}`;
+        // Root URL (/) serves the real OpenClaw Control chat UI
+        const canvasUrl = `/agent/${agent.id}/#token=${agent.token}`;
 
         if (frame) {
             frame.src = canvasUrl;
