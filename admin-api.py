@@ -218,6 +218,13 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         # Serve static files from UI directory
         super().do_GET()
 
+    def do_HEAD(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/agent/"):
+            self._proxy_to_agent("HEAD")
+            return
+        super().do_HEAD()
+
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
@@ -283,12 +290,23 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=30) as resp:
                 resp_body = resp.read()
                 self.send_response(resp.status)
-                # Forward response headers
+                # Forward response headers, stripping iframe-blocking ones
+                blocked_headers = (
+                    "transfer-encoding", "connection",
+                    "x-frame-options",       # Blocks iframe embedding
+                    "content-security-policy", # frame-ancestors 'none' blocks iframe
+                )
                 for key, val in resp.getheaders():
-                    if key.lower() not in ("transfer-encoding", "connection"):
+                    if key.lower() not in blocked_headers:
                         self.send_header(key, val)
-                # Allow iframe embedding from same origin
+                # Replace with permissive CSP for iframe embedding
                 self.send_header("X-Frame-Options", "SAMEORIGIN")
+                self.send_header("Content-Security-Policy",
+                    "default-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                    "connect-src 'self' ws: wss: http: https:; "
+                    "img-src 'self' data: https:; "
+                    "font-src 'self' data:; "
+                    "frame-ancestors 'self'")
                 self.end_headers()
                 self.wfile.write(resp_body)
 
