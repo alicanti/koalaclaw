@@ -1,267 +1,399 @@
-/* Isometric Office Styles */
+/* Pixel Art Office Scene */
 
-.office-floor {
-    perspective: 1000px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-}
-
-.desk-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 40px;
-    padding: 40px;
-    transform-style: preserve-3d;
-}
-
-/* Isometric Desk */
-.desk {
+.office-scene {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    background: #1a1932;
     position: relative;
-    width: 180px;
+    overflow: auto;
+    image-rendering: pixelated;
+}
+
+/* Floor */
+.office-floor-bg {
+    position: absolute;
+    inset: 0;
+    background:
+        repeating-linear-gradient(90deg, transparent, transparent 63px, rgba(61,58,110,0.3) 63px, rgba(61,58,110,0.3) 64px),
+        repeating-linear-gradient(0deg, transparent, transparent 63px, rgba(61,58,110,0.3) 63px, rgba(61,58,110,0.3) 64px);
+    background-size: 64px 64px;
+}
+
+/* Walls */
+.office-wall {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 120px;
-    transform-style: preserve-3d;
+    background: linear-gradient(180deg, #2a2950 0%, #232246 60%, #1a1932 100%);
+    border-bottom: 4px solid #3d3a6e;
+    z-index: 1;
+}
+
+.office-wall::after {
+    content: '';
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 60px;
+    background: linear-gradient(180deg, #0f0e17 0%, #1a1932 100%);
+    border: 3px solid #3d3a6e;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(0,229,255,0.1);
+}
+
+/* Clock on wall */
+.wall-clock {
+    position: absolute;
+    top: 20px;
+    right: 40px;
+    font-family: var(--pixel-font);
+    font-size: 10px;
+    color: var(--accent);
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 4px;
+    z-index: 2;
+}
+
+/* Desk Grid */
+.desk-grid {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 140px 40px 40px;
+    justify-content: center;
+    z-index: 5;
+}
+
+/* Individual Desk */
+.desk-unit {
+    width: 160px;
+    height: 180px;
+    position: relative;
     cursor: pointer;
-    transition: transform 0.3s ease;
+    transition: transform 0.2s;
 }
 
-.desk:hover {
-    transform: translateY(-5px) scale(1.05);
+.desk-unit:hover {
+    transform: scale(1.05);
 }
 
-/* Isometric transform for desk top */
-.desk-top {
+.desk-unit.selected {
+    filter: drop-shadow(0 0 12px rgba(0,229,255,0.4));
+}
+
+/* Desk surface */
+.desk-surface {
     position: absolute;
-    width: 180px;
-    height: 120px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    transform: rotateX(60deg) rotateZ(-45deg);
-    transform-origin: center center;
-    border: 2px solid #1a202c;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    bottom: 40px;
+    left: 10px;
+    right: 10px;
+    height: 24px;
+    background: #5c4a3a;
+    border: 3px solid #3d3226;
+    border-radius: 2px;
+    z-index: 3;
 }
 
-/* Desk front face */
-.desk-front {
+/* Desk legs */
+.desk-surface::before,
+.desk-surface::after {
+    content: '';
     position: absolute;
-    width: 180px;
+    bottom: -20px;
+    width: 8px;
+    height: 20px;
+    background: #3d3226;
+}
+
+.desk-surface::before { left: 8px; }
+.desk-surface::after { right: 8px; }
+
+/* Monitor on desk */
+.desk-monitor {
+    position: absolute;
+    bottom: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 56px;
     height: 40px;
-    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-    transform: rotateX(-30deg) translateZ(-20px) translateY(60px);
-    transform-origin: center bottom;
-    border: 2px solid #1a202c;
+    background: #0f0e17;
+    border: 3px solid #3d3a6e;
+    border-radius: 3px;
+    z-index: 4;
+    overflow: hidden;
 }
 
-/* Desk side face */
-.desk-side {
+/* Monitor screen glow */
+.desk-monitor::after {
+    content: '';
     position: absolute;
-    width: 40px;
-    height: 120px;
-    background: linear-gradient(135deg, #1a202c 0%, #0f1419 100%);
-    transform: rotateY(30deg) translateZ(-20px) translateX(70px);
-    transform-origin: left center;
-    border: 2px solid #1a202c;
+    inset: 3px;
+    background: linear-gradient(135deg, #1a3a2a 0%, #0a2a1a 100%);
+    animation: screen-flicker 4s infinite;
 }
 
-/* Desk decorations */
-.desk-decoration {
+.desk-unit.active .desk-monitor::after {
+    background: linear-gradient(135deg, #1a3a4a 0%, #0a2a3a 100%);
+    animation: screen-active 2s infinite;
+}
+
+@keyframes screen-flicker {
+    0%, 95%, 100% { opacity: 0.6; }
+    96% { opacity: 0.3; }
+}
+
+@keyframes screen-active {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
+
+/* Monitor stand */
+.desk-monitor-stand {
     position: absolute;
-    font-size: 24px;
-    transform: rotateX(60deg) rotateZ(-45deg);
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 6px;
+    background: #3d3a6e;
+    z-index: 4;
+}
+
+/* Chair */
+.desk-chair {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 36px;
+    z-index: 2;
+}
+
+.desk-chair-seat {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    background: #4a3a6e;
+    border: 2px solid #3d2e5e;
+    border-radius: 3px 3px 0 0;
+}
+
+.desk-chair-back {
+    position: absolute;
+    top: -16px;
+    left: 4px;
+    right: 4px;
+    height: 18px;
+    background: #5a4a7e;
+    border: 2px solid #4a3a6e;
+    border-radius: 3px 3px 0 0;
+}
+
+.desk-chair-leg {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 8px;
+    background: #2a2a3a;
+}
+
+/* Koala Character */
+.koala-char {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 36px;
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    transition: all 0.3s;
+}
+
+/* Character states */
+.koala-char.idle {
+    animation: char-idle 3s ease-in-out infinite;
+}
+
+.koala-char.thinking {
+    animation: char-think 1.5s ease-in-out infinite;
+}
+
+.koala-char.typing {
+    animation: char-type 0.4s ease-in-out infinite;
+}
+
+.koala-char.talking {
+    animation: char-talk 0.6s ease-in-out infinite;
+}
+
+.koala-char.error {
+    animation: char-error 0.3s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(255,82,82,0.6));
+}
+
+.koala-char.sleeping {
+    opacity: 0.5;
+    animation: char-sleep 4s ease-in-out infinite;
+}
+
+@keyframes char-idle {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-3px); }
+}
+
+@keyframes char-think {
+    0%, 100% { transform: translateX(-50%) rotate(0deg); }
+    25% { transform: translateX(-50%) rotate(-8deg); }
+    75% { transform: translateX(-50%) rotate(8deg); }
+}
+
+@keyframes char-type {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-2px); }
+}
+
+@keyframes char-talk {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.08); }
+}
+
+@keyframes char-error {
+    0%, 100% { transform: translateX(-50%) translateX(0); }
+    25% { transform: translateX(calc(-50% - 3px)); }
+    75% { transform: translateX(calc(-50% + 3px)); }
+}
+
+@keyframes char-sleep {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.5; }
+    50% { transform: translateX(-50%) scale(0.96); opacity: 0.35; }
+}
+
+/* Speech bubble */
+.speech-bubble {
+    position: absolute;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: var(--bg-dark);
+    font-family: var(--pixel-font);
+    font-size: 7px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.3s;
     pointer-events: none;
 }
 
-.desk-decoration.monitor {
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%) rotateX(60deg) rotateZ(-45deg);
-}
-
-.desk-decoration.keyboard {
-    top: 60px;
-    left: 50%;
-    transform: translateX(-50%) rotateX(60deg) rotateZ(-45deg);
-}
-
-.desk-decoration.coffee {
-    top: 20px;
-    right: 20px;
-    transform: rotateX(60deg) rotateZ(-45deg);
-}
-
-.desk-decoration.plant {
-    top: 20px;
-    left: 20px;
-    transform: rotateX(60deg) rotateZ(-45deg);
-}
-
-/* Agent label */
-.desk-label {
+.speech-bubble::after {
+    content: '';
     position: absolute;
-    bottom: -30px;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--accent);
+}
+
+.desk-unit:hover .speech-bubble,
+.desk-unit.selected .speech-bubble {
+    opacity: 1;
+}
+
+/* Status indicator */
+.desk-status-light {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    z-index: 15;
+    border: 2px solid rgba(0,0,0,0.3);
+}
+
+.desk-status-light.online {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse-dot 2s infinite;
+}
+
+.desk-status-light.thinking {
+    background: var(--warning);
+    box-shadow: 0 0 8px var(--warning);
+    animation: pulse-dot 0.8s infinite;
+}
+
+/* Name plate */
+.desk-nameplate {
+    position: absolute;
+    bottom: 14px;
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
-    font-size: 12px;
-    color: var(--text-primary);
+    z-index: 15;
     white-space: nowrap;
 }
 
-.desk-label .agent-name {
-    font-weight: 600;
-    color: var(--accent-primary);
+.desk-nameplate .np-name {
+    font-family: var(--pixel-font);
+    font-size: 7px;
+    color: var(--accent);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
-.desk-label .agent-role {
-    font-size: 10px;
-    color: var(--text-secondary);
+.desk-nameplate .np-role {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
 }
 
-/* Status indicator on desk */
-.desk-status {
+/* Desk items / decorations */
+.desk-item {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--text-secondary);
-    transform: rotateX(60deg) rotateZ(-45deg);
-    box-shadow: 0 0 10px currentColor;
+    z-index: 5;
+    font-size: 14px;
 }
 
-.desk-status.online {
-    background: var(--success);
-    box-shadow: 0 0 10px var(--success);
-}
+.desk-item.item-coffee { bottom: 66px; right: 20px; }
+.desk-item.item-plant { bottom: 66px; left: 16px; }
+.desk-item.item-book { bottom: 66px; left: 30px; font-size: 12px; }
 
-.desk-status.offline {
-    background: var(--error);
-    box-shadow: 0 0 10px var(--error);
-}
-
-.desk-status.thinking {
-    background: var(--warning);
-    box-shadow: 0 0 10px var(--warning);
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-        transform: rotateX(60deg) rotateZ(-45deg) scale(1);
-    }
-    50% {
-        opacity: 0.5;
-        transform: rotateX(60deg) rotateZ(-45deg) scale(1.2);
-    }
-}
-
-/* Koala character on desk */
-.koala-character {
+/* Office decorations */
+.office-plant {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg);
     font-size: 32px;
-    transition: transform 0.3s ease;
-    pointer-events: none;
-    z-index: 10;
+    z-index: 3;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
-.koala-character.idle {
-    animation: idle-bob 3s ease-in-out infinite;
+.office-watercooler {
+    position: absolute;
+    font-size: 28px;
+    z-index: 3;
 }
 
-.koala-character.thinking {
-    animation: thinking-rotate 2s ease-in-out infinite;
+/* Day/Night ambient */
+.office-scene.night {
+    filter: brightness(0.7) saturate(0.8);
 }
 
-.koala-character.typing {
-    animation: typing-bounce 0.5s ease-in-out infinite;
+.office-scene.night .desk-monitor::after {
+    box-shadow: 0 0 15px rgba(0,229,255,0.2);
 }
-
-.koala-character.browsing {
-    animation: browsing-sway 2s ease-in-out infinite;
-}
-
-.koala-character.talking {
-    animation: talking-pulse 0.8s ease-in-out infinite;
-}
-
-.koala-character.error {
-    animation: error-shake 0.5s ease-in-out infinite;
-}
-
-.koala-character.sleeping {
-    opacity: 0.6;
-    animation: sleeping-breathe 3s ease-in-out infinite;
-}
-
-@keyframes idle-bob {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateY(0);
-    }
-    50% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateY(-3px);
-    }
-}
-
-@keyframes thinking-rotate {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) rotate(0deg);
-    }
-    25% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) rotate(-5deg);
-    }
-    75% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) rotate(5deg);
-    }
-}
-
-@keyframes typing-bounce {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateY(0);
-    }
-    50% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateY(-2px);
-    }
-}
-
-@keyframes browsing-sway {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) rotate(0deg);
-    }
-    50% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) rotate(10deg);
-    }
-}
-
-@keyframes talking-pulse {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) scale(1);
-    }
-    50% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) scale(1.1);
-    }
-}
-
-@keyframes error-shake {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateX(0);
-    }
-    25% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateX(-3px);
-    }
-    75% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) translateX(3px);
-    }
-}
-
-@keyframes sleeping-breathe {
-    0%, 100% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) scale(1);
-    }
-    50% {
-        transform: translate(-50%, -50%) rotateX(60deg) rotateZ(-45deg) scale(0.95);
-    }
-}
-
