@@ -231,7 +231,7 @@ class KoalaClawApp {
         const frame = document.getElementById('canvas-frame');
         const placeholder = document.getElementById('chat-placeholder');
 
-        if (!agent.token || !agent.port) {
+        if (!agent.token || !agent.id) {
             if (placeholder) {
                 placeholder.style.display = 'flex';
                 placeholder.innerHTML = `
@@ -243,32 +243,15 @@ class KoalaClawApp {
             return;
         }
 
-        // Build Canvas URL
-        const host = window.location.hostname;
-        const canvasUrl = `http://${host}:${agent.port}/#token=${agent.token}`;
+        // Proxy URL: same origin, no cross-origin issues
+        // /agent/{id}/ is reverse-proxied to the agent container by admin-api.py
+        const canvasUrl = `/agent/${agent.id}/__openclaw__/canvas/#token=${agent.token}`;
 
-        // Show open button + try iframe
-        if (placeholder) {
-            placeholder.style.display = 'flex';
-            placeholder.innerHTML = `
-                <div class="chat-placeholder-icon">${agent.emoji || '🐨'}</div>
-                <h3 style="color:var(--accent);margin:0">${agent.name}</h3>
-                <p style="color:var(--text-dim);margin:4px 0">${agent.role || ''}</p>
-                <a href="${canvasUrl}" target="_blank" 
-                   style="display:inline-block;margin-top:16px;padding:12px 32px;
-                          background:var(--accent);color:var(--bg-dark);
-                          text-decoration:none;border-radius:6px;font-weight:700;
-                          font-size:15px;transition:transform 0.15s"
-                   onmouseover="this.style.transform='scale(1.05)'"
-                   onmouseout="this.style.transform='scale(1)'">
-                    💬 Open Chat
-                </a>
-                <p style="color:var(--text-dim);font-size:11px;margin-top:12px">
-                    Opens OpenClaw Canvas in a new tab
-                </p>
-            `;
+        if (frame) {
+            frame.src = canvasUrl;
+            frame.style.display = 'block';
         }
-        if (frame) frame.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'none';
     }
 
     updateAgentStatus(agentId, status, state) {

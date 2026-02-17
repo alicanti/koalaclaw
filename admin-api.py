@@ -16,6 +16,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from http import HTTPStatus
 import threading
 import urllib.parse
+import urllib.request
 import socket
 
 # ─── Configuration ───────────────────────────────────────────────
@@ -204,6 +205,11 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # Agent proxy: /agent/{id}/... → container:18789/...
+        if path.startswith("/agent/"):
+            self._proxy_to_agent("GET")
+            return
+
         # API routes
         if path.startswith("/api/"):
             self._handle_api(path, parsed.query)
@@ -216,6 +222,11 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # Agent proxy
+        if path.startswith("/agent/"):
+            self._proxy_to_agent("POST")
+            return
+
         if path.startswith("/api/"):
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length) if content_length > 0 else b""
@@ -223,6 +234,74 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return
 
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
+
+    def _proxy_to_agent(self, method):
+        """Reverse proxy /agent/{id}/path → agent container."""
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            parts = parsed.path.split("/", 3)  # ['', 'agent', '{id}', 'rest...']
+
+            if len(parts) < 3:
+                self.send_error(HTTPStatus.BAD_REQUEST, "Invalid agent path")
+                return
+
+            agent_id = int(parts[2])
+            rest_path = "/" + parts[3] if len(parts) > 3 else "/"
+
+            # Get agent IP from Docker network
+            state = load_state()
+            subnet = state.get("SUBNET", "172.30.0.0/24")
+            prefix = subnet.rsplit(".", 2)[0]  # e.g. "172.30.0"
+            agent_ip = f"{prefix}.1{agent_id}"  # e.g. 172.30.0.11
+            agent_port = 18789
+
+            # Build target URL
+            query = f"?{parsed.query}" if parsed.query else ""
+            target_url = f"http://{agent_ip}:{agent_port}{rest_path}{query}"
+
+            # Read request body if POST
+            body = None
+            if method == "POST":
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 0:
+                    body = self.rfile.read(content_length)
+
+            # Forward request
+            req = urllib.request.Request(target_url, data=body, method=method)
+
+            # Copy relevant headers
+            for header in ("Content-Type", "Authorization", "Accept"):
+                val = self.headers.get(header)
+                if val:
+                    req.add_header(header, val)
+
+            # Add auth token
+            token = state.get(f"TOKEN_{agent_id}", "")
+            if token:
+                req.add_header("Authorization", f"Bearer {token}")
+
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                resp_body = resp.read()
+                self.send_response(resp.status)
+                # Forward response headers
+                for key, val in resp.getheaders():
+                    if key.lower() not in ("transfer-encoding", "connection"):
+                        self.send_header(key, val)
+                # Allow iframe embedding from same origin
+                self.send_header("X-Frame-Options", "SAMEORIGIN")
+                self.end_headers()
+                self.wfile.write(resp_body)
+
+        except urllib.error.HTTPError as e:
+            self.send_response(e.code)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(f"Proxy error: {e.reason}".encode())
+        except Exception as e:
+            self.send_response(502)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(f"Proxy error: {e}".encode())
 
     def _handle_api(self, path, query):
         """Route GET API requests."""
