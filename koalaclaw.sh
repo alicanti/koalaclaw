@@ -15,7 +15,7 @@ DEFAULT_CADDY_IP="172.30.0.100"
 DEFAULT_AGENT_IP_PREFIX="172.30.0.1"  # agents: .11, .12, .13 ...
 STATE_FILE=".koalaclaw.state"
 CREDENTIALS_FILE=".credentials"
-LOG_FILE="/var/log/koalaclaw-install.log"
+LOG_FILE="/var/log/koalaclaw.log"
 OPENCLAW_IMAGE="alpine/openclaw:latest"
 CADDY_IMAGE="caddy:2-alpine"
 MIN_RAM_MB=1024
@@ -45,12 +45,49 @@ fi
 # ═══════════════════════════════════════
 # LOGGING
 # ═══════════════════════════════════════
-_log() { echo -e "$1" | tee -a "$LOG_FILE" 2>/dev/null || echo -e "$1"; }
+_init_log() {
+    # Ensure log file exists and is writable
+    if ! touch "$LOG_FILE" 2>/dev/null; then
+        LOG_FILE="${INSTALL_DIR:-/tmp}/koalaclaw.log"
+        touch "$LOG_FILE" 2>/dev/null || LOG_FILE="/tmp/koalaclaw.log"
+    fi
+    # Write header
+    echo "" >> "$LOG_FILE"
+    echo "════════════════════════════════════════════════════════" >> "$LOG_FILE"
+    echo "  KoalaClaw v${VERSION} — $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$LOG_FILE"
+    echo "  Command: $0 ${ORIGINAL_ARGS:-}" >> "$LOG_FILE"
+    echo "  User: $(whoami) | PID: $$" >> "$LOG_FILE"
+    echo "════════════════════════════════════════════════════════" >> "$LOG_FILE"
+}
+
+_log() {
+    local ts
+    ts=$(date '+%H:%M:%S')
+    # Print to terminal
+    echo -e "$1"
+    # Write plain text (no colors) to log file
+    echo -e "[$ts] $1" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE" 2>/dev/null || true
+}
 _info()    { _log "${GREEN}  ✓${NC} $1"; }
 _warn()    { _log "${YELLOW}  ⚠${NC} $1"; }
 _error()   { _log "${RED}  ✗${NC} $1"; }
 _step()    { _log "${CYAN}  →${NC} $1"; }
 _header()  { _log "\n${BOLD}${WHITE}  ─── $1 ───${NC}\n"; }
+
+# Log command output (both stdout and stderr) to log file
+_run() {
+    local label="$1"
+    shift
+    _step "${label}"
+    echo "[$(date '+%H:%M:%S')] CMD: $*" >> "$LOG_FILE" 2>/dev/null
+    # Run command, tee output to log, show last lines to terminal
+    "$@" >> "$LOG_FILE" 2>&1
+    local rc=$?
+    if (( rc != 0 )); then
+        echo "[$(date '+%H:%M:%S')] EXIT: ${rc}" >> "$LOG_FILE" 2>/dev/null
+    fi
+    return $rc
+}
 _spinner() {
     local pid=$1 msg=$2
     local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
@@ -484,8 +521,8 @@ _check_docker() {
 
 _install_docker() {
     _header "Installing Docker CE"
-    apt-get update -qq
-    apt-get install -y -qq ca-certificates curl gnupg lsb-release >/dev/null 2>&1
+    _run "Updating apt" apt-get update -qq || true
+    _run "Installing prerequisites" apt-get install -y -qq ca-certificates curl gnupg lsb-release || true
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
     chmod a+r /etc/apt/keyrings/docker.gpg
@@ -495,14 +532,17 @@ _install_docker() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${codename} stable" \
         > /etc/apt/sources.list.d/docker.list
 
-    apt-get update -qq
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+    _run "Updating apt (Docker repo)" apt-get update -qq || true
+    _run "Installing Docker CE" apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin || {
+        _error "Docker installation failed. Check log: ${LOG_FILE}"
+        exit 1
+    }
 
     systemctl enable --now docker &>/dev/null
     sleep 2
 
     if ! docker info &>/dev/null; then
-        _error "Docker installation failed."
+        _error "Docker is installed but not running. Check log: ${LOG_FILE}"
         exit 1
     fi
     _info "Docker CE installed successfully"
@@ -536,15 +576,15 @@ _clone_repo() {
     if [[ -d "${REPO_DIR}/.git" ]]; then
         _step "Updating existing repo..."
         cd "${REPO_DIR}"
-        git pull --quiet 2>/dev/null || _warn "Git pull failed, using existing files"
+        git pull --quiet >> "$LOG_FILE" 2>&1 || _warn "Git pull failed, using existing files"
         cd "${INSTALL_DIR}"
     else
         _step "Cloning KoalaClaw repo..."
         rm -rf "${REPO_DIR}" 2>/dev/null
-        if git clone --depth 1 "${GITHUB_REPO}" "${REPO_DIR}" 2>&1 | tail -2; then
+        if git clone --depth 1 "${GITHUB_REPO}" "${REPO_DIR}" >> "$LOG_FILE" 2>&1; then
             _info "Repo cloned successfully"
         else
-            _warn "Git clone failed, trying tarball download..."
+            _warn "Git clone failed (see ${LOG_FILE}), trying tarball download..."
         fi
     fi
 
@@ -552,11 +592,11 @@ _clone_repo() {
     if [[ ! -d "${REPO_DIR}/roles" ]]; then
         _step "Downloading via tarball..."
         mkdir -p "${REPO_DIR}"
-        if curl -fsSL "https://github.com/alicanti/koalaclaw/archive/refs/heads/main.tar.gz" \
-            | tar xz --strip-components=1 -C "${REPO_DIR}" 2>/dev/null; then
+        if curl -fsSL "https://github.com/alicanti/koalaclaw/archive/refs/heads/main.tar.gz" 2>> "$LOG_FILE" \
+            | tar xz --strip-components=1 -C "${REPO_DIR}" 2>> "$LOG_FILE"; then
             _info "Tarball downloaded successfully"
         else
-            _warn "Tarball download also failed"
+            _warn "Tarball download also failed. See: ${LOG_FILE}"
         fi
     fi
 
@@ -1015,11 +1055,18 @@ _deploy() {
     cd "${INSTALL_DIR}"
 
     _step "Pulling Docker images..."
-    docker compose pull --quiet 2>&1 | tail -1
+    docker compose pull --quiet >> "$LOG_FILE" 2>&1 || {
+        _error "Image pull failed. Check log: ${LOG_FILE}"
+        _warn "Trying without --quiet..."
+        docker compose pull 2>&1 | tee -a "$LOG_FILE" | tail -5
+    }
     _info "Images pulled"
 
     _step "Starting containers..."
-    docker compose up -d 2>&1 | tail -5
+    docker compose up -d >> "$LOG_FILE" 2>&1 || {
+        _error "Container start failed. Check log: ${LOG_FILE}"
+        docker compose up -d 2>&1 | tee -a "$LOG_FILE" | tail -10
+    }
     _info "Containers started"
 
     _wait_healthy
@@ -1260,6 +1307,7 @@ _print_summary() {
     echo ""
     echo -e "  ${DIM}Credentials: ${INSTALL_DIR}/${CREDENTIALS_FILE}${NC}"
     echo -e "  ${DIM}Model: ${MODEL}${NC}"
+    echo -e "  ${DIM}Install log: ${LOG_FILE}${NC}"
     echo ""
     echo -e "  ${BOLD}Quick commands:${NC}"
     echo -e "    ${DIM}koalaclaw status${NC}        # Check health"
@@ -1267,6 +1315,8 @@ _print_summary() {
     echo -e "    ${DIM}koalaclaw logs [N]${NC}      # View agent logs"
     echo -e "    ${DIM}koalaclaw add-agent${NC}     # Add more agents"
     echo -e "    ${DIM}koalaclaw backup${NC}        # Backup data"
+    echo ""
+    echo -e "  ${DIM}If something doesn't work, check: ${LOG_FILE}${NC}"
     echo ""
 }
 
@@ -1290,6 +1340,18 @@ cmd_install() {
         # Stop existing
         cd "${INSTALL_DIR}" && docker compose down 2>/dev/null || true
     fi
+
+    # Log system info for debugging
+    {
+        echo "[$(date '+%H:%M:%S')] System info:"
+        echo "  OS: $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '"')"
+        echo "  Kernel: $(uname -r 2>/dev/null)"
+        echo "  Arch: $(dpkg --print-architecture 2>/dev/null || uname -m)"
+        echo "  RAM: $(awk '/MemTotal/ {printf "%.0f MB", $2/1024}' /proc/meminfo 2>/dev/null)"
+        echo "  Disk: $(df -h / 2>/dev/null | awk 'NR==2 {print $4 " free"}')"
+        echo "  Docker: $(docker --version 2>/dev/null || echo 'not installed')"
+        echo "  Bash: ${BASH_VERSION}"
+    } >> "$LOG_FILE" 2>/dev/null
 
     _header "Prerequisites"
     _check_os
@@ -1386,8 +1448,6 @@ cmd_install() {
 
     # ─── Generate ───
     _header "Generating Configuration"
-
-    touch "$LOG_FILE" 2>/dev/null || LOG_FILE="${INSTALL_DIR}/install.log"
 
     # Generate tokens and select roles
     _step "Generating tokens and selecting roles..."
@@ -2326,6 +2386,9 @@ _usage() {
 # MAIN
 # ═══════════════════════════════════════
 main() {
+    ORIGINAL_ARGS="$*"
+    _init_log
+
     # Parse global flags
     while [[ $# -gt 0 ]]; do
         case "$1" in
