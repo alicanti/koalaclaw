@@ -237,9 +237,9 @@ class KoalaClawApp {
             return;
         }
 
-        // Build Canvas URL
+        // Build Canvas URL — root with hash token for auth
         const host = window.location.hostname;
-        const canvasUrl = `http://${host}:${agent.port}/__openclaw__/canvas/#token=${agent.token}`;
+        const canvasUrl = `http://${host}:${agent.port}/#token=${agent.token}`;
 
         if (frame) {
             frame.src = canvasUrl;
