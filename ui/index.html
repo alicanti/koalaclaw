@@ -6,6 +6,7 @@
     <title>KoalaClaw - AI Agent Office</title>
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/office.css">
+    <link rel="stylesheet" href="css/chat.css">
     <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="css/workflow.css">
     <link rel="stylesheet" href="css/monitoring.css">
@@ -75,13 +76,14 @@
                 </div>
             </div>
 
-            <!-- Chat View (Canvas iframe) -->
+            <!-- Chat View -->
             <div class="tab-content" id="content-chat">
-                <div class="chat-placeholder" id="chat-placeholder">
-                    <div class="chat-placeholder-icon">💬</div>
-                    <p>Select an agent from the left panel to start chatting</p>
+                <div id="chat-area">
+                    <div class="chat-select-prompt">
+                        <div class="prompt-icon">💬</div>
+                        <p>Select an agent to start chatting</p>
+                    </div>
                 </div>
-                <iframe class="canvas-frame" id="canvas-frame" style="display:none"></iframe>
             </div>
         </main>
 
@@ -113,6 +115,7 @@
     </div>
 
     <script src="js/websocket.js"></script>
+    <script src="js/chat.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/workflow.js"></script>
     <script src="js/monitoring.js"></script>

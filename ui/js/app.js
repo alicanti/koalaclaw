@@ -20,6 +20,7 @@ class KoalaClawApp {
         this.updateSystemStatus();
         this.startPolling();
         this.wsManager = new WebSocketManager(this);
+        this.chatManager = new ChatManager(this);
         adminPanel = new AdminPanel(this);
         workflowEngine = new WorkflowEngine(this);
         messageBus = new AgentMessageBus(this);
@@ -210,8 +211,8 @@ class KoalaClawApp {
         this.renderAgentList();
         officeRenderer.selectDesk(agentId);
 
-        // Load Canvas iframe
-        this._loadCanvasFrame(agent);
+        // Connect chat
+        this.chatManager.connect(agent);
 
         // Switch to chat tab
         this.switchTab('chat');
@@ -225,34 +226,6 @@ class KoalaClawApp {
         if (this.wsManager && agent.status === 'online' && !this.wsManager.isConnected(agent.id)) {
             this.wsManager.connectToAgent(agent);
         }
-    }
-
-    _loadCanvasFrame(agent) {
-        const frame = document.getElementById('canvas-frame');
-        const placeholder = document.getElementById('chat-placeholder');
-
-        if (!agent.token || !agent.id) {
-            if (placeholder) {
-                placeholder.style.display = 'flex';
-                placeholder.innerHTML = `
-                    <div class="chat-placeholder-icon">💬</div>
-                    <p>Agent not available</p>
-                `;
-            }
-            if (frame) frame.style.display = 'none';
-            return;
-        }
-
-        // Proxy URL: same origin, no cross-origin issues
-        // /agent/{id}/ is reverse-proxied to the agent container by admin-api.py
-        // Root URL (/) serves the real OpenClaw Control chat UI
-        const canvasUrl = `/agent/${agent.id}/#token=${agent.token}`;
-
-        if (frame) {
-            frame.src = canvasUrl;
-            frame.style.display = 'block';
-        }
-        if (placeholder) placeholder.style.display = 'none';
     }
 
     updateAgentStatus(agentId, status, state) {
