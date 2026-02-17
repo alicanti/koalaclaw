@@ -419,7 +419,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         return "idle"
 
     def _send_chat(self, data):
-        """Send a chat message to an agent via its WebSocket gateway."""
+        """Send a chat message to an agent via OpenClaw CLI (docker exec)."""
         agent_id = data.get("agent_id")
         message = data.get("message", "")
 
@@ -427,22 +427,50 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return {"error": "agent_id and message required"}
 
         state = load_state()
-        start_port = int(state.get("START_PORT", "3001"))
-        port = start_port + int(agent_id) - 1
         token = state.get(f"TOKEN_{agent_id}", "")
 
-        # Use docker exec to send message via OpenClaw CLI
+        if not token:
+            return {"error": f"No token found for agent {agent_id}"}
+
+        # Use docker exec + OpenClaw CLI to send message
+        # The CLI connects via localhost WebSocket (auto-approved pairing)
         try:
             result = subprocess.run(
                 ["docker", "exec", f"koala-agent-{agent_id}",
-                 "node", "dist/index.js", "send", "--message", message],
-                capture_output=True, text=True, timeout=30
+                 "node", "openclaw.mjs", "chat",
+                 "--url", f"ws://127.0.0.1:18789",
+                 "--token", token,
+                 "--message", message,
+                 "--no-stream"],
+                capture_output=True, text=True, timeout=60
             )
-            return {
-                "success": result.returncode == 0,
-                "response": result.stdout.strip(),
-                "error": result.stderr.strip() if result.returncode != 0 else None,
-            }
+
+            stdout = result.stdout.strip()
+            stderr = result.stderr.strip()
+
+            if result.returncode == 0 and stdout:
+                return {
+                    "success": True,
+                    "response": stdout,
+                }
+            else:
+                # Try without --no-stream flag
+                result2 = subprocess.run(
+                    ["docker", "exec", f"koala-agent-{agent_id}",
+                     "node", "openclaw.mjs", "chat",
+                     "--url", f"ws://127.0.0.1:18789",
+                     "--token", token,
+                     "-m", message],
+                    capture_output=True, text=True, timeout=60
+                )
+                stdout2 = result2.stdout.strip()
+                if stdout2:
+                    return {"success": True, "response": stdout2}
+                return {
+                    "success": False,
+                    "response": stdout or stdout2 or None,
+                    "error": stderr or "No response from agent",
+                }
         except subprocess.TimeoutExpired:
             return {"error": "Request timed out"}
         except Exception as e:

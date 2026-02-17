@@ -1,238 +1,89 @@
-// KoalaClaw Chat — Direct OpenClaw WebSocket Chat
-// Connects to agent via Caddy-proxied WebSocket
+// KoalaClaw Chat — REST API Chat via admin-api.py
+// Sends messages via docker exec → OpenClaw CLI
 
 class ChatManager {
     constructor(app) {
         this.app = app;
-        this.ws = null;
         this.agent = null;
-        this.reconnectTimer = null;
         this.messageHistory = [];
-        this.isStreaming = false;
-        this.streamBuffer = '';
-        this.currentRunId = null;
+        this.sending = false;
     }
 
     // ─── Connect to Agent ───────────────────────────────────
     connect(agent) {
-        this.disconnect();
         this.agent = agent;
 
-        if (!agent || !agent.port || !agent.token) {
+        if (!agent || !agent.id) {
             this._renderError('Agent not available');
             return;
         }
 
-        const host = window.location.hostname;
-        const wsUrl = `ws://${host}:${agent.port}/__openclaw__/ws`;
-
-        this._renderConnecting();
-        this.app.addLog('info', `Connecting to ${agent.name}...`, 'Chat');
-
-        try {
-            this.ws = new WebSocket(wsUrl);
-            this.ws.onopen = () => this._onOpen();
-            this.ws.onmessage = (e) => this._onMessage(e);
-            this.ws.onclose = (e) => this._onClose(e);
-            this.ws.onerror = (e) => this._onError(e);
-        } catch (e) {
-            this._renderError(`Connection failed: ${e.message}`);
-        }
-    }
-
-    disconnect() {
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
-        }
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        this.isStreaming = false;
-        this.streamBuffer = '';
-    }
-
-    // ─── WebSocket Events ───────────────────────────────────
-    _onOpen() {
-        this.app.addLog('success', `Connected to ${this.agent.name}`, 'Chat');
-        // Caddy already injects Authorization: Bearer TOKEN header
-        // so no extra auth message needed — just render the chat UI
+        this.app.addLog('info', `Chat ready: ${agent.name}`, 'Chat');
         this._renderChat();
     }
 
-    _onMessage(event) {
-        // Debug: log ALL incoming messages
-        console.log('[WS RAW]', event.data);
-
-        let data;
-        try {
-            data = JSON.parse(event.data);
-        } catch {
-            // Non-JSON message — show it
-            if (event.data && event.data.length > 0) {
-                this._appendSystemMessage(`[raw] ${event.data.substring(0, 200)}`, 'warning');
-            }
-            return;
-        }
-
-        // Debug: log parsed message type
-        console.log('[WS MSG]', data.type || data.kind || 'unknown', data);
-
-        // Show unhandled message types in chat for debugging
-        const knownTypes = ['connected','chunk','text','message','run:start','run:end',
-            'tool:start','tool:end','error','pong','heartbeat'];
-        if (data.type && !knownTypes.includes(data.type)) {
-            this._appendSystemMessage(`[${data.type}] ${JSON.stringify(data).substring(0, 150)}`, 'warning');
-        }
-
-        switch (data.type) {
-            case 'connected':
-                this.app.addLog('success', `Authenticated with ${this.agent.name}`, 'Chat');
-                this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
-                break;
-
-            case 'chunk':
-            case 'text':
-                this._handleTextChunk(data);
-                break;
-
-            case 'message':
-                this._handleMessage(data);
-                break;
-
-            case 'run:start':
-                this.currentRunId = data.runId;
-                this.isStreaming = true;
-                this.streamBuffer = '';
-                this._appendAssistantBubble();
-                this.app.updateAgentStatus(this.agent.id, 'online', 'thinking');
-                break;
-
-            case 'run:end':
-                this.isStreaming = false;
-                if (this.streamBuffer) {
-                    this._finalizeStream();
-                }
-                this.currentRunId = null;
-                this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
-                break;
-
-            case 'tool:start':
-                this._appendToolCall(data);
-                this.app.updateAgentStatus(this.agent.id, 'online', 'typing');
-                this.app.addLog('info', `Tool: ${data.name || data.tool || 'unknown'}`, this.agent.name);
-                break;
-
-            case 'tool:end':
-                this._updateToolResult(data);
-                break;
-
-            case 'error':
-                this._appendSystemMessage(`Error: ${data.message || data.error || JSON.stringify(data)}`, 'error');
-                this.app.addLog('error', data.message || data.error, this.agent.name);
-                this.app.updateAgentStatus(this.agent.id, 'online', 'error');
-                break;
-
-            case 'pong':
-            case 'heartbeat':
-                break;
-
-            default:
-                // Try to extract text from unknown message types
-                if (data.content || data.text) {
-                    this._handleTextChunk({ text: data.content || data.text });
-                }
-                break;
-        }
-    }
-
-    _onClose(event) {
-        this.app.addLog('warning', `Disconnected (${event.code}: ${event.reason || 'no reason'})`, 'Chat');
-        this.app.updateAgentStatus(this.agent?.id, 'offline', 'idle');
-
-        if (this.agent && event.code !== 1000) {
-            this._appendSystemMessage('Disconnected. Reconnecting in 5s...', 'warning');
-            this.reconnectTimer = setTimeout(() => {
-                if (this.agent) this.connect(this.agent);
-            }, 5000);
-        }
-    }
-
-    _onError() {
-        this.app.addLog('error', 'WebSocket error', 'Chat');
+    disconnect() {
+        this.agent = null;
     }
 
     // ─── Send Messages ──────────────────────────────────────
-    send(text) {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            this._appendSystemMessage('Not connected', 'error');
-            return;
-        }
-        if (!text.trim()) return;
+    async send(text) {
+        if (!text.trim() || !this.agent || this.sending) return;
 
-        // Add user bubble
         this._appendUserBubble(text);
-
-        // Send to OpenClaw
-        this._send({
-            type: 'chat',
-            message: text,
-            channel: 'webchat'
-        });
-
         this.app.addLog('info', `You: ${text}`, 'Chat');
-    }
 
-    _send(data) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(data));
+        this.sending = true;
+        this._appendAssistantBubble();
+        this.app.updateAgentStatus(this.agent.id, 'online', 'thinking');
+
+        try {
+            const result = await this.app.apiPost('/agents/chat', {
+                agent_id: this.agent.id,
+                message: text
+            });
+
+            if (result && result.response) {
+                this._finalizeStream(result.response);
+                this.app.addLog('success', `${this.agent.name}: ${result.response.substring(0, 100)}`, this.agent.name);
+            } else if (result && result.error) {
+                this._removeStreamingBubble();
+                this._appendSystemMessage(`Error: ${result.error}`, 'error');
+                this.app.addLog('error', result.error, this.agent.name);
+            } else {
+                this._removeStreamingBubble();
+                this._appendSystemMessage('No response received', 'warning');
+            }
+        } catch (e) {
+            this._removeStreamingBubble();
+            this._appendSystemMessage(`Failed: ${e.message}`, 'error');
         }
+
+        this.sending = false;
+        this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
     }
 
-    // ─── Message Handling ───────────────────────────────────
-    _handleTextChunk(data) {
-        const text = data.text || data.content || data.chunk || '';
-        if (!text) return;
-
-        this.streamBuffer += text;
-
-        // Update streaming bubble
-        const bubble = document.getElementById('streaming-bubble');
-        if (bubble) {
-            bubble.innerHTML = this._renderMarkdown(this.streamBuffer);
-            this._scrollToBottom();
-        } else {
-            this._appendAssistantBubble();
-        }
-    }
-
-    _handleMessage(data) {
-        const text = data.content || data.text || data.message || '';
-        if (!text) return;
-
-        if (data.role === 'user') {
-            // Don't double-show user messages
-        } else {
-            this.streamBuffer = text;
-            this._finalizeStream();
-        }
-    }
-
-    _finalizeStream() {
+    _finalizeStream(text) {
         const bubble = document.getElementById('streaming-bubble');
         if (bubble) {
             bubble.removeAttribute('id');
-            bubble.innerHTML = this._renderMarkdown(this.streamBuffer);
-            bubble.classList.remove('streaming');
+            bubble.innerHTML = this._renderMarkdown(text);
+            bubble.closest('.chat-bubble')?.classList.remove('streaming');
         }
         this.messageHistory.push({
             role: 'assistant',
-            content: this.streamBuffer,
+            content: text,
             timestamp: new Date().toISOString()
         });
-        this.streamBuffer = '';
         this._scrollToBottom();
+    }
+
+    _removeStreamingBubble() {
+        const bubble = document.getElementById('streaming-bubble');
+        if (bubble) {
+            const parent = bubble.closest('.chat-bubble');
+            if (parent) parent.remove();
+        }
     }
 
     // ─── UI Rendering ───────────────────────────────────────
