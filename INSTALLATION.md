@@ -1248,6 +1248,8 @@ The CDP relay inside the container binds to `127.0.0.1` only (security restricti
 
 This preserves the Docker bridge network, Caddy routing, and all existing configuration.
 
+> **Note:** The Node.js proxy script is stored at `/state/cdp-proxy.js` (persistent volume) so it survives container restarts. The socat forwarders are managed by a systemd service (`koalaclaw-relay`) for persistence across host reboots. If CDP stops working, run `sudo koalaclaw browser relay` to restart the full chain.
+
 ### Setup
 
 #### 1. Install the Browser Relay Extension

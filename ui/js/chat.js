@@ -5,7 +5,7 @@ class ChatManager {
     constructor(app) {
         this.app = app;
         this.agent = null;
-        this.messageHistory = [];
+        this.histories = new Map(); // agentId → [{role, content, timestamp}]
         this.sending = false;
     }
 
@@ -18,12 +18,54 @@ class ChatManager {
             return;
         }
 
+        // Initialize history for this agent if not exists
+        if (!this.histories.has(agent.id)) {
+            this.histories.set(agent.id, []);
+        }
+
         this.app.addLog('info', `Chat ready: ${agent.name}`, 'Chat');
         this._renderChat();
+
+        // Restore previous messages
+        this._restoreHistory();
     }
 
     disconnect() {
         this.agent = null;
+    }
+
+    _getHistory() {
+        if (!this.agent) return [];
+        return this.histories.get(this.agent.id) || [];
+    }
+
+    _pushHistory(role, content) {
+        if (!this.agent) return;
+        if (!this.histories.has(this.agent.id)) {
+            this.histories.set(this.agent.id, []);
+        }
+        this.histories.get(this.agent.id).push({
+            role, content, timestamp: new Date().toISOString()
+        });
+    }
+
+    _restoreHistory() {
+        const history = this._getHistory();
+        if (history.length === 0) return;
+
+        const messages = document.getElementById('chat-messages');
+        if (!messages) return;
+
+        history.forEach(msg => {
+            if (msg.role === 'user') {
+                this._appendUserBubble(msg.content, msg.timestamp, true);
+            } else if (msg.role === 'assistant') {
+                this._appendRestoredAssistantBubble(msg.content, msg.timestamp);
+            } else if (msg.role === 'system') {
+                this._appendSystemMessage(msg.content, 'info');
+            }
+        });
+        this._scrollToBottom();
     }
 
     // ─── Send Messages ──────────────────────────────────────
@@ -31,6 +73,7 @@ class ChatManager {
         if (!text.trim() || !this.agent || this.sending) return;
 
         this._appendUserBubble(text);
+        this._pushHistory('user', text);
         this.app.addLog('info', `You: ${text}`, 'Chat');
 
         this.sending = true;
@@ -45,6 +88,7 @@ class ChatManager {
 
             if (result && result.response) {
                 this._finalizeStream(result.response);
+                this._pushHistory('assistant', result.response);
                 this.app.addLog('success', `${this.agent.name}: ${result.response.substring(0, 100)}`, this.agent.name);
             } else if (result && result.error) {
                 this._removeStreamingBubble();
@@ -70,11 +114,6 @@ class ChatManager {
             bubble.innerHTML = this._renderMarkdown(text);
             bubble.closest('.chat-bubble')?.classList.remove('streaming');
         }
-        this.messageHistory.push({
-            role: 'assistant',
-            content: text,
-            timestamp: new Date().toISOString()
-        });
         this._scrollToBottom();
     }
 

@@ -1078,41 +1078,12 @@ _deploy() {
 _setup_browser_relay() {
     _step "Setting up browser relay (CDP proxy)..."
 
-    # Each agent needs a Node.js TCP proxy inside the container to forward
-    # from 0.0.0.0:<cdp_proxy_port> → 127.0.0.1:<cdp_port>
-    # because the CDP relay only binds to localhost inside the container.
-    # Then a host socat forwards host:<cdp_port> → container:<cdp_proxy_port>
-
-    for i in $(seq 1 "$AGENT_COUNT"); do
-        local cdp_port=$(( 18792 + i - 1 ))
-        local proxy_port=$(( 18892 + i - 1 ))  # internal proxy port
-
-        # Create Node.js TCP proxy script inside container
-        docker exec "koala-agent-${i}" sh -c "cat > /tmp/cdp-proxy.js << 'PROXYEOF'
-const net = require('net');
-const server = net.createServer((client) => {
-  const target = net.connect(${cdp_port}, '127.0.0.1', () => {
-    client.pipe(target);
-    target.pipe(client);
-  });
-  target.on('error', () => client.destroy());
-  client.on('error', () => target.destroy());
-});
-server.listen(${proxy_port}, '0.0.0.0', () => {
-  console.log('CDP proxy: 0.0.0.0:${proxy_port} -> 127.0.0.1:${cdp_port}');
-});
-PROXYEOF" 2>/dev/null
-
-        # Start the proxy inside container (kill old one first)
-        docker exec "koala-agent-${i}" sh -c \
-            "kill \$(lsof -t -i:${proxy_port} 2>/dev/null) 2>/dev/null; node /tmp/cdp-proxy.js &" 2>/dev/null &
-        disown 2>/dev/null
-
-        # Kill old host socat for this port
-        pkill -f "socat.*${cdp_port}.*${proxy_port}" 2>/dev/null || true
-    done
-
-    sleep 2
+    # OpenClaw's CDP relay binds to 127.0.0.1 inside the container (hardcoded).
+    # We create a Node.js TCP proxy inside each container that listens on
+    # 0.0.0.0:<proxy_port> and forwards to 127.0.0.1:<cdp_port>.
+    # Then socat on the host forwards host:<cdp_port> → container:<proxy_port>.
+    #
+    # Chain: Host:18792 → socat → Container:18892 → Node proxy → 127.0.0.1:18792
 
     # Install socat on host if needed
     if ! command -v socat &>/dev/null; then
@@ -1120,29 +1091,73 @@ PROXYEOF" 2>/dev/null
         apt-get install -y -qq socat >/dev/null 2>&1
     fi
 
-    # Start host socat forwarders
+    # Kill ALL old socat forwarders for CDP
+    pkill -f "socat.*TCP-LISTEN:1879" 2>/dev/null || true
+    pkill -f "socat.*TCP-LISTEN:1889" 2>/dev/null || true
+    sleep 1
+
     local relay_ok=0
     for i in $(seq 1 "$AGENT_COUNT"); do
         local cdp_port=$(( 18792 + i - 1 ))
         local proxy_port=$(( 18892 + i - 1 ))
         local agent_ip="${DEFAULT_AGENT_IP_PREFIX}${i}"
 
-        # Kill old socat
-        pkill -f "socat.*TCP-LISTEN:${cdp_port}" 2>/dev/null || true
-        sleep 0.5
+        # Write the Node.js proxy script to the persistent /state volume
+        # (survives container restarts, unlike /tmp)
+        docker exec "koala-agent-${i}" sh -c "cat > /state/cdp-proxy.js << PROXYEOF
+const net = require('net');
+const CDP_PORT = ${cdp_port};
+const PROXY_PORT = ${proxy_port};
+const server = net.createServer((client) => {
+  const target = net.connect(CDP_PORT, '127.0.0.1', () => {
+    client.pipe(target);
+    target.pipe(client);
+  });
+  target.on('error', () => client.destroy());
+  client.on('error', () => target.destroy());
+});
+server.listen(PROXY_PORT, '0.0.0.0', () => {
+  console.log('CDP proxy: 0.0.0.0:' + PROXY_PORT + ' -> 127.0.0.1:' + CDP_PORT);
+});
+PROXYEOF" 2>/dev/null || true
 
-        # Forward host:cdp_port → container_ip:proxy_port
-        nohup socat "TCP-LISTEN:${cdp_port},fork,reuseaddr" \
-            "TCP:${agent_ip}:${proxy_port}" >/dev/null 2>&1 &
-        disown 2>/dev/null
-        relay_ok=$(( relay_ok + 1 ))
+        # Kill any existing proxy on that port, then start fresh
+        docker exec "koala-agent-${i}" sh -c "
+            # Kill old proxy by port
+            for pid in \$(cat /proc/[0-9]*/cmdline 2>/dev/null | tr '\0' ' ' | grep -l 'cdp-proxy' 2>/dev/null | cut -d/ -f3); do
+                kill \$pid 2>/dev/null
+            done
+            # Start proxy in background
+            nohup node /state/cdp-proxy.js > /tmp/cdp-proxy.log 2>&1 &
+        " 2>/dev/null || true
+
+        sleep 1
+
+        # Verify proxy is listening inside container
+        local proxy_listening
+        proxy_listening=$(docker exec "koala-agent-${i}" sh -c \
+            "cat /proc/net/tcp 2>/dev/null | awk '{print \$2}' | grep -ic '$(printf '%04X' $proxy_port)'" 2>/dev/null || echo "0")
+
+        if [[ "$proxy_listening" -gt 0 ]]; then
+            # Start socat: host:cdp_port → container:proxy_port
+            nohup socat "TCP-LISTEN:${cdp_port},fork,reuseaddr" \
+                "TCP:${agent_ip}:${proxy_port}" >/dev/null 2>&1 &
+            disown 2>/dev/null
+            relay_ok=$(( relay_ok + 1 ))
+            _info "Agent ${i}: CDP relay OK (host:${cdp_port} → container:${proxy_port} → 127.0.0.1:${cdp_port})"
+        else
+            _warn "Agent ${i}: Node proxy not listening on ${proxy_port}. CDP relay skipped."
+            _warn "  Check: docker exec koala-agent-${i} cat /tmp/cdp-proxy.log"
+        fi
     done
 
     # Create systemd service for persistence across reboots
     _create_relay_systemd_service
 
     _info "Browser relay: ${relay_ok}/${AGENT_COUNT} agents configured"
-    _info "CDP ports: $(seq -s', ' 18792 $(( 18792 + AGENT_COUNT - 1 )))"
+    if (( relay_ok > 0 )); then
+        _info "CDP ports: $(seq -s', ' 18792 $(( 18792 + AGENT_COUNT - 1 )))"
+    fi
 }
 
 _create_relay_systemd_service() {
@@ -1154,9 +1169,14 @@ _create_relay_systemd_service() {
 #!/bin/bash
 # KoalaClaw CDP Relay - auto-generated
 # Forwards host CDP ports to container Node.js proxies
+# Chain: Host:cdp_port → socat → Container:proxy_port → Node proxy → 127.0.0.1:cdp_port
 
 # Wait for Docker containers to be ready
-sleep 10
+sleep 15
+
+# Kill old socat instances
+pkill -f "socat.*TCP-LISTEN:1879" 2>/dev/null || true
+sleep 1
 
 RELAYEOF
 
@@ -1166,8 +1186,9 @@ RELAYEOF
         local agent_ip="${DEFAULT_AGENT_IP_PREFIX}${i}"
 
         cat >> "$script_file" << RELAYAGENT
-# Agent ${i}: start Node proxy inside container
-docker exec -d koala-agent-${i} sh -c "node /tmp/cdp-proxy.js 2>/dev/null &" 2>/dev/null
+# Agent ${i}: start Node proxy inside container (reads from /state which persists)
+docker exec -d koala-agent-${i} sh -c "node /state/cdp-proxy.js > /tmp/cdp-proxy.log 2>&1 &" 2>/dev/null
+sleep 2
 
 # Agent ${i}: forward host:${cdp_port} → container:${proxy_port}
 socat TCP-LISTEN:${cdp_port},fork,reuseaddr TCP:${agent_ip}:${proxy_port} &
