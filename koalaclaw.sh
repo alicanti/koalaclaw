@@ -310,15 +310,21 @@ _check_root() {
 
 _check_internet() {
     _step "Checking internet connectivity..."
-    if ! ping -c 1 -W 3 8.8.8.8 &>/dev/null && ! ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+    # Use curl as primary check (more reliable than ping on cloud VMs)
+    if curl -sf --max-time 5 https://google.com &>/dev/null || \
+       curl -sf --max-time 5 https://github.com &>/dev/null; then
+        _info "Internet connectivity OK"
+    elif command -v ping &>/dev/null && \
+         (ping -c 1 -W 3 8.8.8.8 &>/dev/null || ping -c 1 -W 3 1.1.1.1 &>/dev/null); then
+        _info "Internet connectivity OK (DNS may be limited)"
+    else
         _error "No internet connectivity. Docker images cannot be pulled."
         exit 1
     fi
+
     if ! curl -sf --max-time 5 https://registry-1.docker.io/v2/ &>/dev/null && \
        ! curl -sf --max-time 5 https://hub.docker.com &>/dev/null; then
         _warn "Docker Hub may not be reachable. Pull might fail."
-    else
-        _info "Internet connectivity OK"
     fi
 }
 
@@ -438,7 +444,7 @@ _check_docker() {
     _step "Checking Docker..."
     if command -v docker &>/dev/null; then
         local docker_version
-        docker_version=$(docker --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
+        docker_version=$(docker --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
         _info "Docker ${docker_version} found"
 
         # Check compose v2
@@ -1404,7 +1410,7 @@ cmd_install() {
 
     # ─── Web UI ───
     _header "Web UI"
-    _setup_admin_api
+    _setup_admin_api || true
 
     _print_summary
 
