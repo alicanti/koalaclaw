@@ -56,15 +56,8 @@ class ChatManager {
     // ─── WebSocket Events ───────────────────────────────────
     _onOpen() {
         this.app.addLog('success', `Connected to ${this.agent.name}`, 'Chat');
-
-        // Send auth + connect
-        this._send({
-            type: 'connect',
-            auth: { token: this.agent.token },
-            client: 'koalaclaw-ui',
-            capabilities: ['webchat']
-        });
-
+        // Caddy already injects Authorization: Bearer TOKEN header
+        // so no extra auth message needed — just render the chat UI
         this._renderChat();
     }
 
