@@ -111,7 +111,7 @@ _list_roles() {
         roles_dir="${INSTALL_DIR:-/opt/koalaclaw}/repo/roles"
     fi
     if [[ ! -d "$roles_dir" ]]; then
-        return 1
+        return 0  # Return 0 to avoid set -e issues; empty output means no roles
     fi
     
     local roles=()
@@ -170,8 +170,10 @@ _select_role() {
         return 0
     fi
     
-    local roles
-    mapfile -t roles < <(_list_roles)
+    local roles=()
+    while IFS= read -r role; do
+        [[ -n "$role" ]] && roles+=("$role")
+    done < <(_list_roles)
     
     if (( ${#roles[@]} == 0 )); then
         _warn "No roles found. Using default role." >&2
@@ -1086,7 +1088,7 @@ PROXYEOF" 2>/dev/null
         nohup socat "TCP-LISTEN:${cdp_port},fork,reuseaddr" \
             "TCP:${agent_ip}:${proxy_port}" >/dev/null 2>&1 &
         disown 2>/dev/null
-        (( relay_ok++ ))
+        relay_ok=$(( relay_ok + 1 ))
     done
 
     # Create systemd service for persistence across reboots
@@ -1168,7 +1170,7 @@ _reset_device_identity() {
         if docker exec "koala-agent-${i}" node openclaw.mjs devices list \
             --url "ws://127.0.0.1:${INTERNAL_PORT}" \
             --token "${token}" &>/dev/null; then
-            (( paired++ ))
+            paired=$(( paired + 1 ))
         fi
     done
     _info "Device pairing: ${paired}/${AGENT_COUNT} agents paired"
@@ -1188,7 +1190,7 @@ _wait_healthy() {
             local status
             status=$(docker inspect --format='{{.State.Health.Status}}' "koala-agent-${i}" 2>/dev/null || echo "unknown")
             if [[ "$status" == "healthy" ]]; then
-                (( healthy_count++ ))
+                healthy_count=$(( healthy_count + 1 ))
             fi
         done
 
