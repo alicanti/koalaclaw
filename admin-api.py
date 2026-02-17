@@ -433,13 +433,12 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return {"error": f"No token found for agent {agent_id}"}
 
         # Use docker exec + OpenClaw CLI 'agent' command
-        # Connects via localhost WebSocket (auto-approved pairing)
+        # --agent main selects the default agent session
         try:
             result = subprocess.run(
                 ["docker", "exec", f"koala-agent-{agent_id}",
                  "node", "openclaw.mjs", "agent",
-                 "--url", f"ws://127.0.0.1:18789",
-                 "--token", token,
+                 "--agent", "main",
                  "-m", message],
                 capture_output=True, text=True, timeout=120
             )
