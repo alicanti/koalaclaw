@@ -69,11 +69,28 @@ class ChatManager {
     }
 
     _onMessage(event) {
+        // Debug: log ALL incoming messages
+        console.log('[WS RAW]', event.data);
+
         let data;
         try {
             data = JSON.parse(event.data);
         } catch {
+            // Non-JSON message — show it
+            if (event.data && event.data.length > 0) {
+                this._appendSystemMessage(`[raw] ${event.data.substring(0, 200)}`, 'warning');
+            }
             return;
+        }
+
+        // Debug: log parsed message type
+        console.log('[WS MSG]', data.type || data.kind || 'unknown', data);
+
+        // Show unhandled message types in chat for debugging
+        const knownTypes = ['connected','chunk','text','message','run:start','run:end',
+            'tool:start','tool:end','error','pong','heartbeat'];
+        if (data.type && !knownTypes.includes(data.type)) {
+            this._appendSystemMessage(`[${data.type}] ${JSON.stringify(data).substring(0, 150)}`, 'warning');
         }
 
         switch (data.type) {
