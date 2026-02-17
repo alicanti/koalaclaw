@@ -432,43 +432,33 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         if not token:
             return {"error": f"No token found for agent {agent_id}"}
 
-        # Use docker exec + OpenClaw CLI to send message
-        # The CLI connects via localhost WebSocket (auto-approved pairing)
+        # Use docker exec + OpenClaw CLI 'agent' command
+        # Connects via localhost WebSocket (auto-approved pairing)
         try:
             result = subprocess.run(
                 ["docker", "exec", f"koala-agent-{agent_id}",
-                 "node", "openclaw.mjs", "chat",
+                 "node", "openclaw.mjs", "agent",
                  "--url", f"ws://127.0.0.1:18789",
                  "--token", token,
-                 "--message", message,
-                 "--no-stream"],
-                capture_output=True, text=True, timeout=60
+                 "-m", message],
+                capture_output=True, text=True, timeout=120
             )
 
             stdout = result.stdout.strip()
             stderr = result.stderr.strip()
 
-            if result.returncode == 0 and stdout:
-                return {
-                    "success": True,
-                    "response": stdout,
-                }
+            # Filter out OpenClaw banner/noise lines
+            lines = [l for l in stdout.split('\n')
+                     if l.strip() and not l.startswith('🦞') and not l.startswith('Usage:')]
+            response = '\n'.join(lines).strip()
+
+            if response:
+                return {"success": True, "response": response}
+            elif result.returncode == 0:
+                return {"success": True, "response": stdout or "(empty response)"}
             else:
-                # Try without --no-stream flag
-                result2 = subprocess.run(
-                    ["docker", "exec", f"koala-agent-{agent_id}",
-                     "node", "openclaw.mjs", "chat",
-                     "--url", f"ws://127.0.0.1:18789",
-                     "--token", token,
-                     "-m", message],
-                    capture_output=True, text=True, timeout=60
-                )
-                stdout2 = result2.stdout.strip()
-                if stdout2:
-                    return {"success": True, "response": stdout2}
                 return {
                     "success": False,
-                    "response": stdout or stdout2 or None,
                     "error": stderr or "No response from agent",
                 }
         except subprocess.TimeoutExpired:
