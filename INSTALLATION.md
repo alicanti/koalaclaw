@@ -1252,13 +1252,34 @@ This preserves the Docker bridge network, Caddy routing, and all existing config
 
 ### Setup
 
+KoalaClaw automatically installs the extension during `install`. If you need to set it up manually:
+
 #### 1. Install the Browser Relay Extension
 
-In the server's Chromium browser:
-- Install **"OpenClaw Browser Relay"** from Chrome Web Store
-- Or install manually from the OpenClaw repository
+```bash
+# Node.js 22+ required
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
 
-#### 2. CDP Port Mapping
+# Install OpenClaw CLI and extension
+npm install -g openclaw@latest
+openclaw browser extension install
+
+# Copy to accessible location
+cp -r ~/.openclaw/browser/chrome-extension /opt/koalaclaw/browser-extension
+chmod -R a+rX /opt/koalaclaw/browser-extension
+```
+
+#### 2. Load Extension in Chromium
+
+1. Open Chromium on the server
+2. Go to `chrome://extensions`
+3. Enable **Developer mode** (top right toggle)
+4. Click **"Load unpacked"**
+5. Select `/opt/koalaclaw/browser-extension` (or wherever you copied it)
+6. **Pin** the extension to the toolbar
+
+#### 3. CDP Port Mapping
 
 Each agent gets a unique CDP port:
 
@@ -1268,16 +1289,17 @@ Each agent gets a unique CDP port:
 | Agent 2 | `18793` | `http://127.0.0.1:18793` |
 | Agent 3 | `18794` | `http://127.0.0.1:18794` |
 
-KoalaClaw sets this up automatically during `install`.
+KoalaClaw sets up the relay chain automatically during `install`.
 
-#### 3. Attach a Tab
+#### 4. Attach a Tab
 
-1. Open Chromium on the server
-2. Navigate to any web page
-3. Click the extension icon on the toolbar → tab becomes "attached"
+1. Open a **normal web page** in Chromium (e.g. google.com)
+   - ⚠️ Extension does NOT work on `chrome://` pages
+2. Click the extension icon on the toolbar
+3. Badge should show **"ON"** — tab is now attached
 4. The agent can now control that tab
 
-#### 4. Verify
+#### 5. Verify
 
 ```bash
 # Check browser status

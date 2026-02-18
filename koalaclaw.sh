@@ -1158,6 +1158,60 @@ PROXYEOF" 2>/dev/null || true
     if (( relay_ok > 0 )); then
         _info "CDP ports: $(seq -s', ' 18792 $(( 18792 + AGENT_COUNT - 1 )))"
     fi
+
+    # Install Chrome extension for browser relay
+    _install_browser_extension
+}
+
+_install_browser_extension() {
+    _step "Installing OpenClaw Browser Relay extension..."
+
+    # Ensure Node.js 22+ is available on host (required by openclaw npm)
+    local node_major
+    node_major=$(node --version 2>/dev/null | grep -oE '^v([0-9]+)' | tr -d 'v' || echo "0")
+
+    if (( node_major < 22 )); then
+        _step "Installing Node.js 22 (required for extension)..."
+        if curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | bash - >> "$LOG_FILE" 2>&1; then
+            apt-get install -y -qq nodejs >> "$LOG_FILE" 2>&1
+        else
+            _warn "Could not install Node.js 22. Browser extension must be installed manually."
+            _warn "See: https://docs.openclaw.ai/tools/chrome-extension"
+            return 0
+        fi
+    fi
+
+    # Install openclaw npm package (for extension files)
+    if ! command -v openclaw &>/dev/null; then
+        _step "Installing openclaw CLI (for extension files)..."
+        npm install -g openclaw@latest >> "$LOG_FILE" 2>&1 || {
+            _warn "Could not install openclaw CLI. Extension must be installed manually."
+            return 0
+        }
+    fi
+
+    # Install the extension
+    openclaw browser extension install >> "$LOG_FILE" 2>&1 || true
+
+    # Get extension path
+    local ext_path
+    ext_path=$(openclaw browser extension path 2>/dev/null | tail -1)
+
+    if [[ -z "$ext_path" || ! -d "$ext_path" ]]; then
+        ext_path="$HOME/.openclaw/browser/chrome-extension"
+    fi
+
+    if [[ -d "$ext_path" ]]; then
+        # Copy to a user-accessible location
+        local user_ext_dir="${INSTALL_DIR}/browser-extension"
+        cp -r "$ext_path" "$user_ext_dir" 2>/dev/null
+        chmod -R a+rX "$user_ext_dir" 2>/dev/null
+
+        _info "Browser extension installed at: ${user_ext_dir}"
+        _info "To activate: Chromium → chrome://extensions → Developer mode → Load unpacked → ${user_ext_dir}"
+    else
+        _warn "Extension files not found. Install manually: openclaw browser extension install"
+    fi
 }
 
 _create_relay_systemd_service() {
@@ -1330,6 +1384,15 @@ _print_summary() {
     echo -e "  ${DIM}Model: ${MODEL}${NC}"
     echo -e "  ${DIM}Install log: ${LOG_FILE}${NC}"
     echo ""
+    # Browser extension hint
+    if [[ -d "${INSTALL_DIR}/browser-extension" ]]; then
+        echo -e "  ${BOLD}🌐 Browser Extension:${NC}"
+        echo -e "    ${DIM}Chromium → chrome://extensions → Developer mode → Load unpacked${NC}"
+        echo -e "    ${DIM}Path: ${INSTALL_DIR}/browser-extension${NC}"
+        echo -e "    ${DIM}Then open a web page and click the extension icon${NC}"
+        echo ""
+    fi
+
     echo -e "  ${BOLD}Quick commands:${NC}"
     echo -e "    ${DIM}koalaclaw status${NC}        # Check health"
     echo -e "    ${DIM}koalaclaw credentials${NC}   # Show access URLs"

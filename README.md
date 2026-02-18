@@ -108,7 +108,8 @@ Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-a
 - Unique 256-bit tokens per agent
 - Network isolation, static IPs, trusted proxies
 - Backup/restore, one-command updates
-- Browser relay (CDP proxy chain) for Chromium automation
+- Browser relay (CDP proxy chain + Chrome extension) for Chromium automation
+- Auto-installs Node.js 22, OpenClaw CLI, and Chrome extension during setup
 
 ---
 
@@ -236,9 +237,12 @@ graph TB
 ├── Caddyfile                 # Generated
 ├── .koalaclaw.state          # Tokens, roles, config
 ├── .credentials              # Access URLs
+├── browser-extension/        # Chrome extension (auto-installed)
+├── relay-start.sh            # CDP relay startup (systemd)
 └── data/
     └── koala-agent-N/
         ├── openclaw.json     # Gateway config
+        ├── cdp-proxy.js      # CDP relay proxy (persistent)
         ├── role-skills.json  # Role skill config
         └── agents/main/agent/
             ├── auth-profiles.json
@@ -368,6 +372,10 @@ Each agent needs ~400MB RAM.
 | Port already in use | Choose different starting port during install |
 | Web UI not loading | Ensure `python3 admin-api.py` is running on port 3099 |
 | WebSocket disconnects | Check agent container health with `koalaclaw status` |
+| Extension shows "!" | Open a **normal web page** (not chrome://), then click the icon |
+| "Relay not reachable" | Run `sudo koalaclaw browser relay` to restart CDP chain |
+| Extension won't toggle ON | Ensure Node proxy running: check `/tmp/cdp-proxy.log` in container |
+| "Cannot access chrome:// URL" | Extension only works on normal web pages, not chrome:// pages |
 
 For detailed logs:
 ```bash
