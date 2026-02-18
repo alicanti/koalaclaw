@@ -198,19 +198,43 @@ class ChatManager {
         }
     }
 
-    _appendUserBubble(text) {
+    _appendUserBubble(text, timestamp, skipScroll) {
         const messages = document.getElementById('chat-messages');
         if (!messages) return;
+
+        const time = timestamp
+            ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : this._timeStr();
 
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble user';
         bubble.innerHTML = `
             <div class="bubble-content">${this._escapeHtml(text)}</div>
-            <div class="bubble-meta">You · ${this._timeStr()}</div>
+            <div class="bubble-meta">You · ${time}</div>
         `;
         messages.appendChild(bubble);
-        this.messageHistory.push({ role: 'user', content: text, timestamp: new Date().toISOString() });
-        this._scrollToBottom();
+        if (!skipScroll) this._scrollToBottom();
+    }
+
+    _appendRestoredAssistantBubble(text, timestamp) {
+        const messages = document.getElementById('chat-messages');
+        if (!messages) return;
+
+        const time = timestamp
+            ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : this._timeStr();
+
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble assistant';
+        bubble.innerHTML = `
+            <div class="bubble-avatar">${this.agent?.emoji || '🐨'}</div>
+            <div class="bubble-body">
+                <div class="bubble-name">${this.agent?.name || 'Agent'}</div>
+                <div class="bubble-content">${this._renderMarkdown(text)}</div>
+                <div class="bubble-meta">${time}</div>
+            </div>
+        `;
+        messages.appendChild(bubble);
     }
 
     _appendAssistantBubble() {
