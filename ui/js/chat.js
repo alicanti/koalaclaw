@@ -5,12 +5,11 @@ class ChatManager {
     constructor(app) {
         this.app = app;
         this.agent = null;
-        this.histories = new Map(); // agentId → [{role, content, timestamp}]
         this.sending = false;
     }
 
     // ─── Connect to Agent ───────────────────────────────────
-    connect(agent) {
+    async connect(agent) {
         this.agent = agent;
 
         if (!agent || !agent.id) {
@@ -18,53 +17,45 @@ class ChatManager {
             return;
         }
 
-        // Initialize history for this agent if not exists
-        if (!this.histories.has(agent.id)) {
-            this.histories.set(agent.id, []);
-        }
-
         this.app.addLog('info', `Chat ready: ${agent.name}`, 'Chat');
         this._renderChat();
 
-        // Restore previous messages
-        this._restoreHistory();
+        // Load history from server
+        await this._loadHistory();
     }
 
     disconnect() {
         this.agent = null;
     }
 
-    _getHistory() {
-        if (!this.agent) return [];
-        return this.histories.get(this.agent.id) || [];
-    }
-
-    _pushHistory(role, content) {
+    async _loadHistory() {
         if (!this.agent) return;
-        if (!this.histories.has(this.agent.id)) {
-            this.histories.set(this.agent.id, []);
-        }
-        this.histories.get(this.agent.id).push({
-            role, content, timestamp: new Date().toISOString()
-        });
-    }
-
-    _restoreHistory() {
-        const history = this._getHistory();
-        if (history.length === 0) return;
 
         const messages = document.getElementById('chat-messages');
         if (!messages) return;
 
-        history.forEach(msg => {
-            if (msg.role === 'user') {
-                this._appendUserBubble(msg.content, msg.timestamp, true);
-            } else if (msg.role === 'assistant') {
-                this._appendRestoredAssistantBubble(msg.content, msg.timestamp);
-            } else if (msg.role === 'system') {
-                this._appendSystemMessage(msg.content, 'info');
-            }
-        });
+        // Show loading
+        this._appendSystemMessage('Loading history...', 'info');
+
+        const data = await this.app.apiGet(`/agents/${this.agent.id}/history?limit=100`);
+        
+        // Remove loading message
+        const loadingMsg = messages.querySelector('.chat-system-msg:last-child');
+        if (loadingMsg && loadingMsg.textContent === 'Loading history...') {
+            loadingMsg.remove();
+        }
+
+        if (data && data.history && data.history.length > 0) {
+            data.history.forEach(msg => {
+                if (msg.role === 'user') {
+                    this._appendUserBubble(msg.content, msg.timestamp, true);
+                } else if (msg.role === 'assistant') {
+                    this._appendRestoredAssistantBubble(msg.content, msg.timestamp);
+                }
+            });
+            this._appendSystemMessage(`${data.history.length} previous messages loaded`, 'info');
+        }
+
         this._scrollToBottom();
     }
 
@@ -73,7 +64,7 @@ class ChatManager {
         if (!text.trim() || !this.agent || this.sending) return;
 
         this._appendUserBubble(text);
-        this._pushHistory('user', text);
+        // History is persisted server-side in admin-api.py
         this.app.addLog('info', `You: ${text}`, 'Chat');
 
         this.sending = true;
@@ -88,7 +79,7 @@ class ChatManager {
 
             if (result && result.response) {
                 this._finalizeStream(result.response);
-                this._pushHistory('assistant', result.response);
+                // History is persisted server-side in admin-api.py
                 this.app.addLog('success', `${this.agent.name}: ${result.response.substring(0, 100)}`, this.agent.name);
             } else if (result && result.error) {
                 this._removeStreamingBubble();

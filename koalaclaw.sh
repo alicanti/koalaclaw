@@ -283,6 +283,64 @@ _apply_role_to_agent() {
 }
 
 # ═══════════════════════════════════════
+# COGNITIVE INFRASTRUCTURE (mind/)
+# ═══════════════════════════════════════
+_create_mind_directory() {
+    local agent_num="$1"
+    local role="$2"
+    local agent_dir="${INSTALL_DIR}/data/koala-agent-${agent_num}"
+    local mind_dir="${agent_dir}/mind"
+
+    # Don't overwrite existing mind/ (preserves agent memory)
+    if [[ -d "$mind_dir" && -f "$mind_dir/PROFILE.md" ]]; then
+        return 0
+    fi
+
+    mkdir -p "${mind_dir}/logs"
+
+    # Find role template and repo mind templates
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local role_dir="${script_dir}/roles/${role}"
+    local mind_src="${script_dir}/mind"
+
+    if [[ ! -d "$role_dir" ]]; then
+        role_dir="${REPO_DIR:-${INSTALL_DIR}/repo}/roles/${role}"
+        mind_src="${REPO_DIR:-${INSTALL_DIR}/repo}/mind"
+    fi
+
+    # PROFILE.md — from role's mind-template.md
+    if [[ -f "${role_dir}/mind-template.md" ]]; then
+        cp "${role_dir}/mind-template.md" "${mind_dir}/PROFILE.md"
+    else
+        cat > "${mind_dir}/PROFILE.md" << PROFILEEOF
+# Agent ${agent_num} — Profile
+
+## Identity
+- **Role:** ${role}
+- **Status:** Active
+
+## Current Focus
+(To be updated as projects are assigned)
+PROFILEEOF
+    fi
+
+    # PROJECTS.md, DECISIONS.md, ERRORS.md — from templates
+    for tmpl in PROJECTS DECISIONS ERRORS; do
+        if [[ -f "${mind_src}/${tmpl}.template.md" ]]; then
+            cp "${mind_src}/${tmpl}.template.md" "${mind_dir}/${tmpl}.md"
+        else
+            echo "# ${tmpl}" > "${mind_dir}/${tmpl}.md"
+        fi
+    done
+
+    # PROTOCOL.md — reference copy
+    if [[ -f "${mind_src}/PROTOCOL.md" ]]; then
+        cp "${mind_src}/PROTOCOL.md" "${mind_dir}/PROTOCOL.md"
+    fi
+}
+
+# ═══════════════════════════════════════
 # STATE MANAGEMENT
 # ═══════════════════════════════════════
 _state_path() { echo "${INSTALL_DIR}/${STATE_FILE}"; }
@@ -941,6 +999,9 @@ _generate_agent_configs() {
         # Apply role to agent (non-fatal if role not found)
         _apply_role_to_agent "$i" "$role" || true
 
+        # Create mind/ directory (Cognitive Infrastructure)
+        _create_mind_directory "$i" "$role" || true
+
         # openclaw.json
         local cdp_port=$(( 18792 + i - 1 ))
         python3 -c "
@@ -950,7 +1011,22 @@ cfg = {
         'defaults': {
             'model': {
                 'primary': '${MODEL}'
-            }
+            },
+            'preamble': '''You operate under the Cognitive Infrastructure Protocol.
+
+Your persistent memory is at /state/mind/:
+- PROFILE.md: Your identity and role
+- PROJECTS.md: Active projects and status
+- DECISIONS.md: Past decisions and reasoning
+- ERRORS.md: Past mistakes and lessons learned
+- logs/: Daily activity logs
+
+SESSION RULES:
+1. Consider your PROFILE, PROJECTS, DECISIONS, and ERRORS before responding.
+2. After significant interactions, update the relevant mind/ files.
+3. Log important activities to logs/ with today's date.
+4. Never delete past entries — always append.
+5. If you make a mistake, immediately log it to ERRORS.md.'''
         }
     },
     'gateway': {

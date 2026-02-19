@@ -25,6 +25,7 @@ INSTALL_DIR = os.environ.get("KOALACLAW_INSTALL_DIR", "/opt/koalaclaw")
 STATE_FILE = os.path.join(INSTALL_DIR, ".koalaclaw.state")
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 ROLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roles")
+DATA_DIR = os.path.join(INSTALL_DIR, "data")
 
 # ─── State Management ────────────────────────────────────────────
 def load_state():
@@ -134,6 +135,53 @@ def get_all_roles():
                 "gamification": gamification,
             })
     return roles
+
+
+# ─── Chat History ────────────────────────────────────────────────
+def get_history_path(agent_id):
+    """Get the chat history file path for an agent."""
+    return os.path.join(DATA_DIR, f"koala-agent-{agent_id}", "chat-history.jsonl")
+
+
+def read_chat_history(agent_id, limit=100):
+    """Read chat history from JSONL file."""
+    path = get_history_path(agent_id)
+    if not os.path.exists(path):
+        return []
+    
+    entries = []
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    except Exception:
+        return []
+    
+    # Return last N entries
+    return entries[-limit:] if limit else entries
+
+
+def append_chat_history(agent_id, role, content):
+    """Append a message to chat history JSONL file."""
+    path = get_history_path(agent_id)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    
+    entry = {
+        "role": role,
+        "content": content,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    }
+    
+    try:
+        with open(path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
 
 
 # ─── Docker Helpers ──────────────────────────────────────────────
@@ -335,6 +383,13 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     params = urllib.parse.parse_qs(query)
                     tail = int(params.get("tail", [50])[0])
                 self._json_response({"logs": docker_logs(agent_id, tail)})
+            elif path.startswith("/api/agents/") and path.endswith("/history"):
+                agent_id = int(path.split("/")[3])
+                limit = 100
+                if query:
+                    params = urllib.parse.parse_qs(query)
+                    limit = int(params.get("limit", [100])[0])
+                self._json_response({"history": read_chat_history(agent_id, limit)})
             elif path == "/api/roles":
                 self._json_response({"roles": get_all_roles()})
             elif path == "/api/stats":
@@ -432,6 +487,9 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         if not token:
             return {"error": f"No token found for agent {agent_id}"}
 
+        # Persist user message to history
+        append_chat_history(agent_id, "user", message)
+
         # Use docker exec + OpenClaw CLI 'agent' command
         # --agent main selects the default agent session
         try:
@@ -452,9 +510,13 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             response = '\n'.join(lines).strip()
 
             if response:
+                # Persist assistant response to history
+                append_chat_history(agent_id, "assistant", response)
                 return {"success": True, "response": response}
             elif result.returncode == 0:
-                return {"success": True, "response": stdout or "(empty response)"}
+                resp = stdout or "(empty response)"
+                append_chat_history(agent_id, "assistant", resp)
+                return {"success": True, "response": resp}
             else:
                 return {
                     "success": False,
