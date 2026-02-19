@@ -1876,6 +1876,14 @@ cmd_update() {
     _step "Updating platform files..."
     _clone_repo
 
+    # Ensure mind/ directories exist for all agents
+    _step "Updating cognitive infrastructure..."
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        eval "local role=\${ROLE_${i}:-coder-koala}"
+        _create_mind_directory "$i" "$role" || true
+    done
+    _info "Mind directories up to date"
+
     _step "Pulling latest images..."
     docker compose pull --quiet
     _info "Images updated"
