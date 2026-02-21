@@ -291,6 +291,27 @@ _apply_role_to_agent() {
     _info "Applied role '${role}' to Agent ${agent_num}"
 }
 
+# Copy workspace files into running container's actual OpenClaw workspace path
+# OpenClaw reads from /home/node/.openclaw/workspace/ (not /state/workspace/)
+_sync_workspace_to_container() {
+    _step "Syncing workspace files to containers..."
+    local synced=0
+    for i in $(seq 1 "${AGENT_COUNT}"); do
+        local ws_src="${INSTALL_DIR}/data/koala-agent-${i}/workspace"
+        local container="koala-agent-${i}"
+        [[ ! -d "$ws_src" ]] && continue
+        # Ensure target dir exists inside container
+        docker exec "$container" mkdir -p /home/node/.openclaw/workspace/ 2>/dev/null || continue
+        # Copy each file from host workspace to container's OpenClaw workspace
+        for f in "$ws_src"/*; do
+            [[ -f "$f" ]] || continue
+            docker cp "$f" "${container}:/home/node/.openclaw/workspace/$(basename "$f")" 2>/dev/null || true
+        done
+        synced=$(( synced + 1 ))
+    done
+    _info "Workspace synced for ${synced}/${AGENT_COUNT} agents"
+}
+
 # Inject agent roster into orchestrator SOUL.md (so OrchestratorKoala knows who to delegate to)
 _inject_orchestrator_roster() {
     local script_dir role_dir
@@ -1219,6 +1240,7 @@ _deploy() {
     _info "Containers started"
 
     _wait_healthy
+    _sync_workspace_to_container || true
     _reset_device_identity
     _setup_browser_relay
     _verify_endpoints
@@ -1807,6 +1829,7 @@ cmd_add_agent() {
     cd "${INSTALL_DIR}"
     docker compose up -d 2>&1 | tail -5
     _wait_healthy
+    _sync_workspace_to_container || true
     _reset_device_identity
     _verify_endpoints
 
@@ -1992,6 +2015,7 @@ cmd_update() {
     _step "Recreating containers..."
     docker compose up -d --force-recreate 2>&1 | tail -5
     _wait_healthy
+    _sync_workspace_to_container || true
     _reset_device_identity
     _verify_endpoints
 
