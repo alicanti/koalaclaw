@@ -339,20 +339,40 @@ _inject_orchestrator_roster() {
         [[ "$r" != "orchestrator-koala" ]] && continue
         local soul_file="${INSTALL_DIR}/data/koala-agent-${i}/workspace/SOUL.md"
         [[ ! -f "$soul_file" ]] && continue
-        # Replace placeholder line under "## Agent Roster" with roster content
-        python3 -c "
-import re
-with open('$soul_file', 'r') as f:
-    content = f.read()
-with open('$roster_file', 'r') as f:
-    roster = f.read().strip()
-# Replace from '## Agent Roster (reference)' to next '## ' with new section
-pattern = r'(## Agent Roster\s*\(reference\)\s*\n)(.*?)(?=\n## |\Z)'
-replacement = r'\1\n' + roster + r'\n\n'
-new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-with open('$soul_file', 'w') as f:
-    f.write(new_content)
-" 2>/dev/null || true
+        # Replace the roster section: find "## Agent Roster" heading, replace everything
+        # until next "## " heading (or EOF) with the actual roster
+        python3 << PYEOF
+import sys
+try:
+    with open('${soul_file}', 'r') as f:
+        lines = f.readlines()
+    with open('${roster_file}', 'r') as f:
+        roster = f.read().strip()
+    out = []
+    skip = False
+    injected = False
+    for line in lines:
+        if line.startswith('## Agent Roster'):
+            out.append('## Agent Roster\n')
+            out.append('\n')
+            out.append(roster + '\n')
+            out.append('\n')
+            skip = True
+            injected = True
+            continue
+        if skip and line.startswith('## '):
+            skip = False
+        if not skip:
+            out.append(line)
+    if not injected:
+        out.append('\n## Agent Roster\n\n')
+        out.append(roster + '\n')
+    with open('${soul_file}', 'w') as f:
+        f.writelines(out)
+    print('OK: roster injected')
+except Exception as e:
+    print(f'FAIL: {e}', file=sys.stderr)
+PYEOF
         _info "Injected agent roster into OrchestratorKoala (agent ${i}) SOUL.md"
     done
     rm -f "$roster_file"
