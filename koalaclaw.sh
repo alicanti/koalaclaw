@@ -1776,8 +1776,22 @@ cmd_add_agent() {
     AGENT_COUNT=$new_total
     START_PORT="${START_PORT}"
 
-    # Check new ports
-    _check_ports
+    # Check only NEW ports (existing agents already use their ports)
+    _step "Checking new port availability..."
+    local port_conflict=false
+    for i in $(seq "$old_count" $(( new_total - 1 ))); do
+        local port=$(( START_PORT + i ))
+        if ss -tlnp 2>/dev/null | grep -q ":${port} " || \
+           netstat -tlnp 2>/dev/null | grep -q ":${port} "; then
+            _error "Port ${port} is already in use"
+            port_conflict=true
+        fi
+    done
+    if $port_conflict; then
+        _error "Free the conflicting ports first."
+        exit 1
+    fi
+    _info "New ports available"
     _check_ram
 
     # Regenerate everything
