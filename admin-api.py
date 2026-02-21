@@ -19,6 +19,11 @@ import urllib.parse
 import urllib.request
 import socket
 
+try:
+    from wiro_client import WiroClient
+except ImportError:
+    WiroClient = None
+
 # ─── Configuration ───────────────────────────────────────────────
 API_PORT = int(os.environ.get("KOALACLAW_API_PORT", "3099"))
 INSTALL_DIR = os.environ.get("KOALACLAW_INSTALL_DIR", "/opt/koalaclaw")
@@ -26,6 +31,7 @@ STATE_FILE = os.path.join(INSTALL_DIR, ".koalaclaw.state")
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 ROLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roles")
 DATA_DIR = os.path.join(INSTALL_DIR, "data")
+SETTINGS_FILE = os.path.join(INSTALL_DIR, ".settings.json")
 
 # ─── State Management ────────────────────────────────────────────
 def load_state():
@@ -43,6 +49,16 @@ def load_state():
             value = value.strip('"').strip("'")
             state[key.strip()] = value
     return state
+
+
+def get_orchestrator_agent_id(state=None):
+    """Return first agent ID whose role is orchestrator-koala, or 1 as fallback."""
+    state = state or load_state()
+    count = int(state.get("AGENT_COUNT", "0"))
+    for i in range(1, count + 1):
+        if state.get(f"ROLE_{i}") == "orchestrator-koala":
+            return i
+    return 1
 
 
 def get_agents_from_state(state):
@@ -137,6 +153,72 @@ def get_all_roles():
     return roles
 
 
+# ─── Settings ───────────────────────────────────────────────────
+def load_settings():
+    """Load settings from .settings.json (no plain-text secrets in response)."""
+    default = {
+        "wiro_api_key": "",
+        "wiro_api_secret": "",
+        "wiro_configured": False,
+        "channels": {},
+        "default_model": "",
+        "agent_count": 0,
+    }
+    if not os.path.exists(SETTINGS_FILE):
+        return default
+    try:
+        with open(SETTINGS_FILE, "r") as f:
+            raw = json.load(f)
+        # Mask secrets for GET
+        raw["wiro_configured"] = bool(
+            (raw.get("wiro_api_key") or "").strip()
+            and (raw.get("wiro_api_secret") or "").strip()
+        )
+        raw["wiro_api_key"] = "***" if raw.get("wiro_api_key") else ""
+        raw["wiro_api_secret"] = "***" if raw.get("wiro_api_secret") else ""
+        return {**default, **raw}
+    except Exception:
+        return default
+
+
+def save_settings(updates):
+    """Update settings; only persist allowed keys, keep existing secrets if not provided."""
+    current = {}
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                current = json.load(f)
+        except Exception:
+            pass
+    allowed = ("wiro_api_key", "wiro_api_secret", "channels", "default_model", "agent_count")
+    for k in allowed:
+        if k in updates:
+            current[k] = updates[k]
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(current, f, indent=2)
+    return load_settings()
+
+
+def get_wiro_client():
+    """Build WiroClient from current settings (for server-side use)."""
+    if not WiroClient:
+        return None
+    # Load raw settings for credentials
+    raw = {}
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                raw = json.load(f)
+        except Exception:
+            pass
+    key = (raw.get("wiro_api_key") or "").strip()
+    secret = (raw.get("wiro_api_secret") or "").strip()
+    if not key or not secret:
+        return None
+    return WiroClient(api_key=key, api_secret=secret)
+
+
 # ─── Chat History ────────────────────────────────────────────────
 def get_history_path(agent_id):
     """Get the chat history file path for an agent."""
@@ -166,8 +248,8 @@ def read_chat_history(agent_id, limit=100):
     return entries[-limit:] if limit else entries
 
 
-def append_chat_history(agent_id, role, content):
-    """Append a message to chat history JSONL file."""
+def append_chat_history(agent_id, role, content, image_base64=None):
+    """Append a message to chat history JSONL file. Optional image_base64 for user messages."""
     path = get_history_path(agent_id)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     
@@ -176,6 +258,8 @@ def append_chat_history(agent_id, role, content):
         "content": content,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     }
+    if image_base64 is not None:
+        entry["image_base64"] = image_base64
     
     try:
         with open(path, "a") as f:
@@ -399,6 +483,17 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 safe_state = {k: v for k, v in state.items()
                               if k not in ("API_KEY",) and not k.startswith("TOKEN_")}
                 self._json_response(safe_state)
+            elif path == "/api/wiro/models":
+                self._json_response(self._wiro_list_models(query))
+            elif path.startswith("/api/wiro/task/"):
+                token = path.split("/api/wiro/task/", 1)[-1].strip("/")
+                self._json_response(self._wiro_task_status(token))
+            elif path == "/api/settings":
+                self._json_response(self._get_settings())
+            elif path.startswith("/api/settings/channel/") and path.endswith("/status"):
+                # GET /api/settings/channel/{name}/status
+                name = path.split("/api/settings/channel/")[1].replace("/status", "").strip("/")
+                self._json_response(self._channel_status(name))
             else:
                 self._json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
         except Exception as e:
@@ -411,6 +506,16 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/agents/chat":
                 self._json_response(self._send_chat(data))
+            elif path == "/api/agents/delegate":
+                self._json_response(self._delegate(data))
+            elif path == "/api/wiro/generate":
+                self._json_response(self._wiro_generate(data))
+            elif path == "/api/settings":
+                self._json_response(self._post_settings(data))
+            elif path.startswith("/api/settings/channel/"):
+                # POST /api/settings/channel/{name}
+                name = path.split("/api/settings/channel/")[1].strip("/").split("/")[0]
+                self._json_response(self._channel_configure(name, data))
             else:
                 self._json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
         except Exception as e:
@@ -477,6 +582,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         """Send a chat message to an agent via OpenClaw CLI (docker exec)."""
         agent_id = data.get("agent_id")
         message = data.get("message", "")
+        image_base64 = data.get("image_base64")
 
         if not agent_id or not message:
             return {"error": "agent_id and message required"}
@@ -487,8 +593,8 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         if not token:
             return {"error": f"No token found for agent {agent_id}"}
 
-        # Persist user message to history
-        append_chat_history(agent_id, "user", message)
+        # Persist user message to history (with optional image)
+        append_chat_history(agent_id, "user", message, image_base64=image_base64)
 
         # Use docker exec + OpenClaw CLI 'agent' command
         # --agent main selects the default agent session
@@ -497,7 +603,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 ["docker", "exec", f"koala-agent-{agent_id}",
                  "node", "openclaw.mjs", "agent",
                  "--agent", "main",
-                 "-m", message],
+                 "-m", message + (" [Image attached]" if image_base64 else "")],
                 capture_output=True, text=True, timeout=120
             )
 
@@ -526,6 +632,183 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return {"error": "Request timed out"}
         except Exception as e:
             return {"error": str(e)}
+
+    def _wiro_list_models(self, query):
+        """GET /api/wiro/models — list models, optional category from query."""
+        client = get_wiro_client()
+        if not client or not client.is_configured:
+            return {"error": "Wiro not configured", "models": [], "categories": {}}
+        try:
+            params = urllib.parse.parse_qs(query) if query else {}
+            category = (params.get("category") or [None])[0]
+            return client.list_models(category=category)
+        except Exception as e:
+            return {"error": str(e), "models": [], "categories": {}}
+
+    def _wiro_task_status(self, token):
+        """GET /api/wiro/task/{token} — check task status."""
+        client = get_wiro_client()
+        if not client or not client.is_configured:
+            return {"error": "Wiro not configured"}
+        try:
+            return client.poll_task(token, timeout=5)
+        except Exception as e:
+            return {"error": str(e), "status": "error"}
+
+    def _wiro_generate(self, data):
+        """POST /api/wiro/generate — {model, params} or {owner, project, params} -> run + poll."""
+        client = get_wiro_client()
+        if not client or not client.is_configured:
+            return {"error": "Wiro not configured"}
+        model = data.get("model") or ""
+        owner = data.get("owner") or ""
+        project = data.get("project") or ""
+        if not owner or not project:
+            if "/" in model:
+                owner, _, project = model.partition("/")
+            else:
+                return {"error": "Provide model (owner/project) or owner and project"}
+        params = data.get("params") or {}
+        try:
+            return client.generate(owner.strip(), project.strip(), params)
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_settings(self):
+        """GET /api/settings — current config (keys masked, channel statuses)."""
+        s = load_settings()
+        state = load_state()
+        s["agent_count"] = int(state.get("AGENT_COUNT", "0"))
+        return s
+
+    def _delegate(self, data):
+        """POST /api/agents/delegate — delegate task from one agent to another."""
+        from_agent = data.get("from_agent")
+        to_agent = data.get("to_agent")
+        task = data.get("task", "")
+        context = data.get("context", "")
+
+        if not from_agent or not to_agent:
+            return {"error": "from_agent and to_agent required"}
+        from_id = int(from_agent) if isinstance(from_agent, int) else int(from_agent)
+        to_id = int(to_agent) if isinstance(to_agent, int) else int(to_agent)
+        if from_id == to_id:
+            return {"error": "from_agent and to_agent must differ"}
+
+        state = load_state()
+        count = int(state.get("AGENT_COUNT", "0"))
+        if to_id < 1 or to_id > count:
+            return {"error": f"to_agent {to_id} out of range (1..{count})"}
+
+        message = task if not context else f"{task}\n\nContext:\n{context}"
+        try:
+            result = subprocess.run(
+                ["docker", "exec", f"koala-agent-{to_id}",
+                 "node", "openclaw.mjs", "agent",
+                 "--agent", "main",
+                 "-m", message],
+                capture_output=True, text=True, timeout=120
+            )
+            stdout = result.stdout.strip()
+            stderr = result.stderr.strip()
+            lines = [l for l in stdout.split("\n")
+                     if l.strip() and not l.startswith("🦞") and not l.startswith("Usage:")]
+            response = "\n".join(lines).strip() or stdout or "(no response)"
+
+            # Log delegation in both agents' chat history
+            append_chat_history(from_id, "assistant", f"[Delegated to agent {to_id}] {task}")
+            append_chat_history(to_id, "user", f"[From orchestrator/agent {from_id}] {message}")
+            append_chat_history(to_id, "assistant", response)
+
+            return {"success": True, "response": response, "from_agent": from_id, "to_agent": to_id}
+        except subprocess.TimeoutExpired:
+            return {"error": "Delegation timed out"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _post_settings(self, data):
+        """POST /api/settings — update settings (Wiro key/secret, channel tokens)."""
+        updates = {}
+        if "wiro_api_key" in data and data["wiro_api_key"] is not None:
+            updates["wiro_api_key"] = (data["wiro_api_key"] or "").strip()
+        if "wiro_api_secret" in data and data["wiro_api_secret"] is not None:
+            updates["wiro_api_secret"] = (data["wiro_api_secret"] or "").strip()
+        if "channels" in data and isinstance(data["channels"], dict):
+            updates["channels"] = data["channels"]
+        if "default_model" in data:
+            updates["default_model"] = data["default_model"]
+        if not updates:
+            return load_settings()
+        return save_settings(updates)
+
+    def _channel_status(self, name):
+        """GET /api/settings/channel/{name}/status — check channel connection."""
+        state = load_state()
+        orch_id = get_orchestrator_agent_id(state)
+        container = f"koala-agent-{orch_id}"
+        try:
+            result = subprocess.run(
+                ["docker", "exec", container, "node", "openclaw.mjs", "channels", "status", name],
+                capture_output=True, text=True, timeout=10
+            )
+            out = (result.stdout or "").strip()
+            return {"channel": name, "status": "connected" if result.returncode == 0 and out else "unknown", "detail": out or result.stderr}
+        except Exception as e:
+            return {"channel": name, "status": "error", "detail": str(e)}
+
+    def _channel_configure(self, name, data):
+        """POST /api/settings/channel/{name} — configure channel (login) for orchestrator."""
+        state = load_state()
+        orch_id = get_orchestrator_agent_id(state)
+        container = f"koala-agent-{orch_id}"
+        if name == "telegram":
+            token = (data.get("token") or data.get("bot_token") or "").strip()
+            if not token:
+                return {"error": "token required"}
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "telegram", "--token", token],
+                    capture_output=True, text=True, timeout=30
+                )
+                return {"success": result.returncode == 0, "message": result.stdout or result.stderr}
+            except Exception as e:
+                return {"error": str(e)}
+        if name == "whatsapp":
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "whatsapp"],
+                    capture_output=True, text=True, timeout=60
+                )
+                out = result.stdout or result.stderr
+                return {"success": result.returncode == 0, "message": out, "qr_url": out if "http" in out else None}
+            except Exception as e:
+                return {"error": str(e)}
+        if name == "slack":
+            bot = (data.get("bot_token") or data.get("token") or "").strip()
+            app = (data.get("app_token") or "").strip()
+            if not bot:
+                return {"error": "bot_token required"}
+            try:
+                args = ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "slack", "--token", bot]
+                if app:
+                    args.extend(["--app-token", app])
+                result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+                return {"success": result.returncode == 0, "message": result.stdout or result.stderr}
+            except Exception as e:
+                return {"error": str(e)}
+        if name == "discord":
+            token = (data.get("token") or data.get("bot_token") or "").strip()
+            if not token:
+                return {"error": "token required"}
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "discord", "--token", token],
+                    capture_output=True, text=True, timeout=30
+                )
+                return {"success": result.returncode == 0, "message": result.stdout or result.stderr}
+            except Exception as e:
+                return {"error": str(e)}
+        return {"error": f"Unknown channel: {name}"}
 
     def _json_response(self, data, status=HTTPStatus.OK):
         """Send a JSON response."""

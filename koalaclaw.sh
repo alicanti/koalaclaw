@@ -291,6 +291,52 @@ _apply_role_to_agent() {
     _info "Applied role '${role}' to Agent ${agent_num}"
 }
 
+# Inject agent roster into orchestrator SOUL.md (so OrchestratorKoala knows who to delegate to)
+_inject_orchestrator_roster() {
+    local script_dir role_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local roster_file="${INSTALL_DIR}/.roster.tmp"
+    : > "$roster_file"
+    local i r name_line role_title_line role_name role_title
+    for i in $(seq 1 "${AGENT_COUNT}"); do
+        eval "r=\${ROLE_${i}:-}"
+        [[ -z "$r" ]] && continue
+        role_dir="${script_dir}/roles/${r}"
+        [[ ! -d "$role_dir" ]] && role_dir="${REPO_DIR:-${INSTALL_DIR}/repo}/roles/${r}"
+        role_name="Agent ${i}"
+        role_title="${r}"
+        if [[ -f "${role_dir}/IDENTITY.md" ]]; then
+            name_line=$(grep -m1 "^\*\*Name:\*\*" "${role_dir}/IDENTITY.md" 2>/dev/null || true)
+            role_title_line=$(grep -m1 "^\*\*Role:\*\*" "${role_dir}/IDENTITY.md" 2>/dev/null || true)
+            [[ -n "$name_line" ]] && role_name=$(echo "$name_line" | sed 's/^\*\*Name:\*\*[[:space:]]*//;s/[[:space:]]*$//')
+            [[ -n "$role_title_line" ]] && role_title=$(echo "$role_title_line" | sed 's/^\*\*Role:\*\*[[:space:]]*//;s/[[:space:]]*$//')
+        fi
+        echo "- **Agent ${i}** — ${role_name} — ${role_title}" >> "$roster_file"
+    done
+    for i in $(seq 1 "${AGENT_COUNT}"); do
+        eval "r=\${ROLE_${i}:-}"
+        [[ "$r" != "orchestrator-koala" ]] && continue
+        local soul_file="${INSTALL_DIR}/data/koala-agent-${i}/workspace/SOUL.md"
+        [[ ! -f "$soul_file" ]] && continue
+        # Replace placeholder line under "## Agent Roster" with roster content
+        python3 -c "
+import re
+with open('$soul_file', 'r') as f:
+    content = f.read()
+with open('$roster_file', 'r') as f:
+    roster = f.read().strip()
+# Replace from '## Agent Roster (reference)' to next '## ' with new section
+pattern = r'(## Agent Roster\s*\(reference\)\s*\n)(.*?)(?=\n## |\Z)'
+replacement = r'\1\n' + roster + r'\n\n'
+new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+with open('$soul_file', 'w') as f:
+    f.write(new_content)
+" 2>/dev/null || true
+        _info "Injected agent roster into OrchestratorKoala (agent ${i}) SOUL.md"
+    done
+    rm -f "$roster_file"
+}
+
 # ═══════════════════════════════════════
 # COGNITIVE INFRASTRUCTURE (mind/)
 # ═══════════════════════════════════════
@@ -1084,6 +1130,9 @@ with open('${auth_dir}/auth-profiles.json', 'w') as f:
     chown -R 1000:1000 "${INSTALL_DIR}/data/"
     chmod -R u+rwX,g+rwX,o-rwx "${INSTALL_DIR}/data/"
 
+    # Inject agent roster into any OrchestratorKoala agent's SOUL.md
+    _inject_orchestrator_roster || true
+
     _info "Agent configs created (${AGENT_COUNT} agents)"
 }
 
@@ -1121,6 +1170,29 @@ CRED_AGENT
 
     chmod 600 "$creds_file"
     _info "Credentials saved to ${creds_file}"
+}
+
+_create_settings_file() {
+    local settings_file="${INSTALL_DIR}/.settings.json"
+    _step "Creating settings file..."
+    python3 -c "
+import json, os
+p = os.environ.get('INSTALL_DIR', '/opt/koalaclaw')
+f = os.path.join(p, '.settings.json')
+data = {
+    'wiro_api_key': os.environ.get('WIRO_API_KEY', ''),
+    'wiro_api_secret': os.environ.get('WIRO_API_SECRET', ''),
+    'channels': {},
+    'default_model': os.environ.get('MODEL', ''),
+}
+os.makedirs(p, exist_ok=True)
+with open(f, 'w') as out:
+    json.dump(data, out, indent=2)
+" 2>/dev/null || true
+    if [[ -f "$settings_file" ]]; then
+        chmod 600 "$settings_file"
+        _info "Settings file created (${settings_file})"
+    fi
 }
 
 # ═══════════════════════════════════════
@@ -1588,6 +1660,17 @@ cmd_install() {
     read -rp "  Model (full name, e.g. openai/gpt-5.2) [${default_model}]: " MODEL
     MODEL="${MODEL:-$default_model}"
 
+    # Optional Wiro AI (can add later in Web UI Settings)
+    WIRO_API_KEY=""
+    WIRO_API_SECRET=""
+    read -rp "  Add Wiro AI key now? (optional; can add later in Settings) [y/N]: " wiro_ans
+    if [[ "${wiro_ans,,}" == "y" || "${wiro_ans,,}" == "yes" ]]; then
+        read -rp "  Wiro API Key: " WIRO_API_KEY
+        read -rp "  Wiro API Secret: " WIRO_API_SECRET
+        WIRO_API_KEY="${WIRO_API_KEY:-}"
+        WIRO_API_SECRET="${WIRO_API_SECRET:-}"
+    fi
+
     # Subnet
     SUBNET="${DEFAULT_SUBNET}"
     CADDY_IP="${DEFAULT_CADDY_IP}"
@@ -1627,6 +1710,7 @@ cmd_install() {
     _generate_caddyfile
     _generate_agent_configs
     _generate_credentials
+    INSTALL_DIR="${INSTALL_DIR}" MODEL="${MODEL}" WIRO_API_KEY="${WIRO_API_KEY:-}" WIRO_API_SECRET="${WIRO_API_SECRET:-}" _create_settings_file || true
 
     # ─── Deploy ───
     _deploy
@@ -1884,6 +1968,8 @@ cmd_update() {
         _create_mind_directory "$i" "$role" || true
     done
     _info "Mind directories up to date"
+
+    _inject_orchestrator_roster || true
 
     _step "Pulling latest images..."
     docker compose pull --quiet

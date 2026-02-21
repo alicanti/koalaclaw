@@ -1,7 +1,7 @@
 # KoalaClaw Installation Guide
 
 > Deploy N specialized AI agents with an isometric office Web UI on a fresh Ubuntu 24.04 server.
-> Includes 19 agent roles, workflow pipelines, monitoring, and gamification.
+> Includes 20 agent roles (with OrchestratorKoala), Wiro AI integration, workflow pipelines, monitoring, channel integrations, and gamification.
 
 ## Quick Install (Automated)
 
@@ -20,18 +20,37 @@ The installer will:
 1. Check system requirements (OS, RAM, disk, ports)
 2. Install Docker CE + Compose v2 if missing
 3. Ask how many agents you want (1-50)
-4. Let you select a role for each agent (19 roles available)
+4. Let you select a role for each agent (20 roles available, including OrchestratorKoala)
 5. Ask for your AI provider and API key
 6. Validate the key and list available models
-7. Generate all config files, tokens, and deploy
-8. Set up the Web UI on port 3099
+7. Optionally configure Wiro AI key (can also be done later in Settings)
+8. Generate all config files, tokens, and deploy
+9. Set up the Web UI on port 3099
+10. Create `.settings.json` for Wiro/channel/model configuration
 
-After install, start the Web UI:
-```bash
-cd /opt/koalaclaw
-python3 admin-api.py &
-# Open http://SERVER_IP:3099 in your browser
-```
+After install, the Web UI runs automatically as a systemd service (`koalaclaw-ui`).
+Open `http://SERVER_IP:3099` in your browser.
+
+## Post-Install: Settings Page
+
+Click the **⚙️** button in the Web UI tab bar to open Settings:
+
+- **Wiro AI**: Enter your API key and secret, test the connection, save.
+- **Channel Integrations**: Connect Telegram (bot token), WhatsApp (QR login), Slack, or Discord to the OrchestratorKoala agent.
+- **General**: Change the default AI model for all agents.
+
+## Post-Install: Wiro AI
+
+If you skipped the Wiro key during install, add it via Settings (⚙️) in the Web UI. Once configured:
+1. Open a chat with any agent
+2. Click the **✨** button next to the message input
+3. Browse models by category (Image, Video, Audio, LLM)
+4. Enter a prompt and click Generate
+5. The result appears in the chat
+
+## Post-Install: Image Upload
+
+In the chat view, click the **📎** button to attach an image before sending a message. Images are displayed inline in the chat history.
 
 ## Manual Install (Step by Step)
 

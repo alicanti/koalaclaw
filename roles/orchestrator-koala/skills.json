@@ -1,0 +1,31 @@
+{
+  "enabled": [
+    "coding-agent",
+    "github",
+    "tmux",
+    "browser",
+    "summarize",
+    "replicate-api",
+    "elevenlabs-tts",
+    "openai-image-gen",
+    "seo-writer",
+    "notion",
+    "blogwatcher",
+    "email-responder",
+    "trello",
+    "nano-pdf",
+    "vuln-scanner",
+    "calendar-sync",
+    "cron",
+    "crypto-tracker",
+    "server-monitor",
+    "healthcheck",
+    "csv-analyzer",
+    "web-scraper",
+    "voice-call",
+    "twitter-api",
+    "reddit-api",
+    "wiro"
+  ],
+  "disabled": []
+}

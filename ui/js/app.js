@@ -73,6 +73,10 @@ class KoalaClawApp {
             this.loadAgents();
         });
 
+        document.getElementById('btn-settings')?.addEventListener('click', () => {
+            if (typeof window.openSettings === 'function') window.openSettings();
+        });
+
         // Ctrl+K focus
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -286,4 +290,5 @@ class KoalaClawApp {
 // Boot
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new KoalaClawApp();
+    window.koalaApp = window.app;
 });

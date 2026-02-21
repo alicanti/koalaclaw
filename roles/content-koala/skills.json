@@ -1,10 +1,1 @@
-{
-  "enabled": [
-    "seo-writer",
-    "notion",
-    "blogwatcher",
-    "browser"
-  ],
-  "disabled": []
-}
-
+{"enabled":["seo-writer","notion","blogwatcher","browser","wiro"],"disabled":[]}

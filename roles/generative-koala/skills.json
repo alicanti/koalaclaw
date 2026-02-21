@@ -1,10 +1,1 @@
-{
-  "enabled": [
-    "replicate-api",
-    "elevenlabs-tts",
-    "openai-image-gen",
-    "browser"
-  ],
-  "disabled": []
-}
-
+{"enabled":["replicate-api","elevenlabs-tts","openai-image-gen","browser","wiro"],"disabled":[]}

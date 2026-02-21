@@ -263,6 +263,109 @@
     padding-left: 4px;
 }
 
+/* Image upload */
+.chat-image-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chat-attach-btn,
+.chat-wiro-btn {
+    width: 40px;
+    height: 40px;
+    background: var(--bg-card);
+    color: var(--text-dim);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.chat-attach-btn:hover,
+.chat-wiro-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.chat-upload-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    margin-bottom: 4px;
+}
+
+.chat-upload-preview img {
+    max-width: 120px;
+    max-height: 80px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.chat-upload-clear {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.chat-upload-clear:hover {
+    color: var(--error);
+    border-color: var(--error);
+}
+
+/* In-message images */
+.chat-image-wrap {
+    margin: 8px 0;
+}
+
+.chat-image {
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 400px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: block;
+}
+
+.chat-image:hover {
+    opacity: 0.95;
+}
+
+/* Wiro generation progress */
+.chat-wiro-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.chat-wiro-progress .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
 /* Connecting State */
 .chat-connecting {
     flex: 1;
@@ -285,6 +388,158 @@
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* Wiro modal */
+.wiro-modal {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 720px;
+    width: 100%;
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.wiro-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.wiro-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--text);
+}
+
+.wiro-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-dim);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.wiro-close:hover {
+    color: var(--text);
+}
+
+.wiro-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.wiro-tab {
+    padding: 8px 14px;
+    background: var(--bg-mid);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.wiro-tab:hover, .wiro-tab.active {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.wiro-search {
+    width: 100%;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.wiro-search:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.wiro-model-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.wiro-card {
+    background: var(--bg-mid);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.wiro-card-name {
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.wiro-card-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.wiro-card-prompt {
+    margin-bottom: 8px;
+}
+
+.wiro-prompt-input {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-dark);
+    color: var(--text);
+}
+
+.wiro-generate-btn {
+    width: 100%;
+    padding: 8px;
+    background: var(--accent);
+    color: var(--bg-dark);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.wiro-generate-btn:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.wiro-generate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.wiro-error, .wiro-empty {
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 12px;
+}
+
+.wiro-error { color: var(--error); }
+
+.wiro-modal-progress {
+    margin-bottom: 12px;
 }
 
 /* Placeholder */

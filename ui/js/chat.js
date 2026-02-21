@@ -6,6 +6,7 @@ class ChatManager {
         this.app = app;
         this.agent = null;
         this.sending = false;
+        this.pendingImage = null; // base64 data URL for next send
     }
 
     // ─── Connect to Agent ───────────────────────────────────
@@ -48,7 +49,7 @@ class ChatManager {
         if (data && data.history && data.history.length > 0) {
             data.history.forEach(msg => {
                 if (msg.role === 'user') {
-                    this._appendUserBubble(msg.content, msg.timestamp, true);
+                    this._appendUserBubble(msg.content, msg.timestamp, true, msg.image_base64);
                 } else if (msg.role === 'assistant') {
                     this._appendRestoredAssistantBubble(msg.content, msg.timestamp);
                 }
@@ -60,11 +61,14 @@ class ChatManager {
     }
 
     // ─── Send Messages ──────────────────────────────────────
-    async send(text) {
+    async send(text, imageBase64) {
         if (!text.trim() || !this.agent || this.sending) return;
 
-        this._appendUserBubble(text);
-        // History is persisted server-side in admin-api.py
+        const img = imageBase64 || this.pendingImage;
+        this._appendUserBubble(text, null, false, img);
+        this.pendingImage = null;
+        this._clearUploadPreview();
+
         this.app.addLog('info', `You: ${text}`, 'Chat');
 
         this.sending = true;
@@ -72,10 +76,9 @@ class ChatManager {
         this.app.updateAgentStatus(this.agent.id, 'online', 'thinking');
 
         try {
-            const result = await this.app.apiPost('/agents/chat', {
-                agent_id: this.agent.id,
-                message: text
-            });
+            const payload = { agent_id: this.agent.id, message: text };
+            if (img) payload.image_base64 = img;
+            const result = await this.app.apiPost('/agents/chat', payload);
 
             if (result && result.response) {
                 this._finalizeStream(result.response);
@@ -124,11 +127,20 @@ class ChatManager {
         container.innerHTML = `
             <div class="chat-messages" id="chat-messages"></div>
             <div class="chat-input-area">
+                <div class="chat-upload-preview" id="chat-upload-preview" style="display:none">
+                    <img id="chat-upload-preview-img" alt="Preview">
+                    <button type="button" id="chat-upload-clear" class="chat-upload-clear">✕</button>
+                </div>
                 <div class="chat-input-row">
+                    <input type="file" id="chat-image-input" accept="image/*" class="chat-image-input" title="Attach image">
+                    <button type="button" id="chat-attach-btn" class="chat-attach-btn" title="Attach image">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    </button>
                     <input type="text" id="chat-msg-input" class="chat-msg-input"
                            placeholder="Message ${this.agent.name}..."
                            autocomplete="off">
-                    <button id="chat-send-btn" class="chat-send-btn">
+                    <button type="button" id="chat-wiro-btn" class="chat-wiro-btn" title="Generate with Wiro AI">✨</button>
+                    <button type="button" id="chat-send-btn" class="chat-send-btn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
                         </svg>
@@ -142,7 +154,11 @@ class ChatManager {
 
         // Event listeners
         const input = document.getElementById('chat-msg-input');
-        const btn = document.getElementById('chat-send-btn');
+        const sendBtn = document.getElementById('chat-send-btn');
+        const attachBtn = document.getElementById('chat-attach-btn');
+        const fileInput = document.getElementById('chat-image-input');
+        const clearPreview = document.getElementById('chat-upload-clear');
+        const wiroBtn = document.getElementById('chat-wiro-btn');
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -150,8 +166,18 @@ class ChatManager {
                 this._sendFromInput();
             }
         });
-        btn.addEventListener('click', () => this._sendFromInput());
+        sendBtn.addEventListener('click', () => this._sendFromInput());
+        attachBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => this._onImageSelect(e));
+        if (clearPreview) clearPreview.addEventListener('click', () => this._clearUploadPreview());
+        if (wiroBtn) wiroBtn.addEventListener('click', () => this._openWiroModal());
         input.focus();
+
+        window.addEventListener('koalaclaw-wiro-result', (e) => {
+            if (!this.agent || !e.detail || e.detail.agent !== this.agent) return;
+            const text = e.detail.result || (e.detail.raw && e.detail.raw.url) || '';
+            if (text) this._appendRestoredAssistantBubble(text);
+        });
 
         // Show welcome
         this._appendSystemMessage(`Connected to ${this.agent.emoji} ${this.agent.name}`, 'success');
@@ -183,13 +209,44 @@ class ChatManager {
         const input = document.getElementById('chat-msg-input');
         if (!input) return;
         const text = input.value.trim();
-        if (text) {
-            this.send(text);
+        if (text || this.pendingImage) {
+            this.send(text || '(image)', this.pendingImage);
             input.value = '';
         }
     }
 
-    _appendUserBubble(text, timestamp, skipScroll) {
+    _onImageSelect(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            this.pendingImage = reader.result;
+            const preview = document.getElementById('chat-upload-preview');
+            const img = document.getElementById('chat-upload-preview-img');
+            if (preview && img) {
+                img.src = reader.result;
+                preview.style.display = 'flex';
+            }
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
+
+    _clearUploadPreview() {
+        this.pendingImage = null;
+        const preview = document.getElementById('chat-upload-preview');
+        const img = document.getElementById('chat-upload-preview-img');
+        if (preview) preview.style.display = 'none';
+        if (img) img.src = '';
+        const fileInput = document.getElementById('chat-image-input');
+        if (fileInput) fileInput.value = '';
+    }
+
+    _openWiroModal() {
+        window.dispatchEvent(new CustomEvent('koalaclaw-open-wiro', { detail: { agent: this.agent } }));
+    }
+
+    _appendUserBubble(text, timestamp, skipScroll, imageBase64) {
         const messages = document.getElementById('chat-messages');
         if (!messages) return;
 
@@ -197,10 +254,14 @@ class ChatManager {
             ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             : this._timeStr();
 
+        const safeDataUrl = (imageBase64 && String(imageBase64).startsWith('data:image/')) ? imageBase64 : '';
+        const imgHtml = safeDataUrl
+            ? `<div class="chat-image-wrap"><img class="chat-image" src="${safeDataUrl.replace(/"/g, '&quot;')}" alt="Attached"></div>`
+            : '';
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble user';
         bubble.innerHTML = `
-            <div class="bubble-content">${this._escapeHtml(text)}</div>
+            <div class="bubble-content">${imgHtml}${this._escapeHtml(text || '')}</div>
             <div class="bubble-meta">You · ${time}</div>
         `;
         messages.appendChild(bubble);
@@ -327,6 +388,8 @@ class ChatManager {
         html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
         // Links
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        // Image URLs (standalone .png/.jpg/.jpeg/.webp/.gif)
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))(?:[\s)]|$)/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"></div>');
         // Line breaks
         html = html.replace(/\n/g, '<br>');
 

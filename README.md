@@ -76,7 +76,7 @@ Internet / LAN
      ├── :3001 → Caddy → 💻 CoderKoala     (coding, review, deploy)
      ├── :3002 → Caddy → 📣 MarketerKoala  (social media, campaigns)
      ├── :3003 → Caddy → 🧠 StrategyKoala  (planning, OKRs)
-     ├── :300N → Caddy → 🐨 AnyKoala       (your choice of 19 roles)
+     ├── :300N → Caddy → 🐨 AnyKoala       (your choice of 20 roles)
      └── :3099 → Admin API → 🎮 Web UI     (isometric office dashboard)
 ```
 
@@ -84,19 +84,30 @@ Internet / LAN
 
 ## ✨ Features
 
-### 19 Specialized Agent Roles
-Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pre-configured skills, desk decorations, and a gamification skill tree.
+### 20 Specialized Agent Roles
+Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pre-configured skills, desk decorations, and a gamification skill tree. Includes an **OrchestratorKoala** that delegates complex tasks to specialist agents.
 
 ### Isometric Office Web UI
 A browser-based dashboard at `:3099` with:
 - **Isometric office** — each agent sits at a desk with role-specific decorations
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping
 - **Admin panel** — agent list, status, skill toggles, quick actions
-- **Chat bar** — talk to any agent with streaming responses
+- **Chat with image upload** — talk to any agent, attach images (📎), view images in responses
+- **Wiro AI integration** — generate images/video/audio via 500+ models (✨ button in chat)
+- **Settings page** — configure Wiro API keys, channel integrations, default model (⚙️)
 - **Live logs** — color-coded, filterable, real-time log stream
 - **Workflow pipelines** — chain agents together (Blog Post, Product Launch, Security Audit)
 - **Monitoring dashboard** — CPU/RAM per agent, alerts, cron jobs
 - **Gamification** — XP, levels (1-50), achievements, leaderboard, outfits, desk rewards
+
+### Wiro AI Model Marketplace
+Connect to [Wiro AI](https://wiro.ai) for 500+ generative models (image, video, audio, LLM). Enter your API key in Settings, then use the ✨ button in chat to browse models by category, enter a prompt, and generate content directly in the conversation.
+
+### Agent-to-Agent Delegation
+OrchestratorKoala analyzes complex requests, breaks them into sub-tasks, and delegates to specialist agents (ResearchKoala for research, CoderKoala for code, etc.). Results are combined and reported back with attribution.
+
+### Channel Integrations
+Connect Telegram, WhatsApp, Slack, or Discord to the OrchestratorKoala agent via the Settings page. Messages from external channels are routed to the orchestrator, which can delegate to any specialist agent.
 
 ### 12 Custom Skills
 Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-api, elevenlabs-tts, web-scraper, csv-analyzer, server-monitor, crypto-tracker, seo-writer, vuln-scanner, calendar-sync.
@@ -113,7 +124,7 @@ Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-a
 
 ---
 
-## 🐨 19 Agent Roles
+## 🐨 20 Agent Roles
 
 | # | Role | Emoji | Focus |
 |---|------|-------|-------|
@@ -121,12 +132,12 @@ Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-a
 | 2 | MarketerKoala | 📣 | Social media, campaigns, analytics |
 | 3 | StrategyKoala | 🧠 | Business strategy, OKRs, roadmaps |
 | 4 | CustomerKoala | 🎧 | Customer support, live chat, FAQ |
-| 5 | GenerativeKoala | 🎨 | Image/video/audio generation |
+| 5 | GenerativeKoala | 🎨 | Image/video/audio generation (+ Wiro AI) |
 | 6 | ResearchKoala | 🔬 | Deep research, reports, analysis |
 | 7 | DataKoala | 📊 | Data analysis, charts, SQL |
 | 8 | DevOpsKoala | ⚙️ | Server ops, monitoring, CI/CD |
 | 9 | FinanceKoala | 💰 | Crypto, stocks, portfolio tracking |
-| 10 | ContentKoala | ✍️ | Blog writing, newsletters, SEO |
+| 10 | ContentKoala | ✍️ | Blog writing, newsletters, SEO (+ Wiro AI) |
 | 11 | SecurityKoala | 🔒 | Vulnerability scanning, audits |
 | 12 | SchedulerKoala | 📅 | Calendar, reminders, cron jobs |
 | 13 | TranslatorKoala | 🌍 | Translation, localization |
@@ -136,6 +147,7 @@ Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-a
 | 17 | QAKoala | 🧪 | Testing, bug reports, QA |
 | 18 | DesignKoala | 🎯 | UI/UX feedback, design review |
 | 19 | CustomKoala | 🛠️ | User-defined custom role |
+| 20 | OrchestratorKoala | 🎯 | Task orchestration, delegation, channels |
 
 Each role includes:
 - `IDENTITY.md` — name, emoji, personality, speaking style
@@ -236,6 +248,7 @@ graph TB
 ├── docker-compose.yml        # Generated
 ├── Caddyfile                 # Generated
 ├── .koalaclaw.state          # Tokens, roles, config
+├── .settings.json            # Wiro keys, channels, model (UI-editable)
 ├── .credentials              # Access URLs
 ├── browser-extension/        # Chrome extension (auto-installed)
 ├── relay-start.sh            # CDP relay startup (systemd)
@@ -244,6 +257,13 @@ graph TB
         ├── openclaw.json     # Gateway config
         ├── cdp-proxy.js      # CDP relay proxy (persistent)
         ├── role-skills.json  # Role skill config
+        ├── chat-history.jsonl # Persistent chat history
+        ├── mind/             # Cognitive Infrastructure
+        │   ├── PROFILE.md
+        │   ├── PROJECTS.md
+        │   ├── DECISIONS.md
+        │   ├── ERRORS.md
+        │   └── logs/
         └── agents/main/agent/
             ├── auth-profiles.json
             └── identity/
@@ -252,18 +272,25 @@ graph TB
 
 GitHub repo:
 ├── koalaclaw.sh              # CLI installer
-├── admin-api.py              # Web UI backend
+├── admin-api.py              # Web UI backend + Wiro/Settings/Delegation API
+├── wiro_client.py            # Wiro AI API client (HMAC auth, run/poll)
 ├── ui/                       # Web UI frontend
 │   ├── index.html
-│   ├── css/                  # 7 CSS modules
-│   └── js/                   # 8 JS modules
-├── roles/                    # 19 role templates
+│   ├── css/                  # 8 CSS modules (incl. settings.css)
+│   └── js/                   # 10 JS modules (incl. wiro.js, settings.js)
+├── roles/                    # 20 role templates (incl. orchestrator-koala)
 │   └── <role-name>/
 │       ├── IDENTITY.md
 │       ├── SOUL.md
 │       ├── skills.json
 │       ├── desk.json
+│       ├── mind-template.md
 │       └── gamification.json
+├── mind/                     # Cognitive Infrastructure templates
+│   ├── PROTOCOL.md
+│   ├── PROJECTS.template.md
+│   ├── DECISIONS.template.md
+│   └── ERRORS.template.md
 ├── custom-skills/            # 12 skill templates
 │   └── <skill-name>/SKILL.md
 ├── workflows/                # 4 preset pipelines
