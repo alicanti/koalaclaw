@@ -264,7 +264,7 @@ _apply_role_to_agent() {
     local identity_dir="${agent_dir}/agents/main/agent/identity"
     mkdir -p "$identity_dir"
     
-    # Copy role files
+    # Copy role files to identity dir
     if [[ -f "${role_dir}/IDENTITY.md" ]]; then
         cp "${role_dir}/IDENTITY.md" "${identity_dir}/IDENTITY.md"
     fi
@@ -272,9 +272,18 @@ _apply_role_to_agent() {
         cp "${role_dir}/SOUL.md" "${identity_dir}/SOUL.md"
     fi
     
+    # Also copy to workspace dir (where OpenClaw actually reads AGENTS.md/SOUL.md)
+    local workspace_dir="${agent_dir}/workspace"
+    mkdir -p "$workspace_dir"
+    if [[ -f "${role_dir}/IDENTITY.md" ]]; then
+        cp "${role_dir}/IDENTITY.md" "${workspace_dir}/IDENTITY.md"
+    fi
+    if [[ -f "${role_dir}/SOUL.md" ]]; then
+        cp "${role_dir}/SOUL.md" "${workspace_dir}/SOUL.md"
+    fi
+    
     # Apply skills from role
     if [[ -f "${role_dir}/skills.json" ]]; then
-        # Skills will be applied via OpenClaw config
         local skills_file="${agent_dir}/role-skills.json"
         cp "${role_dir}/skills.json" "$skills_file"
     fi
@@ -337,6 +346,13 @@ PROFILEEOF
     # PROTOCOL.md — reference copy
     if [[ -f "${mind_src}/PROTOCOL.md" ]]; then
         cp "${mind_src}/PROTOCOL.md" "${mind_dir}/PROTOCOL.md"
+    fi
+
+    # Also copy Cognitive Infrastructure Protocol to workspace
+    local workspace_dir="${agent_dir}/workspace"
+    mkdir -p "$workspace_dir"
+    if [[ -f "${mind_src}/PROTOCOL.md" ]]; then
+        cp "${mind_src}/PROTOCOL.md" "${workspace_dir}/COGNITIVE_PROTOCOL.md"
     fi
 }
 
@@ -1012,21 +1028,6 @@ cfg = {
             'model': {
                 'primary': '${MODEL}'
             },
-            'preamble': '''You operate under the Cognitive Infrastructure Protocol.
-
-Your persistent memory is at /state/mind/:
-- PROFILE.md: Your identity and role
-- PROJECTS.md: Active projects and status
-- DECISIONS.md: Past decisions and reasoning
-- ERRORS.md: Past mistakes and lessons learned
-- logs/: Daily activity logs
-
-SESSION RULES:
-1. Consider your PROFILE, PROJECTS, DECISIONS, and ERRORS before responding.
-2. After significant interactions, update the relevant mind/ files.
-3. Log important activities to logs/ with today's date.
-4. Never delete past entries — always append.
-5. If you make a mistake, immediately log it to ERRORS.md.'''
         }
     },
     'gateway': {
