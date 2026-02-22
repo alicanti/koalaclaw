@@ -17,11 +17,11 @@
 <body>
     <div class="app-container">
         <!-- Left Sidebar: Mission Control (collapsible) -->
-        <aside class="admin-panel mission-control" id="mission-control-sidebar">
-            <div class="admin-header mc-header">
+        <aside class="mission-control" id="mission-control-sidebar">
+            <div class="mc-header">
                 <div class="logo-row">
-                    <span class="logo-icon">🦞</span>
-                    <div>
+                    <span class="logo-icon">🐨</span>
+                    <div class="mc-logo-text">
                         <h1>KoalaClaw</h1>
                         <p class="subtitle">AI Agent Office</p>
                     </div>
@@ -31,11 +31,11 @@
 
             <div class="mc-body">
                 <section class="mc-section open" data-section="agents">
-                    <h2 class="mc-section-header" data-section="agents">
-                        <span class="mc-section-icon">🐨</span>
+                    <div class="mc-section-header">
+                        <span class="mc-section-icon">👥</span>
                         <span class="mc-section-title">Agents</span>
                         <span class="mc-chevron">▼</span>
-                    </h2>
+                    </div>
                     <div class="mc-section-content">
                         <div class="agent-list" id="agent-list"></div>
                         <button class="btn-add-agent" id="btn-add-agent">+ Add Agent</button>
@@ -43,31 +43,31 @@
                 </section>
 
                 <section class="mc-section" data-section="files" id="mc-section-files">
-                    <h2 class="mc-section-header">
-                        <span class="mc-section-icon">📄</span>
+                    <div class="mc-section-header">
+                        <span class="mc-section-icon">📝</span>
                         <span class="mc-section-title">Agent Files</span>
                         <span class="mc-chevron">▼</span>
-                    </h2>
+                    </div>
                     <div class="mc-section-content" id="mc-files-content">
                         <p class="mc-placeholder">Select an agent to edit files.</p>
                     </div>
                 </section>
 
-                <section class="mc-section open" data-section="integrations">
-                    <h2 class="mc-section-header">
-                        <span class="mc-section-icon">🔌</span>
+                <section class="mc-section" data-section="integrations">
+                    <div class="mc-section-header">
+                        <span class="mc-section-icon">🔗</span>
                         <span class="mc-section-title">Integrations</span>
                         <span class="mc-chevron">▼</span>
-                    </h2>
+                    </div>
                     <div class="mc-section-content" id="mc-integrations-content"></div>
                 </section>
 
                 <section class="mc-section open" data-section="system">
-                    <h2 class="mc-section-header">
-                        <span class="mc-section-icon">⚙</span>
+                    <div class="mc-section-header">
+                        <span class="mc-section-icon">⚙️</span>
                         <span class="mc-section-title">System</span>
                         <span class="mc-chevron">▼</span>
-                    </h2>
+                    </div>
                     <div class="mc-section-content">
                         <div class="system-info">
                             <div class="info-item">

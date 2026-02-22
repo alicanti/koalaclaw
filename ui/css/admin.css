@@ -17,7 +17,7 @@
 }
 
 #agent-detail-panel.visible {
-    left: 260px; /* Offset by admin panel width so it doesn't cover agent list */
+    left: var(--sidebar-width, 280px);
 }
 
 .detail-header {

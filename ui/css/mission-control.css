@@ -1,26 +1,36 @@
-/* Mission Control Sidebar - collapsible multi-section panel */
+/* ═══════════════════════════════════════════
+   Mission Control Sidebar
+   ═══════════════════════════════════════════ */
 
 .mission-control {
-    --mc-width: 320px;
-    --mc-width-collapsed: 60px;
-    width: var(--mc-width);
-    min-width: var(--mc-width);
-    transition: width 0.25s ease, min-width 0.25s ease;
+    --mc-bg: #151430;
+    --mc-bg-hover: rgba(255,255,255,0.04);
+    --mc-bg-active: rgba(0,229,255,0.08);
+    --mc-border: rgba(255,255,255,0.06);
+    --mc-radius: 8px;
+
+    background: var(--mc-bg);
+    border-right: 1px solid var(--mc-border);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: width 0.3s ease, min-width 0.3s ease;
+    width: var(--sidebar-width, 280px);
+    min-width: var(--sidebar-width, 280px);
 }
 
+/* ─── Collapsed state ─── */
 .mission-control.collapsed {
-    width: var(--mc-width-collapsed);
-    min-width: var(--mc-width-collapsed);
+    width: 56px;
+    min-width: 56px;
 }
 
-.mission-control.collapsed .mc-section-title,
+.mission-control.collapsed .mc-logo-text,
 .mission-control.collapsed .mc-section-content,
+.mission-control.collapsed .mc-section-title,
 .mission-control.collapsed .mc-chevron,
-.mission-control.collapsed .agent-list .info,
-.mission-control.collapsed .agent-list .status-dot,
+.mission-control.collapsed .agent-item .info,
+.mission-control.collapsed .agent-item .status-dot,
 .mission-control.collapsed .btn-add-agent,
 .mission-control.collapsed .system-info .value,
 .mission-control.collapsed .mc-placeholder,
@@ -31,47 +41,44 @@
     display: none !important;
 }
 
-.mission-control.collapsed .mc-header .logo-row div,
-.mission-control.collapsed .mc-header .logo-row h1,
-.mission-control.collapsed .mc-header .logo-row .subtitle {
-    display: none;
-}
-
 .mission-control.collapsed .mc-section-header {
     justify-content: center;
-    padding: 10px;
+    padding: 12px 0;
 }
 
 .mission-control.collapsed .mc-section-icon {
     margin: 0;
+    font-size: 16px;
 }
 
 .mission-control.collapsed .agent-item {
     justify-content: center;
-    padding: 8px;
+    padding: 8px 0;
+    background: none;
+    border: none;
 }
 
 .mission-control.collapsed .agent-item .emoji {
     margin: 0;
+    font-size: 18px;
 }
 
-.mission-control.collapsed .system-info {
-    flex-direction: column;
-    align-items: center;
+.mission-control.collapsed .mc-header {
+    padding: 16px 0;
+    justify-content: center;
 }
 
-.mission-control.collapsed .info-item {
-    flex-direction: column;
-    align-items: center;
+.mission-control.collapsed .mc-toggle {
+    transform: rotate(180deg);
 }
 
-/* Header with collapse toggle */
+/* ─── Header ─── */
 .mc-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    gap: 12px;
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid var(--mc-border);
     flex-shrink: 0;
 }
 
@@ -79,110 +86,134 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.mc-header .logo-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.mc-logo-text h1 {
+    font-family: var(--pixel-font);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    line-height: 1.3;
+}
+
+.mc-logo-text .subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 1px;
 }
 
 .mc-toggle {
-    background: var(--bg-tertiary, rgba(255,255,255,0.05));
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
     width: 28px;
     height: 28px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, color 0.2s;
-}
-
-.mission-control.collapsed .mc-toggle {
-    transform: rotate(180deg);
+    background: transparent;
+    border: 1px solid var(--mc-border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s;
 }
 
 .mc-toggle:hover {
-    background: var(--accent, #00e5ff);
-    color: var(--bg-dark, #0d0c1a);
+    background: var(--accent);
+    color: var(--bg-dark);
+    border-color: var(--accent);
 }
 
-/* Body scrollable */
+/* ─── Scrollable body ─── */
 .mc-body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    padding-bottom: 12px;
 }
 
-/* Section */
+/* ─── Sections ─── */
 .mc-section {
-    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.06));
+    border-bottom: 1px solid var(--mc-border);
+}
+
+.mc-section:last-child {
+    border-bottom: none;
 }
 
 .mc-section-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 12px 18px;
     cursor: pointer;
     user-select: none;
-    transition: background 0.2s;
+    transition: background 0.15s;
 }
 
 .mc-section-header:hover {
-    background: var(--bg-tertiary, rgba(255,255,255,0.05));
+    background: var(--mc-bg-hover);
 }
 
 .mc-section-icon {
-    font-size: 18px;
+    font-size: 14px;
     flex-shrink: 0;
+    width: 20px;
+    text-align: center;
 }
 
 .mc-section-title {
     flex: 1;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-primary, #eee);
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
 }
 
 .mc-chevron {
-    font-size: 10px;
-    color: var(--text-secondary);
-    transition: transform 0.2s;
+    font-size: 8px;
+    color: var(--text-dim);
+    transition: transform 0.25s ease;
+    opacity: 0.5;
 }
 
 .mc-section.open .mc-chevron {
-    transform: rotate(-180deg);
+    transform: rotate(180deg);
 }
 
-.mc-section:not(.open) .mc-section-content {
+/* Section content: collapse animation */
+.mc-section-content {
     max-height: 0;
     overflow: hidden;
-    padding-top: 0;
-    padding-bottom: 0;
     opacity: 0;
-}
-
-.mc-section-content {
-    padding: 8px 12px 14px;
-    max-height: 280px;
-    overflow-y: auto;
-    transition: max-height 0.25s ease, padding 0.2s ease, opacity 0.2s ease;
+    transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.2s ease;
+    padding: 0 14px;
 }
 
 .mc-section.open .mc-section-content {
-    max-height: 400px;
+    max-height: 600px;
+    opacity: 1;
+    padding: 4px 14px 14px;
+    overflow-y: auto;
 }
 
-.mc-section[data-section="agents"] .mc-section-content {
-    max-height: 320px;
+/* ═══════════════════════════════════════════
+   Agent List
+   ═══════════════════════════════════════════ */
+.mission-control .agent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
-.mc-section[data-section="system"] .mc-section-content {
-    max-height: 220px;
-}
-
-/* Agent cards (override/enhance .agent-item) */
 .mission-control .agent-list .agent-item {
     display: flex;
     align-items: center;
@@ -190,21 +221,25 @@
     padding: 8px 10px;
     border-radius: 6px;
     cursor: pointer;
-    transition: background 0.2s;
-    margin-bottom: 4px;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    background: transparent;
+    margin: 0;
 }
 
 .mission-control .agent-list .agent-item:hover {
-    background: var(--bg-tertiary, rgba(255,255,255,0.06));
+    background: var(--mc-bg-hover);
 }
 
 .mission-control .agent-list .agent-item.selected {
-    background: var(--accent-dim, rgba(0,229,255,0.15));
-    border-left: 3px solid var(--accent, #00e5ff);
+    background: var(--mc-bg-active);
+    border-color: rgba(0,229,255,0.2);
 }
 
 .mission-control .agent-list .agent-item .emoji {
-    font-size: 22px;
+    font-size: 20px;
+    width: 28px;
+    text-align: center;
     flex-shrink: 0;
 }
 
@@ -215,102 +250,74 @@
 
 .mission-control .agent-list .agent-item .name {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .mission-control .agent-list .agent-item .role {
-    font-size: 11px;
-    color: var(--text-secondary);
+    font-size: 10px;
+    color: var(--text-dim);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .mission-control .agent-list .agent-item .status-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
+    background: var(--text-dim);
 }
 
 .mission-control .agent-list .agent-item .status-dot.online {
-    background: var(--success, #4ade80);
-    box-shadow: 0 0 6px var(--success);
+    background: var(--success);
+    box-shadow: 0 0 6px rgba(0,230,118,0.5);
+    animation: mc-pulse 2s infinite;
 }
 
 .mission-control .agent-list .agent-item .status-dot.offline {
-    background: var(--error, #f87171);
+    background: var(--error);
+}
+
+@keyframes mc-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 
 .mission-control .btn-add-agent {
     width: 100%;
-    margin-top: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
+    margin-top: 6px;
+    padding: 7px;
+    font-size: 11px;
     border-radius: 6px;
     cursor: pointer;
-    background: var(--bg-tertiary);
-    border: 1px dashed var(--border-color);
-    color: var(--text-secondary);
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.1);
+    color: var(--text-dim);
+    transition: all 0.15s;
 }
 
 .mission-control .btn-add-agent:hover {
-    background: var(--accent-dim);
-    color: var(--accent);
     border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.04);
 }
 
-/* Placeholder */
+/* ═══════════════════════════════════════════
+   Agent File Editor
+   ═══════════════════════════════════════════ */
 .mc-placeholder {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin: 0;
-    padding: 8px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 0;
+    opacity: 0.6;
 }
 
-/* System section */
-.mc-system-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.mc-system-actions button {
-    padding: 6px 12px;
-    font-size: 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-}
-
-.mc-system-actions button:hover {
-    background: var(--accent-dim);
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
-.mc-system-actions button.btn-danger:hover {
-    border-color: var(--error);
-    color: var(--error);
-}
-
-/* Detail panel offset when sidebar collapsed */
-.mission-control.collapsed ~ #agent-detail-panel.visible,
-body.mc-collapsed #agent-detail-panel.visible {
-    left: 60px;
-}
-
-#agent-detail-panel.visible {
-    left: 320px;
-}
-
-/* Agent file editor */
 .mc-file-editor {
     display: flex;
     flex-direction: column;
@@ -319,87 +326,106 @@ body.mc-collapsed #agent-detail-panel.visible {
 
 .mc-files-tabs {
     display: flex;
-    flex-wrap: wrap;
     gap: 4px;
+    flex-wrap: wrap;
 }
 
 .mc-file-tab {
-    padding: 4px 8px;
-    font-size: 11px;
-    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 5px;
     cursor: pointer;
-    background: var(--bg-tertiary);
+    background: rgba(255,255,255,0.04);
     border: 1px solid transparent;
-    color: var(--text-secondary);
+    color: var(--text-dim);
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
 }
 
 .mc-file-tab:hover {
-    color: var(--text-primary);
+    color: var(--text);
+    background: rgba(255,255,255,0.06);
 }
 
 .mc-file-tab.active {
-    background: var(--accent-dim);
-    border-color: var(--accent);
+    background: rgba(0,229,255,0.1);
+    border-color: rgba(0,229,255,0.3);
     color: var(--accent);
 }
 
 .mc-file-textarea {
     width: 100%;
-    min-height: 160px;
-    font-family: ui-monospace, monospace;
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-dark, #0d0c1a);
-    color: var(--text-primary);
+    min-height: 140px;
+    max-height: 200px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.3);
+    color: var(--text);
     resize: vertical;
+    transition: border-color 0.2s;
 }
 
 .mc-file-textarea:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: rgba(0,229,255,0.4);
 }
 
 .mc-file-actions {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
 }
 
 .mc-file-status {
-    font-size: 11px;
-    color: var(--text-secondary);
+    font-size: 10px;
+    color: var(--text-dim);
 }
 
 .mc-btn-save {
-    padding: 4px 12px;
-    font-size: 12px;
-    border-radius: 4px;
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 5px;
     cursor: pointer;
     background: var(--accent);
-    border: 1px solid var(--accent);
+    border: none;
     color: var(--bg-dark);
+    transition: all 0.15s;
 }
 
 .mc-btn-save:hover:not(:disabled) {
-    filter: brightness(1.1);
+    filter: brightness(1.15);
+    box-shadow: 0 0 12px rgba(0,229,255,0.3);
 }
 
 .mc-btn-save:disabled {
-    opacity: 0.5;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 
-/* Integrations panel */
+/* ═══════════════════════════════════════════
+   Integrations
+   ═══════════════════════════════════════════ */
 .mc-integration-card {
     padding: 10px 12px;
-    margin-bottom: 10px;
-    background: var(--bg-tertiary, rgba(255,255,255,0.04));
-    border-radius: 6px;
-    border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+    margin-bottom: 6px;
+    background: rgba(255,255,255,0.02);
+    border-radius: var(--mc-radius);
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: border-color 0.15s;
+}
+
+.mc-integration-card:hover {
+    border-color: rgba(255,255,255,0.1);
+}
+
+.mc-integration-card:last-child {
+    margin-bottom: 0;
 }
 
 .mc-integration-header {
@@ -410,80 +436,154 @@ body.mc-collapsed #agent-detail-panel.visible {
 }
 
 .mc-integration-icon {
-    font-size: 16px;
+    font-size: 14px;
+    width: 20px;
+    text-align: center;
 }
 
 .mc-integration-name {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     flex: 1;
+    color: var(--text);
 }
 
 .mc-integration-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: var(--bg-mid);
-    color: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
 }
 
 .mc-integration-badge.configured {
-    background: var(--success-dim, rgba(74, 222, 128, 0.2));
-    color: var(--success, #4ade80);
+    background: rgba(0,230,118,0.12);
+    color: var(--success);
 }
 
 .mc-integration-card .mc-integration-input {
     width: 100%;
-    margin-bottom: 6px;
-    padding: 6px 8px;
+    margin-bottom: 4px;
+    padding: 6px 10px;
     font-size: 11px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-dark);
-    color: var(--text-primary);
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.25);
+    color: var(--text);
+    transition: border-color 0.15s;
 }
 
 .mc-integration-card .mc-integration-input:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: rgba(0,229,255,0.4);
+}
+
+.mc-integration-card .mc-integration-input::placeholder {
+    color: var(--text-dim);
+    opacity: 0.5;
 }
 
 .mc-integration-actions {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     margin-top: 6px;
 }
 
 .mc-int-btn {
     padding: 4px 10px;
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
-    background: var(--bg-mid);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-dim);
+    transition: all 0.15s;
 }
 
 .mc-int-btn:hover {
-    background: var(--accent-dim);
-    border-color: var(--accent);
+    background: rgba(0,229,255,0.08);
+    border-color: rgba(0,229,255,0.3);
     color: var(--accent);
 }
 
 .mc-int-btn.mc-int-delete:hover {
-    border-color: var(--error);
+    background: rgba(255,82,82,0.08);
+    border-color: rgba(255,82,82,0.3);
     color: var(--error);
 }
 
-/* Responsive: narrow screens */
-@media (max-width: 900px) {
-    .mission-control {
-        --mc-width: 280px;
-    }
+/* ═══════════════════════════════════════════
+   System Section
+   ═══════════════════════════════════════════ */
+.mc-section[data-section="system"] .system-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
-@media (max-width: 600px) {
-    .mission-control:not(.collapsed) {
-        --mc-width: 260px;
-    }
+.mc-section[data-section="system"] .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 5px;
+    font-size: 11px;
+}
+
+.mc-section[data-section="system"] .info-item .label {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.mc-section[data-section="system"] .info-item .value {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.mc-system-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.mc-system-actions button {
+    flex: 1;
+    padding: 7px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 5px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-dim);
+    transition: all 0.15s;
+}
+
+.mc-system-actions button:hover {
+    background: rgba(0,229,255,0.06);
+    border-color: rgba(0,229,255,0.25);
+    color: var(--accent);
+}
+
+/* ─── Detail panel offset ─── */
+#agent-detail-panel.visible {
+    left: var(--sidebar-width, 280px);
+}
+
+body.mc-collapsed #agent-detail-panel.visible {
+    left: 56px;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 1200px) {
+    :root { --sidebar-width: 260px; }
+}
+
+@media (max-width: 900px) {
+    :root { --sidebar-width: 240px; }
 }

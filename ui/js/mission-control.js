@@ -13,7 +13,7 @@ class MissionControl {
         this.app = app;
         this.sidebar = null;
         this.collapsed = false;
-        this.sectionOpen = { agents: true, files: true, integrations: true, system: true };
+        this.sectionOpen = { agents: true, files: false, integrations: false, system: true };
         this.fileEditorAgent = null;
         this.fileEditorPath = null;
         this.fileEditorDirty = false;
