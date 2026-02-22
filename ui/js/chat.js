@@ -1,12 +1,13 @@
 // KoalaClaw Chat — REST API Chat via admin-api.py
-// Sends messages via docker exec → OpenClaw CLI
+// Supports direct agent chat and orchestrated multi-agent mode
 
 class ChatManager {
     constructor(app) {
         this.app = app;
         this.agent = null;
         this.sending = false;
-        this.pendingImage = null; // base64 data URL for next send
+        this.pendingImage = null;
+        this.orchestrateMode = false; // when true, messages go through orchestrator
     }
 
     // ─── Connect to Agent ───────────────────────────────────
@@ -72,9 +73,20 @@ class ChatManager {
         this.app.addLog('info', `You: ${text}`, 'Chat');
 
         this.sending = true;
-        this._appendAssistantBubble();
         this.app.updateAgentStatus(this.agent.id, 'online', 'thinking');
 
+        if (this.orchestrateMode) {
+            await this._sendOrchestrated(text);
+        } else {
+            await this._sendDirect(text, img);
+        }
+
+        this.sending = false;
+        this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
+    }
+
+    async _sendDirect(text, img) {
+        this._appendAssistantBubble();
         try {
             const payload = { agent_id: this.agent.id, message: text };
             if (img) payload.image_base64 = img;
@@ -82,7 +94,6 @@ class ChatManager {
 
             if (result && result.response) {
                 this._finalizeStream(result.response);
-                // History is persisted server-side in admin-api.py
                 this.app.addLog('success', `${this.agent.name}: ${result.response.substring(0, 100)}`, this.agent.name);
             } else if (result && result.error) {
                 this._removeStreamingBubble();
@@ -96,9 +107,32 @@ class ChatManager {
             this._removeStreamingBubble();
             this._appendSystemMessage(`Failed: ${e.message}`, 'error');
         }
+    }
 
-        this.sending = false;
-        this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
+    async _sendOrchestrated(text) {
+        this._appendSystemMessage('🎯 Orchestrating across agents...', 'info');
+        try {
+            const result = await this.app.apiPost('/agents/orchestrate', { message: text });
+
+            if (result && result.success) {
+                if (result.chain && result.chain.length > 1) {
+                    this._renderDelegationChain(result.chain);
+                }
+                if (result.response) {
+                    this._appendRestoredAssistantBubble(result.response);
+                }
+                if (result.plan) {
+                    this.app.addLog('success', `Orchestrated: ${result.plan}`, 'OrchestratorKoala');
+                }
+            } else if (result && result.error) {
+                this._appendSystemMessage(`Orchestration error: ${result.error}`, 'error');
+                this.app.addLog('error', result.error, 'OrchestratorKoala');
+            } else {
+                this._appendSystemMessage('No orchestration response', 'warning');
+            }
+        } catch (e) {
+            this._appendSystemMessage(`Orchestration failed: ${e.message}`, 'error');
+        }
     }
 
     _finalizeStream(text) {
@@ -148,6 +182,10 @@ class ChatManager {
                 </div>
                 <div class="chat-input-hint">
                     ${this.agent.emoji} ${this.agent.name} · ${this.agent.role || ''}
+                    <label class="orchestrate-toggle" title="When enabled, messages are routed through OrchestratorKoala who delegates to specialist agents">
+                        <input type="checkbox" id="chat-orchestrate-toggle" ${this.orchestrateMode ? 'checked' : ''}>
+                        <span class="orchestrate-label">🎯 Orchestrate</span>
+                    </label>
                 </div>
             </div>
         `;
@@ -171,6 +209,11 @@ class ChatManager {
         fileInput.addEventListener('change', (e) => this._onImageSelect(e));
         if (clearPreview) clearPreview.addEventListener('click', () => this._clearUploadPreview());
         if (wiroBtn) wiroBtn.addEventListener('click', () => this._openWiroModal());
+        const orchToggle = document.getElementById('chat-orchestrate-toggle');
+        if (orchToggle) orchToggle.addEventListener('change', (e) => {
+            this.orchestrateMode = e.target.checked;
+            this.app.addLog('info', `Orchestration mode: ${this.orchestrateMode ? 'ON' : 'OFF'}`, 'Chat');
+        });
         input.focus();
 
         window.addEventListener('koalaclaw-wiro-result', (e) => {
@@ -341,6 +384,35 @@ class ChatManager {
                 status.className = 'tool-status done';
             }
         }
+    }
+
+    _renderDelegationChain(chain) {
+        const messages = document.getElementById('chat-messages');
+        if (!messages || !chain || chain.length < 2) return;
+
+        const el = document.createElement('div');
+        el.className = 'chat-delegation-chain';
+
+        const steps = chain.slice(1).map(c => `
+            <div class="chain-step">
+                <span class="chain-agent-emoji">${c.agent_emoji || '🐨'}</span>
+                <div class="chain-step-body">
+                    <div class="chain-agent-name">${this._escapeHtml(c.agent_name)} <span class="chain-role">${this._escapeHtml(c.role)}</span></div>
+                    <div class="chain-task">${this._escapeHtml(c.task || '')}</div>
+                    <details class="chain-response-details">
+                        <summary>View response</summary>
+                        <div class="chain-response">${this._renderMarkdown(c.response || '')}</div>
+                    </details>
+                </div>
+            </div>
+        `).join('');
+
+        el.innerHTML = `
+            <div class="chain-header">🎯 Delegation Chain</div>
+            ${steps}
+        `;
+        messages.appendChild(el);
+        this._scrollToBottom();
     }
 
     _appendSystemMessage(text, type) {

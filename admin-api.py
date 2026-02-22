@@ -8,6 +8,7 @@ Runs on port 3099 by default.
 import asyncio
 import json
 import os
+import re
 import subprocess
 import time
 import hashlib
@@ -552,6 +553,47 @@ def get_system_info():
     return info
 
 
+# ─── Agent Execution Helper ──────────────────────────────────────
+def _exec_agent_message(agent_id, message, timeout=120):
+    """Send a message to an agent via docker exec and return the cleaned response."""
+    result = subprocess.run(
+        ["docker", "exec", f"koala-agent-{agent_id}",
+         "node", "openclaw.mjs", "agent",
+         "--agent", "main",
+         "-m", message],
+        capture_output=True, text=True, timeout=timeout
+    )
+    stdout = result.stdout.strip()
+    lines = [l for l in stdout.split("\n")
+             if l.strip() and not l.startswith("🦞") and not l.startswith("Usage:")]
+    response = "\n".join(lines).strip()
+    if not response and result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "No response from agent")
+    return response or stdout or "(empty response)"
+
+
+def _parse_json_from_response(text):
+    """Try to extract a JSON object from an LLM response (handles markdown fences)."""
+    # Try direct parse
+    try:
+        return json.loads(text.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # Try extracting from ```json ... ``` or { ... }
+    patterns = [
+        r'```(?:json)?\s*(\{[\s\S]*?\})\s*```',
+        r'(\{[\s\S]*"(?:plan|delegations|direct_answer)"[\s\S]*\})',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except (json.JSONDecodeError, ValueError):
+                continue
+    return None
+
+
 # ─── HTTP API Handler ────────────────────────────────────────────
 class AdminAPIHandler(SimpleHTTPRequestHandler):
     """Handles both static file serving (UI) and API endpoints."""
@@ -736,6 +778,8 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 self._json_response(load_integrations())
             elif path == "/api/system/info":
                 self._json_response(get_system_info())
+            elif path == "/api/agents/roster":
+                self._json_response(self._get_roster())
             elif path == "/api/roles":
                 self._json_response({"roles": get_all_roles()})
             elif path == "/api/stats":
@@ -770,6 +814,10 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 self._json_response(self._send_chat(data))
             elif path == "/api/agents/delegate":
                 self._json_response(self._delegate(data))
+            elif path == "/api/agents/orchestrate":
+                self._json_response(self._orchestrate(data))
+            elif path == "/api/agents/broadcast":
+                self._json_response(self._broadcast(data))
             elif path == "/api/wiro/generate":
                 self._json_response(self._wiro_generate(data))
             elif path == "/api/settings":
@@ -889,45 +937,16 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
 
         state = load_state()
         token = state.get(f"TOKEN_{agent_id}", "")
-
         if not token:
             return {"error": f"No token found for agent {agent_id}"}
 
-        # Persist user message to history (with optional image)
         append_chat_history(agent_id, "user", message, image_base64=image_base64)
 
-        # Use docker exec + OpenClaw CLI 'agent' command
-        # --agent main selects the default agent session
         try:
-            result = subprocess.run(
-                ["docker", "exec", f"koala-agent-{agent_id}",
-                 "node", "openclaw.mjs", "agent",
-                 "--agent", "main",
-                 "-m", message + (" [Image attached]" if image_base64 else "")],
-                capture_output=True, text=True, timeout=120
-            )
-
-            stdout = result.stdout.strip()
-            stderr = result.stderr.strip()
-
-            # Filter out OpenClaw banner/noise lines
-            lines = [l for l in stdout.split('\n')
-                     if l.strip() and not l.startswith('🦞') and not l.startswith('Usage:')]
-            response = '\n'.join(lines).strip()
-
-            if response:
-                # Persist assistant response to history
-                append_chat_history(agent_id, "assistant", response)
-                return {"success": True, "response": response}
-            elif result.returncode == 0:
-                resp = stdout or "(empty response)"
-                append_chat_history(agent_id, "assistant", resp)
-                return {"success": True, "response": resp}
-            else:
-                return {
-                    "success": False,
-                    "error": stderr or "No response from agent",
-                }
+            msg = message + (" [Image attached]" if image_base64 else "")
+            response = _exec_agent_message(agent_id, msg)
+            append_chat_history(agent_id, "assistant", response)
+            return {"success": True, "response": response}
         except subprocess.TimeoutExpired:
             return {"error": "Request timed out"}
         except Exception as e:
@@ -990,8 +1009,8 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
 
         if not from_agent or not to_agent:
             return {"error": "from_agent and to_agent required"}
-        from_id = int(from_agent) if isinstance(from_agent, int) else int(from_agent)
-        to_id = int(to_agent) if isinstance(to_agent, int) else int(to_agent)
+        from_id = int(from_agent)
+        to_id = int(to_agent)
         if from_id == to_id:
             return {"error": "from_agent and to_agent must differ"}
 
@@ -1000,31 +1019,214 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         if to_id < 1 or to_id > count:
             return {"error": f"to_agent {to_id} out of range (1..{count})"}
 
+        from_info = get_role_info(state.get(f"ROLE_{from_id}", ""))
+        to_info = get_role_info(state.get(f"ROLE_{to_id}", ""))
+
         message = task if not context else f"{task}\n\nContext:\n{context}"
         try:
-            result = subprocess.run(
-                ["docker", "exec", f"koala-agent-{to_id}",
-                 "node", "openclaw.mjs", "agent",
-                 "--agent", "main",
-                 "-m", message],
-                capture_output=True, text=True, timeout=120
-            )
-            stdout = result.stdout.strip()
-            stderr = result.stderr.strip()
-            lines = [l for l in stdout.split("\n")
-                     if l.strip() and not l.startswith("🦞") and not l.startswith("Usage:")]
-            response = "\n".join(lines).strip() or stdout or "(no response)"
+            response = _exec_agent_message(to_id, message)
 
-            # Log delegation in both agents' chat history
-            append_chat_history(from_id, "assistant", f"[Delegated to agent {to_id}] {task}")
-            append_chat_history(to_id, "user", f"[From orchestrator/agent {from_id}] {message}")
-            append_chat_history(to_id, "assistant", response)
+            append_chat_history(from_id, "delegation", json.dumps({
+                "direction": "out", "to_agent": to_id, "to_name": to_info["name"],
+                "task": task, "response": response[:500],
+            }))
+            append_chat_history(to_id, "delegation", json.dumps({
+                "direction": "in", "from_agent": from_id, "from_name": from_info["name"],
+                "task": task, "response": response[:500],
+            }))
 
-            return {"success": True, "response": response, "from_agent": from_id, "to_agent": to_id}
+            return {"success": True, "response": response, "from_agent": from_id, "to_agent": to_id,
+                    "from_name": from_info["name"], "to_name": to_info["name"]}
         except subprocess.TimeoutExpired:
             return {"error": "Delegation timed out"}
         except Exception as e:
             return {"error": str(e)}
+
+    def _orchestrate(self, data):
+        """POST /api/agents/orchestrate — smart multi-agent orchestration.
+        
+        The orchestrator analyzes the task, decides which agents to involve,
+        delegates sub-tasks, and returns a combined result with full chain.
+        """
+        message = (data.get("message") or data.get("task") or "").strip()
+        if not message:
+            return {"error": "message required"}
+
+        state = load_state()
+        count = int(state.get("AGENT_COUNT", "0"))
+        orch_id = get_orchestrator_agent_id(state)
+
+        agents_roster = []
+        for i in range(1, count + 1):
+            info = get_role_info(state.get(f"ROLE_{i}", ""))
+            agents_roster.append({"id": i, "name": info["name"], "role": info["role_title"], "emoji": info["emoji"]})
+
+        roster_text = "\n".join(
+            f"- Agent {a['id']}: {a['emoji']} {a['name']} — {a['role']}"
+            for a in agents_roster
+        )
+
+        analysis_prompt = (
+            f"You are OrchestratorKoala. Analyze this user request and decide how to handle it.\n\n"
+            f"## Available Agents\n{roster_text}\n\n"
+            f"## User Request\n{message}\n\n"
+            f"## Instructions\n"
+            f"Respond ONLY with a JSON object (no markdown, no explanation):\n"
+            f'{{"plan": "brief description of your plan",'
+            f' "delegations": [{{"agent_id": N, "task": "what to ask this agent"}}],'
+            f' "direct_answer": "your own answer if no delegation needed or null"}}\n\n'
+            f"Rules:\n"
+            f"- If the request is simple, set delegations to [] and provide direct_answer\n"
+            f"- If it needs specialists, add delegations (max 3 agents)\n"
+            f"- Each delegation task should be self-contained and clear\n"
+            f"- Do NOT delegate to yourself (Agent {orch_id})\n"
+        )
+
+        try:
+            raw_plan = _exec_agent_message(orch_id, analysis_prompt, timeout=60)
+        except Exception as e:
+            return {"error": f"Orchestrator analysis failed: {e}"}
+
+        plan = _parse_json_from_response(raw_plan)
+        if not plan:
+            append_chat_history(orch_id, "user", message)
+            append_chat_history(orch_id, "assistant", raw_plan)
+            return {
+                "success": True,
+                "plan": "direct",
+                "response": raw_plan,
+                "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala", "role": "orchestration", "response": raw_plan}],
+            }
+
+        if plan.get("direct_answer") and not plan.get("delegations"):
+            append_chat_history(orch_id, "user", message)
+            append_chat_history(orch_id, "assistant", plan["direct_answer"])
+            return {
+                "success": True,
+                "plan": plan.get("plan", "direct"),
+                "response": plan["direct_answer"],
+                "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala", "role": "orchestration", "response": plan["direct_answer"]}],
+            }
+
+        chain = []
+        delegations = plan.get("delegations") or []
+        for deleg in delegations[:3]:
+            target_id = int(deleg.get("agent_id", 0))
+            task_text = deleg.get("task", "")
+            if target_id < 1 or target_id > count or target_id == orch_id or not task_text:
+                continue
+
+            target_info = get_role_info(state.get(f"ROLE_{target_id}", ""))
+            try:
+                resp = _exec_agent_message(target_id, task_text, timeout=90)
+            except Exception as e:
+                resp = f"(Agent {target_id} error: {e})"
+
+            chain.append({
+                "agent_id": target_id,
+                "agent_name": target_info["name"],
+                "agent_emoji": target_info["emoji"],
+                "role": target_info["role_title"],
+                "task": task_text,
+                "response": resp,
+            })
+
+            append_chat_history(target_id, "delegation", json.dumps({
+                "direction": "in", "from_agent": orch_id, "from_name": "OrchestratorKoala",
+                "task": task_text, "response": resp[:500],
+            }))
+
+        if chain:
+            summary_parts = "\n\n".join(
+                f"### {c['agent_name']} ({c['role']})\n{c['response']}"
+                for c in chain
+            )
+            combine_prompt = (
+                f"You delegated sub-tasks to specialists. Combine their responses into one clear answer for the user.\n\n"
+                f"## Original Request\n{message}\n\n"
+                f"## Agent Responses\n{summary_parts}\n\n"
+                f"Provide a unified, well-structured response. Attribute contributions where useful."
+            )
+            try:
+                final = _exec_agent_message(orch_id, combine_prompt, timeout=60)
+            except Exception:
+                final = summary_parts
+        else:
+            final = plan.get("direct_answer") or raw_plan
+
+        chain.insert(0, {
+            "agent_id": orch_id,
+            "agent_name": "OrchestratorKoala",
+            "agent_emoji": "🎯",
+            "role": "orchestration",
+            "task": f"Plan: {plan.get('plan', 'analyze and combine')}",
+            "response": final,
+        })
+
+        append_chat_history(orch_id, "user", message)
+        append_chat_history(orch_id, "assistant", final)
+        append_chat_history(orch_id, "delegation", json.dumps({
+            "direction": "orchestration",
+            "plan": plan.get("plan", ""),
+            "agents_involved": [c["agent_name"] for c in chain],
+        }))
+
+        return {
+            "success": True,
+            "plan": plan.get("plan", ""),
+            "response": final,
+            "chain": chain,
+        }
+
+    def _get_roster(self):
+        """GET /api/agents/roster — agent discovery for inter-agent communication."""
+        state = load_state()
+        count = int(state.get("AGENT_COUNT", "0"))
+        roster = []
+        for i in range(1, count + 1):
+            role_id = state.get(f"ROLE_{i}", "")
+            info = get_role_info(role_id)
+            cs = docker_container_status(i)
+            roster.append({
+                "id": i,
+                "name": info["name"],
+                "emoji": info["emoji"],
+                "role": info["role_title"],
+                "role_id": role_id,
+                "status": "online" if cs["status"] == "running" else "offline",
+            })
+        return {"roster": roster, "orchestrator_id": get_orchestrator_agent_id(state)}
+
+    def _broadcast(self, data):
+        """POST /api/agents/broadcast — send message to multiple agents, collect responses."""
+        message = (data.get("message") or "").strip()
+        agent_ids = data.get("agent_ids") or []
+        if not message:
+            return {"error": "message required"}
+
+        state = load_state()
+        count = int(state.get("AGENT_COUNT", "0"))
+        if not agent_ids:
+            agent_ids = list(range(1, count + 1))
+
+        results = []
+        for aid in agent_ids:
+            aid = int(aid)
+            if aid < 1 or aid > count:
+                continue
+            info = get_role_info(state.get(f"ROLE_{aid}", ""))
+            try:
+                resp = _exec_agent_message(aid, message, timeout=90)
+            except Exception as e:
+                resp = f"(error: {e})"
+            results.append({
+                "agent_id": aid,
+                "agent_name": info["name"],
+                "agent_emoji": info["emoji"],
+                "role": info["role_title"],
+                "response": resp,
+            })
+        return {"success": True, "results": results}
 
     def _post_settings(self, data):
         """POST /api/settings — update settings (Wiro key/secret, channel tokens)."""
