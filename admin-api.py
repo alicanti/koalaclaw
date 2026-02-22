@@ -33,6 +33,19 @@ ROLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roles")
 DATA_DIR = os.path.join(INSTALL_DIR, "data")
 SETTINGS_FILE = os.path.join(INSTALL_DIR, ".settings.json")
 
+# Allowed agent file paths (relative to agent dir): workspace root or mind/
+AGENT_EDITABLE_FILES = [
+    "workspace/IDENTITY.md",
+    "workspace/SOUL.md",
+    "workspace/AGENTS.md",
+    "workspace/COGNITIVE_PROTOCOL.md",
+    "mind/PROFILE.md",
+    "mind/PROJECTS.md",
+    "mind/DECISIONS.md",
+    "mind/ERRORS.md",
+    "mind/PROTOCOL.md",
+]
+
 # ─── State Management ────────────────────────────────────────────
 def load_state():
     """Load state from .koalaclaw.state bash file."""
@@ -204,7 +217,6 @@ def get_wiro_client():
     """Build WiroClient from current settings (for server-side use)."""
     if not WiroClient:
         return None
-    # Load raw settings for credentials
     raw = {}
     if os.path.exists(SETTINGS_FILE):
         try:
@@ -212,8 +224,10 @@ def get_wiro_client():
                 raw = json.load(f)
         except Exception:
             pass
-    key = (raw.get("wiro_api_key") or "").strip()
-    secret = (raw.get("wiro_api_secret") or "").strip()
+    # Prefer integrations.wiro, then legacy root keys
+    integ = raw.get("integrations", {}).get("wiro", {})
+    key = (integ.get("key") or raw.get("wiro_api_key") or "").strip()
+    secret = (integ.get("secret") or raw.get("wiro_api_secret") or "").strip()
     if not key or not secret:
         return None
     return WiroClient(api_key=key, api_secret=secret)
@@ -326,6 +340,218 @@ def docker_stats():
         return []
 
 
+def get_agent_data_dir(agent_id):
+    """Return absolute path to agent data directory."""
+    return os.path.join(DATA_DIR, f"koala-agent-{agent_id}")
+
+
+def list_agent_files(agent_id):
+    """List editable files for an agent (path relative to agent dir, exists flag)."""
+    base = get_agent_data_dir(agent_id)
+    out = []
+    for rel in AGENT_EDITABLE_FILES:
+        full = os.path.join(base, rel)
+        out.append({"path": rel, "exists": os.path.isfile(full)})
+    return out
+
+
+def read_agent_file(agent_id, filename):
+    """Read content of an agent file. filename is e.g. workspace/IDENTITY.md or mind/PROFILE.md."""
+    if filename not in AGENT_EDITABLE_FILES:
+        return None
+    base = get_agent_data_dir(agent_id)
+    full = os.path.join(base, filename)
+    if not os.path.isfile(full):
+        return ""
+    try:
+        with open(full, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return None
+
+
+def write_agent_file(agent_id, filename, content):
+    """Write content to agent file and sync to container (workspace and mind)."""
+    if filename not in AGENT_EDITABLE_FILES:
+        return False
+    base = get_agent_data_dir(agent_id)
+    full = os.path.join(base, filename)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    try:
+        with open(full, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception:
+        return False
+    # Sync to container: workspace/* -> /home/node/.openclaw/workspace/, mind/* -> .../workspace/mind/
+    container = f"koala-agent-{agent_id}"
+    try:
+        subprocess.run(["docker", "exec", container, "mkdir", "-p", "/home/node/.openclaw/workspace", "/home/node/.openclaw/workspace/mind"], check=True, capture_output=True, timeout=5)
+    except subprocess.CalledProcessError:
+        pass  # container may be stopped
+    if filename.startswith("workspace/"):
+        dest_name = os.path.basename(filename)
+        try:
+            subprocess.run(["docker", "cp", full, f"{container}:/home/node/.openclaw/workspace/{dest_name}"], check=True, capture_output=True, timeout=5)
+        except subprocess.CalledProcessError:
+            pass
+    elif filename.startswith("mind/"):
+        dest_name = os.path.basename(filename)
+        try:
+            subprocess.run(["docker", "cp", full, f"{container}:/home/node/.openclaw/workspace/mind/{dest_name}"], check=True, capture_output=True, timeout=5)
+        except subprocess.CalledProcessError:
+            pass
+    return True
+
+
+def load_integrations():
+    """Load integrations from .settings.json (keys masked)."""
+    default_providers = ["openai", "anthropic", "wiro", "google", "groq", "mistral"]
+    out = {p: {"configured": False, "key_masked": "", "last_tested": None} for p in default_providers}
+    if not os.path.exists(SETTINGS_FILE):
+        return out
+    try:
+        with open(SETTINGS_FILE, "r") as f:
+            raw = json.load(f)
+        integ = raw.get("integrations", {})
+        for p in default_providers:
+            cfg = integ.get(p, {})
+            has_key = bool((cfg.get("key") or "").strip())
+            out[p] = {
+                "configured": has_key,
+                "key_masked": "***" if has_key else "",
+                "last_tested": cfg.get("last_tested"),
+            }
+    except Exception:
+        pass
+    return out
+
+
+def save_integration(provider, key, extra=None):
+    """Save API key for a provider. extra can include secret (e.g. wiro)."""
+    current = {}
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                current = json.load(f)
+        except Exception:
+            pass
+    integrations = current.get("integrations", {})
+    integrations[provider] = {"key": (key or "").strip(), "last_tested": None}
+    if extra:
+        integrations[provider].update(extra)
+    current["integrations"] = integrations
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(current, f, indent=2)
+    return load_integrations()
+
+
+def delete_integration(provider):
+    """Remove stored key for a provider."""
+    current = {}
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                current = json.load(f)
+        except Exception:
+            pass
+    integrations = current.get("integrations", {})
+    integrations.pop(provider, None)
+    current["integrations"] = integrations
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(current, f, indent=2)
+    return load_integrations()
+
+
+def get_integration_key(provider):
+    """Get raw key for a provider (server-side only)."""
+    if not os.path.exists(SETTINGS_FILE):
+        return None
+    try:
+        with open(SETTINGS_FILE, "r") as f:
+            raw = json.load(f)
+        return (raw.get("integrations", {}).get(provider, {}).get("key") or "").strip()
+    except Exception:
+        return None
+
+
+def test_integration(provider):
+    """Test provider connection. Returns {ok: bool, message: str}."""
+    if provider == "wiro":
+        client = get_wiro_client()
+        if not client or not client.is_configured:
+            return {"ok": False, "message": "Wiro not configured"}
+        try:
+            client.list_models()
+            return {"ok": True, "message": "OK"}
+        except Exception as e:
+            return {"ok": False, "message": str(e)}
+    if provider in ("openai", "anthropic", "google", "groq", "mistral"):
+        # Simple ping: we don't have a generic test; report configured
+        key = get_integration_key(provider)
+        return {"ok": bool(key), "message": "Configured" if key else "No key set"}
+    return {"ok": False, "message": f"Unknown provider: {provider}"}
+
+
+def docker_restart_agent(agent_id):
+    """Restart a single agent container."""
+    name = f"koala-agent-{agent_id}"
+    try:
+        subprocess.run(["docker", "restart", name], check=True, capture_output=True, timeout=30)
+        return True
+    except Exception:
+        return False
+
+
+def docker_restart_all():
+    """Restart all koala agent containers."""
+    state = load_state()
+    count = int(state.get("AGENT_COUNT", "0"))
+    ok = 0
+    for i in range(1, count + 1):
+        if docker_restart_agent(i):
+            ok += 1
+    return ok, count
+
+
+def get_system_info():
+    """Return uptime, disk, memory, docker version."""
+    info = {"uptime_seconds": None, "docker_version": None, "disk": None, "memory": None}
+    try:
+        with open("/proc/uptime") as f:
+            info["uptime_seconds"] = float(f.read().split()[0])
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(["docker", "--version"], capture_output=True, text=True, timeout=2)
+        if r.returncode == 0:
+            info["docker_version"] = r.stdout.strip()
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(["df", "-k", "."], capture_output=True, text=True, timeout=2)
+        if r.returncode == 0:
+            parts = r.stdout.strip().split("\n")[-1].split()
+            if len(parts) >= 3:
+                info["disk"] = {"total_kb": int(parts[1]), "used_kb": int(parts[2])}
+    except Exception:
+        pass
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    info["memory"] = {"total_kb": int(line.split()[1])}
+                    break
+                if line.startswith("MemAvailable:"):
+                    if "memory" in info and info["memory"]:
+                        info["memory"]["available_kb"] = int(line.split()[1])
+                    break
+    except Exception:
+        pass
+    return info
+
+
 # ─── HTTP API Handler ────────────────────────────────────────────
 class AdminAPIHandler(SimpleHTTPRequestHandler):
     """Handles both static file serving (UI) and API endpoints."""
@@ -372,6 +598,19 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             self._handle_api_post(path, body)
             return
 
+        self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
+
+    def do_DELETE(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if path.startswith("/api/integrations/"):
+            # DELETE /api/integrations/{provider} — no trailing /test
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 4 and parts[2] == "integrations":
+                provider = parts[3]
+                if provider != "test":
+                    self._json_response(delete_integration(provider))
+                    return
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
 
     def _proxy_to_agent(self, method):
@@ -474,6 +713,29 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     params = urllib.parse.parse_qs(query)
                     limit = int(params.get("limit", [100])[0])
                 self._json_response({"history": read_chat_history(agent_id, limit)})
+            elif path.startswith("/api/agents/") and "/files" in path:
+                # GET /api/agents/{id}/files or GET /api/agents/{id}/files/{path}
+                parts = [p for p in path.split("/") if p]
+                if len(parts) < 4:
+                    self._json_response({"error": "Invalid path"}, HTTPStatus.BAD_REQUEST)
+                    return
+                agent_id = int(parts[2])
+                if parts[3] != "files":
+                    self._json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                if len(parts) == 4:
+                    self._json_response({"files": list_agent_files(agent_id)})
+                    return
+                filename = "/".join(parts[4:])
+                content = read_agent_file(agent_id, filename)
+                if content is None:
+                    self._json_response({"error": "File not found or not allowed"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._json_response({"path": filename, "content": content})
+            elif path == "/api/integrations":
+                self._json_response(load_integrations())
+            elif path == "/api/system/info":
+                self._json_response(get_system_info())
             elif path == "/api/roles":
                 self._json_response({"roles": get_all_roles()})
             elif path == "/api/stats":
@@ -516,6 +778,44 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 # POST /api/settings/channel/{name}
                 name = path.split("/api/settings/channel/")[1].strip("/").split("/")[0]
                 self._json_response(self._channel_configure(name, data))
+            elif path.startswith("/api/agents/") and "/files/" in path:
+                # POST /api/agents/{id}/files/{path}
+                parts = [p for p in path.split("/") if p]
+                if len(parts) < 5:
+                    self._json_response({"error": "Invalid path"}, HTTPStatus.BAD_REQUEST)
+                    return
+                agent_id = int(parts[2])
+                if parts[3] != "files":
+                    self._json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                filename = "/".join(parts[4:])
+                content = data.get("content", "")
+                if write_agent_file(agent_id, filename, content):
+                    self._json_response({"success": True, "path": filename})
+                else:
+                    self._json_response({"error": "Write failed or path not allowed"}, HTTPStatus.BAD_REQUEST)
+            elif path.startswith("/api/integrations/") and path.endswith("/test"):
+                provider = path.split("/api/integrations/")[1].replace("/test", "").strip("/")
+                self._json_response(test_integration(provider))
+            elif path.startswith("/api/integrations/"):
+                # POST /api/integrations/{provider}
+                provider = path.split("/api/integrations/")[1].strip("/").split("/")[0]
+                key = (data.get("key") or "").strip()
+                extra = {}
+                if provider == "wiro" and "secret" in data:
+                    extra["secret"] = (data.get("secret") or "").strip()
+                save_integration(provider, key, extra if extra else None)
+                self._json_response(load_integrations())
+            elif path.startswith("/api/system/restart-agent/"):
+                try:
+                    agent_id = int(path.rstrip("/").split("/")[-1])
+                    ok = docker_restart_agent(agent_id)
+                    self._json_response({"success": ok, "agent_id": agent_id})
+                except (ValueError, IndexError):
+                    self._json_response({"error": "Invalid agent id"}, HTTPStatus.BAD_REQUEST)
+            elif path == "/api/system/restart-all":
+                ok, total = docker_restart_all()
+                self._json_response({"success": True, "restarted": ok, "total": total})
             else:
                 self._json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
         except Exception as e:
@@ -817,7 +1117,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
@@ -826,7 +1126,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         """Handle CORS preflight."""
         self.send_response(HTTPStatus.NO_CONTENT)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 

@@ -89,8 +89,10 @@ Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pr
 
 ### Isometric Office Web UI
 A browser-based dashboard at `:3099` with:
-- **Isometric office** — each agent sits at a desk with role-specific decorations
-- **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping
+- **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Integrations (OpenAI, Anthropic, Wiro, etc.), and System (restart, backup)
+- **Animated office** — canvas overlay with procedural pixel koalas, dust particles, coffee steam, thinking sparkles, screen glow, and day/night tint
+- **Isometric office** — each agent sits at a desk with role-specific decorations; hover tooltips and desk click zoom
+- **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
 - **Admin panel** — agent list, status, skill toggles, quick actions
 - **Chat with image upload** — talk to any agent, attach images (📎), view images in responses
 - **Wiro AI integration** — generate images/video/audio via 500+ models (✨ button in chat)
@@ -185,8 +187,8 @@ Each role includes:
 
 The web UI runs on port `3099` and provides a complete management interface:
 
-### Isometric Office
-Each agent has a desk in the office. Click an agent to see details, toggle skills, view logs, or open their OpenClaw Canvas.
+### Isometric Office & Mission Control
+Each agent has a desk in the office. Click an agent to see details, toggle skills, view logs, or open their OpenClaw Canvas. The **Mission Control** sidebar (collapse with ◀) lets you edit agent files (Identity, Soul, Memory, Protocol), manage API keys (OpenAI, Anthropic, Wiro, etc.), and run system actions (Restart All, Backup). The office view uses a canvas overlay for pixel-art style characters, ambient effects (dust, steam, sparkles), and day/night tint.
 
 ### Workflow Pipelines
 Chain agents together for complex tasks:

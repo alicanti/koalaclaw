@@ -21,6 +21,7 @@ class KoalaClawApp {
         this.startPolling();
         this.wsManager = new WebSocketManager(this);
         this.chatManager = new ChatManager(this);
+        missionControl = new MissionControl(this);
         adminPanel = new AdminPanel(this);
         workflowEngine = new WorkflowEngine(this);
         messageBus = new AgentMessageBus(this);
@@ -107,6 +108,14 @@ class KoalaClawApp {
         } catch (e) { return null; }
     }
 
+    async apiDelete(path) {
+        try {
+            const res = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (e) { return null; }
+    }
+
     // ─── Data ───────────────────────────────────────────────
     async loadAgents() {
         const data = await this.apiGet('/agents');
@@ -172,6 +181,7 @@ class KoalaClawApp {
                 }
             }
         });
+        officeRenderer.setAgents?.(this.agents);
         this.updateSystemStatus();
     }
 
@@ -225,6 +235,7 @@ class KoalaClawApp {
 
         // Show detail panel
         if (adminPanel) adminPanel.showAgentDetail(agent);
+        if (missionControl) missionControl.onAgentSelected(agent);
 
         // Connect WS if needed
         if (this.wsManager && agent.status === 'online' && !this.wsManager.isConnected(agent.id)) {

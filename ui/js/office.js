@@ -4,6 +4,7 @@ class OfficeRenderer {
     constructor() {
         this.agents = [];
         this.selectedId = null;
+        this._animator = null;
     }
 
     render(agents, selectedId) {
@@ -47,6 +48,12 @@ class OfficeRenderer {
         // Office decorations
         this._addDecorations(scene, agents.length);
 
+        // Canvas overlay for animations (sprite chars, particles)
+        if (window.OfficeAnimator) {
+            if (this._animator) this._animator.destroy();
+            this._animator = new OfficeAnimator(scene, { agents });
+        }
+
         // Update clock every minute
         this._startClock();
     }
@@ -67,7 +74,6 @@ class OfficeRenderer {
             ? (state === 'thinking' ? 'thinking' : 'online')
             : '';
 
-        // Determine speech text
         let speech = '';
         if (state === 'thinking') speech = 'Thinking...';
         else if (state === 'typing') speech = 'Typing...';
@@ -76,6 +82,9 @@ class OfficeRenderer {
         else if (state === 'sleeping') speech = 'Zzz...';
         else if (agent.status === 'online') speech = 'Ready';
         else speech = 'Offline';
+
+        unit.title = `${agent.name || 'Agent ' + agent.id} · ${agent.role || ''} · ${speech}`;
+        unit.setAttribute('data-tooltip', `${agent.name || 'Agent ' + agent.id}\n${agent.role || ''}\n${speech}`);
 
         unit.innerHTML = `
             <div class="desk-status-light ${statusClass}"></div>
@@ -156,6 +165,12 @@ class OfficeRenderer {
             else if (state === 'error') bubble.textContent = 'Error!';
             else bubble.textContent = status === 'online' ? 'Ready' : 'Offline';
         }
+        const agent = this.agents.find(a => a.id === agentId);
+        if (agent) {
+            const speech = bubble?.textContent || 'Ready';
+            unit.title = `${agent.name} · ${agent.role || ''} · ${speech}`;
+            unit.setAttribute('data-tooltip', `${agent.name}\n${agent.role || ''}\n${speech}`);
+        }
     }
 
     selectDesk(agentId) {
@@ -163,6 +178,11 @@ class OfficeRenderer {
         const unit = document.querySelector(`.desk-unit[data-agent-id="${agentId}"]`);
         if (unit) unit.classList.add('selected');
         this.selectedId = agentId;
+    }
+
+    setAgents(agents) {
+        this.agents = agents || this.agents;
+        if (this._animator) this._animator.setAgents(this.agents);
     }
 }
 

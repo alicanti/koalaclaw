@@ -1703,6 +1703,8 @@ python3 admin-api.py &
 
 | Feature | Description |
 |---------|-------------|
+| Mission Control | Collapsible sidebar: Agents, Agent Files (Identity/Soul/Memory editor), Integrations (API keys), System (Restart All, Backup) |
+| Animated Office | Canvas overlay with pixel koalas, dust, steam, sparkles, screen glow, day/night tint; hover tooltips and desk click zoom |
 | Isometric Office | Visual representation of all agents at their desks |
 | Admin Panel | Agent list, status, skill toggles, quick actions |
 | Chat Bar | Send messages to any agent with streaming responses |
