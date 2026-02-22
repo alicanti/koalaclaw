@@ -1705,9 +1705,10 @@ python3 admin-api.py &
 |---------|-------------|
 | Mission Control | Collapsible sidebar: Agents, Agent Files (Identity/Soul/Memory editor), Integrations (API keys), System (Restart All, Backup) |
 | Animated Office | Canvas overlay with pixel koalas, dust, steam, sparkles, screen glow, day/night tint; hover tooltips and desk click zoom |
+| Orchestrated Chat | 🎯 Orchestrate toggle routes messages through OrchestratorKoala; live delegation chain shows each agent working in real time (SSE streaming) |
 | Isometric Office | Visual representation of all agents at their desks |
 | Admin Panel | Agent list, status, skill toggles, quick actions |
-| Chat Bar | Send messages to any agent with streaming responses |
+| Chat + Image Upload | Send messages to any agent, attach images (📎), Wiro AI generation (✨) |
 | Live Logs | Real-time, color-coded, filterable log stream |
 | Workflows | Chain agents together (Blog Post, Product Launch, etc.) |
 | Monitoring | CPU/RAM metrics, alert thresholds, cron jobs |
@@ -1719,11 +1720,26 @@ python3 admin-api.py &
 |----------|--------|-------------|
 | `/api/status` | GET | System status (online agents, model, version) |
 | `/api/agents` | GET | All agents with live container status |
+| `/api/agents/roster` | GET | Agent discovery (names, roles, status, orchestrator ID) |
 | `/api/agents/{id}/logs` | GET | Recent logs for an agent |
-| `/api/roles` | GET | All 19 available roles |
+| `/api/agents/{id}/history` | GET | Chat history for an agent |
+| `/api/agents/{id}/files` | GET | List editable agent files |
+| `/api/agents/{id}/files/{path}` | GET/POST | Read/write agent files (Identity, Soul, etc.) |
+| `/api/agents/chat` | POST | Send a message to an agent |
+| `/api/agents/orchestrate` | POST | SSE streaming orchestration (analyze → delegate → combine) |
+| `/api/agents/delegate` | POST | Direct agent-to-agent delegation |
+| `/api/agents/broadcast` | POST | Send message to multiple agents |
+| `/api/integrations` | GET | List configured API key providers |
+| `/api/integrations/{provider}` | POST/DELETE | Save or remove an API key |
+| `/api/integrations/{provider}/test` | POST | Test provider connection |
+| `/api/system/info` | GET | System metrics (uptime, disk, memory) |
+| `/api/system/restart-all` | POST | Restart all agent containers |
+| `/api/roles` | GET | All 20 available roles |
 | `/api/stats` | GET | Docker container resource usage |
 | `/api/config` | GET | System configuration (safe, no secrets) |
-| `/api/agents/chat` | POST | Send a message to an agent |
+| `/api/wiro/models` | GET | List Wiro AI models by category |
+| `/api/wiro/generate` | POST | Generate content via Wiro AI |
+| `/api/settings` | GET/POST | General settings (Wiro keys, channels, model) |
 
 ### Running as a Service
 

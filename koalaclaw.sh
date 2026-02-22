@@ -791,10 +791,10 @@ _clone_repo() {
         fi
     fi
 
-    if [[ -d "${REPO_DIR}/roles" ]]; then
+    if [[ -d "${REPO_DIR}/roles" && -d "${REPO_DIR}/ui" && -f "${REPO_DIR}/admin-api.py" ]]; then
         local role_count
         role_count=$(ls -d "${REPO_DIR}/roles/"*/ 2>/dev/null | wc -l)
-        _info "Platform files ready: ${role_count} roles, UI, skills, workflows"
+        _info "Platform files ready: ${role_count} roles, UI, admin API, orchestration"
     else
         _warn "Could not download platform files. Roles and Web UI will not be available."
         _warn "You can manually clone: git clone ${GITHUB_REPO} ${REPO_DIR}"
@@ -810,6 +810,32 @@ _setup_admin_api() {
     if [[ ! -f "${REPO_DIR}/admin-api.py" ]]; then
         _warn "admin-api.py not found. Web UI will not be available."
         return 1
+    fi
+
+    # Verify critical files exist
+    local critical_files=(
+        "ui/index.html"
+        "ui/js/app.js"
+        "ui/js/chat.js"
+        "ui/js/mission-control.js"
+        "ui/js/office.js"
+        "ui/js/office-animator.js"
+        "ui/css/main.css"
+        "ui/css/chat.css"
+        "ui/css/mission-control.css"
+        "ui/css/office.css"
+    )
+    local missing_files=()
+    for f in "${critical_files[@]}"; do
+        [[ ! -f "${REPO_DIR}/${f}" ]] && missing_files+=("${f}")
+    done
+    if (( ${#missing_files[@]} > 0 )); then
+        _warn "Missing UI files: ${missing_files[*]}"
+        _warn "Web UI may not function correctly. Try: cd ${REPO_DIR} && git pull"
+    fi
+
+    if [[ ! -f "${REPO_DIR}/wiro_client.py" ]]; then
+        _warn "wiro_client.py not found. Wiro AI integration will not be available."
     fi
 
     # Create systemd service

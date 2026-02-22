@@ -95,6 +95,7 @@ A browser-based dashboard at `:3099` with:
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
 - **Admin panel** — agent list, status, skill toggles, quick actions
 - **Chat with image upload** — talk to any agent, attach images (📎), view images in responses
+- **Orchestrate mode** — toggle 🎯 in chat to route messages through OrchestratorKoala with live delegation chain
 - **Wiro AI integration** — generate images/video/audio via 500+ models (✨ button in chat)
 - **Settings page** — configure Wiro API keys, channel integrations, default model (⚙️)
 - **Live logs** — color-coded, filterable, real-time log stream
@@ -105,8 +106,18 @@ A browser-based dashboard at `:3099` with:
 ### Wiro AI Model Marketplace
 Connect to [Wiro AI](https://wiro.ai) for 500+ generative models (image, video, audio, LLM). Enter your API key in Settings, then use the ✨ button in chat to browse models by category, enter a prompt, and generate content directly in the conversation.
 
-### Agent-to-Agent Delegation
-OrchestratorKoala analyzes complex requests, breaks them into sub-tasks, and delegates to specialist agents (ResearchKoala for research, CoderKoala for code, etc.). Results are combined and reported back with attribution.
+### Inter-Agent Communication & Orchestration
+OrchestratorKoala analyzes complex requests, breaks them into sub-tasks, and delegates to specialist agents in real time. The orchestration uses **Server-Sent Events (SSE)** so you see each step live in the chat:
+
+1. **Analyzing** — Orchestrator decides which agents to involve (or answers directly for simple questions)
+2. **Delegating** — Each agent works on its sub-task; progress shown live (⏳ → spinner → ✅)
+3. **Combining** — Orchestrator merges all responses into a unified answer
+
+API endpoints:
+- `POST /api/agents/orchestrate` — SSE streaming orchestration
+- `POST /api/agents/delegate` — direct agent-to-agent delegation
+- `POST /api/agents/broadcast` — send to multiple agents at once
+- `GET /api/agents/roster` — discover all agents and their roles
 
 ### Channel Integrations
 Connect Telegram, WhatsApp, Slack, or Discord to the OrchestratorKoala agent via the Settings page. Messages from external channels are routed to the orchestrator, which can delegate to any specialist agent.
@@ -190,6 +201,9 @@ The web UI runs on port `3099` and provides a complete management interface:
 ### Isometric Office & Mission Control
 Each agent has a desk in the office. Click an agent to see details, toggle skills, view logs, or open their OpenClaw Canvas. The **Mission Control** sidebar (collapse with ◀) lets you edit agent files (Identity, Soul, Memory, Protocol), manage API keys (OpenAI, Anthropic, Wiro, etc.), and run system actions (Restart All, Backup). The office view uses a canvas overlay for pixel-art style characters, ambient effects (dust, steam, sparkles), and day/night tint.
 
+### Orchestrated Chat
+Enable the **🎯 Orchestrate** toggle in any agent's chat to route messages through OrchestratorKoala. For complex tasks, the orchestrator automatically delegates to specialist agents and shows a **live delegation chain** — you see each agent start working, finish, and can expand their individual responses. Simple questions are answered directly without unnecessary delegation.
+
 ### Workflow Pipelines
 Chain agents together for complex tasks:
 - **Blog Post Pipeline**: Research → Write → SEO → Social Media
@@ -219,26 +233,29 @@ graph TB
     end
 
     subgraph Server["Ubuntu Server"]
-        AdminAPI["Python Admin API :3099"]
+        AdminAPI["Python Admin API :3099<br>REST + SSE Streaming"]
         Caddy["Caddy Reverse Proxy"]
         Socat["socat CDP relay"]
 
-        subgraph Docker["Docker koala-net"]
-            A1["Agent 1"]
-            A2["Agent 2"]
-            AN["Agent N"]
+        subgraph Docker["Docker koala-net (172.30.0.0/24)"]
+            A1["Agent 1 — ResearchKoala"]
+            A2["Agent 2 — ContentKoala"]
+            AN["Agent N — ..."]
+            ORCH["OrchestratorKoala"]
         end
     end
 
     subgraph External["External"]
-        AI["OpenAI / Anthropic"]
+        AI["OpenAI / Anthropic / Wiro"]
         Chromium["Chromium + Relay"]
     end
 
-    UI --> AdminAPI
+    UI -->|"REST + SSE"| AdminAPI
+    AdminAPI -->|"docker exec"| ORCH
+    ORCH -.->|"delegate via API"| A1 & A2 & AN
     Canvas --> Caddy
-    Caddy --> A1 & A2 & AN
-    A1 & A2 & AN --> AI
+    Caddy --> A1 & A2 & AN & ORCH
+    A1 & A2 & AN & ORCH --> AI
     Chromium <--> Socat
     Socat <--> A1 & A2 & AN
 ```
@@ -274,12 +291,12 @@ graph TB
 
 GitHub repo:
 ├── koalaclaw.sh              # CLI installer
-├── admin-api.py              # Web UI backend + Wiro/Settings/Delegation API
+├── admin-api.py              # Web UI backend + Orchestration/SSE/Delegation API
 ├── wiro_client.py            # Wiro AI API client (HMAC auth, run/poll)
 ├── ui/                       # Web UI frontend
 │   ├── index.html
-│   ├── css/                  # 8 CSS modules (incl. settings.css)
-│   └── js/                   # 10 JS modules (incl. wiro.js, settings.js)
+│   ├── css/                  # 9 CSS modules (main, chat, office, mission-control, etc.)
+│   └── js/                   # 11 JS modules (app, chat, office, mission-control, office-animator, etc.)
 ├── roles/                    # 20 role templates (incl. orchestrator-koala)
 │   └── <role-name>/
 │       ├── IDENTITY.md
