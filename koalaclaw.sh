@@ -293,16 +293,46 @@ _apply_role_to_agent() {
 
 # Copy workspace files into running container's actual OpenClaw workspace path
 # OpenClaw reads from /home/node/.openclaw/workspace/ (not /state/workspace/)
+# Also generates a role-specific AGENTS.md that overrides OpenClaw's default
 _sync_workspace_to_container() {
     _step "Syncing workspace files to containers..."
     local synced=0
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     for i in $(seq 1 "${AGENT_COUNT}"); do
         local ws_src="${INSTALL_DIR}/data/koala-agent-${i}/workspace"
         local container="koala-agent-${i}"
         [[ ! -d "$ws_src" ]] && continue
-        # Ensure target dir exists inside container
         docker exec "$container" mkdir -p /home/node/.openclaw/workspace/ 2>/dev/null || continue
-        # Copy each file from host workspace to container's OpenClaw workspace
+
+        # Generate role-specific AGENTS.md so OpenClaw knows the agent's identity
+        eval "local role=\${ROLE_${i}:-coder-koala}"
+        local role_dir="${script_dir}/roles/${role}"
+        [[ ! -d "$role_dir" ]] && role_dir="${REPO_DIR:-${INSTALL_DIR}/repo}/roles/${role}"
+        if [[ -f "${role_dir}/IDENTITY.md" && -f "${role_dir}/SOUL.md" ]]; then
+            local agents_md="${ws_src}/AGENTS.md"
+            {
+                echo "# AGENTS.md - Your Workspace"
+                echo ""
+                echo "You are NOT a generic assistant. You have a specific role and identity."
+                echo "Read IDENTITY.md and SOUL.md in this workspace to understand who you are."
+                echo ""
+                echo "## Your Identity"
+                echo ""
+                cat "${role_dir}/IDENTITY.md"
+                echo ""
+                echo "## Your Behavior Rules"
+                echo ""
+                cat "${role_dir}/SOUL.md"
+                echo ""
+                echo "## Workspace"
+                echo ""
+                echo "This folder is your workspace. You can create files, notes, and outputs here."
+                echo "Always act according to your role identity above."
+            } > "$agents_md"
+        fi
+
+        # Copy all workspace files into container
         for f in "$ws_src"/*; do
             [[ -f "$f" ]] || continue
             docker cp "$f" "${container}:/home/node/.openclaw/workspace/$(basename "$f")" 2>/dev/null || true
