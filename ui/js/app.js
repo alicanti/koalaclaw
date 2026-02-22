@@ -93,19 +93,34 @@ class KoalaClawApp {
             const res = await fetch(`${API_BASE}${path}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return await res.json();
-        } catch (e) { return null; }
+        } catch (e) {
+            console.warn(`API GET ${path} failed:`, e.message);
+            return null;
+        }
     }
 
-    async apiPost(path, data) {
+    async apiPost(path, data, timeoutMs = 300000) {
         try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
             const res = await fetch(`${API_BASE}${path}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                signal: controller.signal,
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            clearTimeout(timer);
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                let errData;
+                try { errData = JSON.parse(text); } catch { errData = { error: `HTTP ${res.status}: ${text}` }; }
+                return errData;
+            }
             return await res.json();
-        } catch (e) { return null; }
+        } catch (e) {
+            if (e.name === 'AbortError') return { error: 'Request timed out (5 min)' };
+            return { error: e.message };
+        }
     }
 
     async apiDelete(path) {

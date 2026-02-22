@@ -110,9 +110,13 @@ class ChatManager {
     }
 
     async _sendOrchestrated(text) {
-        this._appendSystemMessage('🎯 Orchestrating across agents...', 'info');
+        this._appendSystemMessage('🎯 Orchestrating — analyzing task and delegating to agents...', 'info');
+        this._appendAssistantBubble();
+
         try {
-            const result = await this.app.apiPost('/agents/orchestrate', { message: text });
+            const result = await this.app.apiPost('/agents/orchestrate', { message: text }, 300000);
+
+            this._removeStreamingBubble();
 
             if (result && result.success) {
                 if (result.chain && result.chain.length > 1) {
@@ -128,9 +132,10 @@ class ChatManager {
                 this._appendSystemMessage(`Orchestration error: ${result.error}`, 'error');
                 this.app.addLog('error', result.error, 'OrchestratorKoala');
             } else {
-                this._appendSystemMessage('No orchestration response', 'warning');
+                this._appendSystemMessage('No orchestration response received', 'warning');
             }
         } catch (e) {
+            this._removeStreamingBubble();
             this._appendSystemMessage(`Orchestration failed: ${e.message}`, 'error');
         }
     }

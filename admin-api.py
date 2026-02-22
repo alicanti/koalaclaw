@@ -1067,35 +1067,54 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         )
 
         analysis_prompt = (
-            f"You are OrchestratorKoala. Analyze this user request and decide how to handle it.\n\n"
-            f"## Available Agents\n{roster_text}\n\n"
-            f"## User Request\n{message}\n\n"
-            f"## Instructions\n"
-            f"Respond ONLY with a JSON object (no markdown, no explanation):\n"
-            f'{{"plan": "brief description of your plan",'
-            f' "delegations": [{{"agent_id": N, "task": "what to ask this agent"}}],'
-            f' "direct_answer": "your own answer if no delegation needed or null"}}\n\n'
-            f"Rules:\n"
-            f"- If the request is simple, set delegations to [] and provide direct_answer\n"
-            f"- If it needs specialists, add delegations (max 3 agents)\n"
-            f"- Each delegation task should be self-contained and clear\n"
-            f"- Do NOT delegate to yourself (Agent {orch_id})\n"
+            f"SYSTEM: You are a task router. You MUST respond with ONLY a raw JSON object. "
+            f"No markdown. No explanation. No text before or after the JSON.\n\n"
+            f"Available agents:\n{roster_text}\n\n"
+            f"User request: {message}\n\n"
+            f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n\n"
+            f"Respond with this exact JSON structure:\n"
+            f'{{"plan":"your plan","delegations":[{{"agent_id":1,"task":"task for agent"}}],"direct_answer":null}}\n\n'
+            f"If simple question, use: "
+            f'{{"plan":"direct","delegations":[],"direct_answer":"your answer here"}}'
         )
 
+        import sys
+        print(f"[ORCH] Analyzing task via Agent {orch_id}...", file=sys.stderr, flush=True)
         try:
             raw_plan = _exec_agent_message(orch_id, analysis_prompt, timeout=60)
+            print(f"[ORCH] Raw plan: {raw_plan[:200]}...", file=sys.stderr, flush=True)
         except Exception as e:
-            return {"error": f"Orchestrator analysis failed: {e}"}
+            print(f"[ORCH] Analysis failed: {e}", file=sys.stderr, flush=True)
+            try:
+                fallback = _exec_agent_message(orch_id, message, timeout=60)
+                append_chat_history(orch_id, "user", message)
+                append_chat_history(orch_id, "assistant", fallback)
+                return {
+                    "success": True, "plan": "direct (fallback)",
+                    "response": fallback,
+                    "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala",
+                               "agent_emoji": "🎯", "role": "orchestration", "response": fallback}],
+                }
+            except Exception:
+                return {"error": f"Orchestrator failed: {e}"}
 
         plan = _parse_json_from_response(raw_plan)
+        print(f"[ORCH] Parsed plan: {plan}", file=sys.stderr, flush=True)
         if not plan:
+            # Orchestrator didn't return JSON — treat raw response as direct answer
+            # but also try sending the original message directly for a natural response
+            try:
+                direct_resp = _exec_agent_message(orch_id, message, timeout=60)
+            except Exception:
+                direct_resp = raw_plan
             append_chat_history(orch_id, "user", message)
-            append_chat_history(orch_id, "assistant", raw_plan)
+            append_chat_history(orch_id, "assistant", direct_resp)
             return {
                 "success": True,
                 "plan": "direct",
-                "response": raw_plan,
-                "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala", "role": "orchestration", "response": raw_plan}],
+                "response": direct_resp,
+                "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala",
+                           "agent_emoji": "🎯", "role": "orchestration", "response": direct_resp}],
             }
 
         if plan.get("direct_answer") and not plan.get("delegations"):
@@ -1117,6 +1136,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 continue
 
             target_info = get_role_info(state.get(f"ROLE_{target_id}", ""))
+            print(f"[ORCH] Delegating to Agent {target_id} ({target_info['name']}): {task_text[:80]}...", file=sys.stderr, flush=True)
             try:
                 resp = _exec_agent_message(target_id, task_text, timeout=90)
             except Exception as e:
@@ -1333,8 +1353,11 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, format, *args):
-        """Suppress default logging for cleaner output."""
-        pass
+        """Log API requests for debugging."""
+        if "/api/" in (args[0] if args else ""):
+            import sys
+            sys.stderr.write(f"[API] {args[0]}\n")
+            sys.stderr.flush()
 
 
 # ─── Server ──────────────────────────────────────────────────────
