@@ -115,33 +115,157 @@ class ChatManager {
     }
 
     async _sendOrchestrated(text) {
-        this._appendSystemMessage('🎯 Orchestrating — analyzing task and delegating to agents...', 'info');
-        this._appendAssistantBubble();
+        const chainEl = this._createLiveChain();
 
         try {
-            const result = await this.app.apiPost('/agents/orchestrate', { message: text }, 300000);
+            const res = await fetch(`${API_BASE}/agents/orchestrate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text }),
+            });
 
-            this._removeStreamingBubble();
+            if (!res.ok || !res.body) {
+                this._removeLiveChain(chainEl);
+                this._appendSystemMessage(`Orchestration HTTP error: ${res.status}`, 'error');
+                return;
+            }
 
-            if (result && result.success) {
-                if (result.chain && result.chain.length > 1) {
-                    this._renderDelegationChain(result.chain);
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                let lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                let currentEvent = '';
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        currentEvent = line.slice(7).trim();
+                    } else if (line.startsWith('data: ') && currentEvent) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            this._handleOrchEvent(currentEvent, data, chainEl);
+                        } catch {}
+                        currentEvent = '';
+                    }
                 }
-                if (result.response) {
-                    this._appendRestoredAssistantBubble(result.response);
-                }
-                if (result.plan) {
-                    this.app.addLog('success', `Orchestrated: ${result.plan}`, 'OrchestratorKoala');
-                }
-            } else if (result && result.error) {
-                this._appendSystemMessage(`Orchestration error: ${result.error}`, 'error');
-                this.app.addLog('error', result.error, 'OrchestratorKoala');
-            } else {
-                this._appendSystemMessage('No orchestration response received', 'warning');
             }
         } catch (e) {
-            this._removeStreamingBubble();
+            this._removeLiveChain(chainEl);
             this._appendSystemMessage(`Orchestration failed: ${e.message}`, 'error');
+        }
+    }
+
+    _createLiveChain() {
+        const messages = document.getElementById('chat-messages');
+        if (!messages) return null;
+        const el = document.createElement('div');
+        el.className = 'chat-delegation-chain live';
+        el.innerHTML = `
+            <div class="chain-header">🎯 Orchestration</div>
+            <div class="chain-status">Analyzing task...</div>
+            <div class="chain-steps"></div>
+        `;
+        messages.appendChild(el);
+        this._scrollToBottom();
+        return el;
+    }
+
+    _removeLiveChain(el) {
+        if (el) el.remove();
+    }
+
+    _handleOrchEvent(event, data, chainEl) {
+        if (!chainEl) return;
+        const statusEl = chainEl.querySelector('.chain-status');
+        const stepsEl = chainEl.querySelector('.chain-steps');
+
+        switch (event) {
+            case 'phase':
+                if (statusEl) statusEl.textContent = data.message || data.phase;
+                break;
+
+            case 'plan':
+                if (statusEl) statusEl.textContent = data.plan || 'Delegating...';
+                if (data.delegations && data.delegations.length > 0 && stepsEl) {
+                    data.delegations.forEach(d => {
+                        const step = document.createElement('div');
+                        step.className = 'chain-step pending';
+                        step.id = `chain-step-${d.agent_id}`;
+                        step.innerHTML = `
+                            <span class="chain-agent-emoji">${d.agent_emoji || '🐨'}</span>
+                            <div class="chain-step-body">
+                                <div class="chain-agent-name">${this._escapeHtml(d.agent_name || '')} <span class="chain-role">${this._escapeHtml(d.task || '').substring(0, 60)}...</span></div>
+                                <div class="chain-step-status">⏳ Waiting</div>
+                            </div>
+                        `;
+                        stepsEl.appendChild(step);
+                    });
+                } else if (stepsEl) {
+                    if (statusEl) statusEl.textContent = 'Direct answer';
+                }
+                this._scrollToBottom();
+                break;
+
+            case 'delegating': {
+                const step = chainEl.querySelector(`#chain-step-${data.agent_id}`);
+                if (step) {
+                    step.classList.remove('pending');
+                    step.classList.add('running');
+                    const st = step.querySelector('.chain-step-status');
+                    if (st) st.innerHTML = '<span class="chain-spinner"></span> Working...';
+                }
+                if (statusEl) statusEl.textContent = `${data.agent_emoji || ''} ${data.agent_name} is working...`;
+                this.app.addLog('info', `Delegating to ${data.agent_name}`, 'Orchestrator');
+                this._scrollToBottom();
+                break;
+            }
+
+            case 'agent_done': {
+                const step = chainEl.querySelector(`#chain-step-${data.agent_id}`);
+                if (step) {
+                    step.classList.remove('running');
+                    step.classList.add('done');
+                    const st = step.querySelector('.chain-step-status');
+                    if (st) st.innerHTML = '✅ Done';
+                    const body = step.querySelector('.chain-step-body');
+                    if (body && data.response) {
+                        const details = document.createElement('details');
+                        details.className = 'chain-response-details';
+                        details.innerHTML = `<summary>View response</summary><div class="chain-response">${this._renderMarkdown(data.response)}</div>`;
+                        body.appendChild(details);
+                    }
+                }
+                this.app.addLog('success', `${data.agent_name} completed`, 'Orchestrator');
+                this._scrollToBottom();
+                break;
+            }
+
+            case 'done':
+                if (statusEl) statusEl.textContent = '✅ Complete';
+                chainEl.classList.remove('live');
+                if (data.response) {
+                    this._appendRestoredAssistantBubble(data.response);
+                }
+                if (data.plan) {
+                    this.app.addLog('success', `Orchestrated: ${data.plan}`, 'OrchestratorKoala');
+                }
+                this._scrollToBottom();
+                break;
+
+            case 'error':
+                if (statusEl) statusEl.textContent = `❌ ${data.error || 'Error'}`;
+                chainEl.classList.remove('live');
+                this.app.addLog('error', data.error || 'Orchestration error', 'OrchestratorKoala');
+                break;
+
+            case 'close':
+                break;
         }
     }
 

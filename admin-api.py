@@ -815,7 +815,8 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             elif path == "/api/agents/delegate":
                 self._json_response(self._delegate(data))
             elif path == "/api/agents/orchestrate":
-                self._json_response(self._orchestrate(data))
+                self._orchestrate_stream(data)
+                return
             elif path == "/api/agents/broadcast":
                 self._json_response(self._broadcast(data))
             elif path == "/api/wiro/generate":
@@ -1042,15 +1043,21 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             return {"error": str(e)}
 
-    def _orchestrate(self, data):
-        """POST /api/agents/orchestrate — smart multi-agent orchestration.
-        
-        The orchestrator analyzes the task, decides which agents to involve,
-        delegates sub-tasks, and returns a combined result with full chain.
+    def _orchestrate_stream(self, data):
+        """POST /api/agents/orchestrate — SSE streaming multi-agent orchestration.
+
+        Sends Server-Sent Events as each step completes so the UI can show
+        live progress. Events: phase, plan, delegating, agent_done, combining, done, error.
         """
         message = (data.get("message") or data.get("task") or "").strip()
         if not message:
-            return {"error": "message required"}
+            self._sse_start()
+            self._sse_send("error", {"error": "message required"})
+            self._sse_end()
+            return
+
+        self._sse_start()
+        import sys
 
         state = load_state()
         count = int(state.get("AGENT_COUNT", "0"))
@@ -1067,89 +1074,102 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         )
 
         analysis_prompt = (
-            f"SYSTEM: You are a task router. You MUST respond with ONLY a raw JSON object. "
-            f"No markdown. No explanation. No text before or after the JSON.\n\n"
+            f"SYSTEM: You are a task router. Respond with ONLY a raw JSON object. "
+            f"No markdown fences, no explanation, no text before or after.\n\n"
             f"Available agents:\n{roster_text}\n\n"
             f"User request: {message}\n\n"
-            f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n\n"
-            f"Respond with this exact JSON structure:\n"
-            f'{{"plan":"your plan","delegations":[{{"agent_id":1,"task":"task for agent"}}],"direct_answer":null}}\n\n'
-            f"If simple question, use: "
-            f'{{"plan":"direct","delegations":[],"direct_answer":"your answer here"}}'
+            f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n"
+            f"Only delegate when the task genuinely needs a specialist. "
+            f"For simple questions, answer directly.\n\n"
+            f"JSON format:\n"
+            f'{{"plan":"brief plan","delegations":[{{"agent_id":N,"task":"task"}}],"direct_answer":null}}\n'
+            f"For simple/direct: "
+            f'{{"plan":"direct","delegations":[],"direct_answer":"your answer"}}'
         )
 
-        import sys
+        self._sse_send("phase", {"phase": "analyzing", "message": "Analyzing task..."})
         print(f"[ORCH] Analyzing task via Agent {orch_id}...", file=sys.stderr, flush=True)
+
         try:
             raw_plan = _exec_agent_message(orch_id, analysis_prompt, timeout=60)
-            print(f"[ORCH] Raw plan: {raw_plan[:200]}...", file=sys.stderr, flush=True)
+            print(f"[ORCH] Raw plan: {raw_plan[:300]}", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[ORCH] Analysis failed: {e}", file=sys.stderr, flush=True)
+            self._sse_send("phase", {"phase": "fallback", "message": "Answering directly..."})
             try:
                 fallback = _exec_agent_message(orch_id, message, timeout=60)
-                append_chat_history(orch_id, "user", message)
-                append_chat_history(orch_id, "assistant", fallback)
-                return {
-                    "success": True, "plan": "direct (fallback)",
-                    "response": fallback,
-                    "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala",
-                               "agent_emoji": "🎯", "role": "orchestration", "response": fallback}],
-                }
             except Exception:
-                return {"error": f"Orchestrator failed: {e}"}
+                self._sse_send("error", {"error": f"Orchestrator failed: {e}"})
+                self._sse_end()
+                return
+            append_chat_history(orch_id, "user", message)
+            append_chat_history(orch_id, "assistant", fallback)
+            self._sse_send("done", {"response": fallback, "chain": [], "plan": "direct (fallback)"})
+            self._sse_end()
+            return
 
         plan = _parse_json_from_response(raw_plan)
         print(f"[ORCH] Parsed plan: {plan}", file=sys.stderr, flush=True)
+
         if not plan:
-            # Orchestrator didn't return JSON — treat raw response as direct answer
-            # but also try sending the original message directly for a natural response
+            self._sse_send("phase", {"phase": "direct", "message": "Answering directly..."})
             try:
                 direct_resp = _exec_agent_message(orch_id, message, timeout=60)
             except Exception:
                 direct_resp = raw_plan
             append_chat_history(orch_id, "user", message)
             append_chat_history(orch_id, "assistant", direct_resp)
-            return {
-                "success": True,
-                "plan": "direct",
-                "response": direct_resp,
-                "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala",
-                           "agent_emoji": "🎯", "role": "orchestration", "response": direct_resp}],
-            }
+            self._sse_send("done", {"response": direct_resp, "chain": [], "plan": "direct"})
+            self._sse_end()
+            return
 
         if plan.get("direct_answer") and not plan.get("delegations"):
+            answer = plan["direct_answer"]
             append_chat_history(orch_id, "user", message)
-            append_chat_history(orch_id, "assistant", plan["direct_answer"])
-            return {
-                "success": True,
-                "plan": plan.get("plan", "direct"),
-                "response": plan["direct_answer"],
-                "chain": [{"agent_id": orch_id, "agent_name": "OrchestratorKoala", "role": "orchestration", "response": plan["direct_answer"]}],
-            }
+            append_chat_history(orch_id, "assistant", answer)
+            self._sse_send("plan", {"plan": plan.get("plan", "direct"), "delegations": []})
+            self._sse_send("done", {"response": answer, "chain": [], "plan": plan.get("plan", "direct")})
+            self._sse_end()
+            return
+
+        delegations = plan.get("delegations") or []
+        self._sse_send("plan", {
+            "plan": plan.get("plan", ""),
+            "delegations": [
+                {"agent_id": d.get("agent_id"), "task": d.get("task", "")[:120],
+                 "agent_name": next((a["name"] for a in agents_roster if a["id"] == d.get("agent_id")), f"Agent {d.get('agent_id')}"),
+                 "agent_emoji": next((a["emoji"] for a in agents_roster if a["id"] == d.get("agent_id")), "🐨")}
+                for d in delegations
+            ],
+        })
 
         chain = []
-        delegations = plan.get("delegations") or []
-        for deleg in delegations[:3]:
+        for deleg in delegations:
             target_id = int(deleg.get("agent_id", 0))
             task_text = deleg.get("task", "")
             if target_id < 1 or target_id > count or target_id == orch_id or not task_text:
                 continue
 
             target_info = get_role_info(state.get(f"ROLE_{target_id}", ""))
+            self._sse_send("delegating", {
+                "agent_id": target_id, "agent_name": target_info["name"],
+                "agent_emoji": target_info["emoji"], "role": target_info["role_title"],
+                "task": task_text,
+            })
             print(f"[ORCH] Delegating to Agent {target_id} ({target_info['name']}): {task_text[:80]}...", file=sys.stderr, flush=True)
+
             try:
-                resp = _exec_agent_message(target_id, task_text, timeout=90)
+                resp = _exec_agent_message(target_id, task_text, timeout=120)
             except Exception as e:
                 resp = f"(Agent {target_id} error: {e})"
 
-            chain.append({
-                "agent_id": target_id,
-                "agent_name": target_info["name"],
-                "agent_emoji": target_info["emoji"],
-                "role": target_info["role_title"],
-                "task": task_text,
-                "response": resp,
-            })
+            step = {
+                "agent_id": target_id, "agent_name": target_info["name"],
+                "agent_emoji": target_info["emoji"], "role": target_info["role_title"],
+                "task": task_text, "response": resp,
+            }
+            chain.append(step)
+            self._sse_send("agent_done", step)
 
             append_chat_history(target_id, "delegation", json.dumps({
                 "direction": "in", "from_agent": orch_id, "from_name": "OrchestratorKoala",
@@ -1157,15 +1177,16 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             }))
 
         if chain:
+            self._sse_send("phase", {"phase": "combining", "message": "Combining results..."})
             summary_parts = "\n\n".join(
-                f"### {c['agent_name']} ({c['role']})\n{c['response']}"
-                for c in chain
+                f"### {c['agent_name']} ({c['role']})\n{c['response']}" for c in chain
             )
             combine_prompt = (
-                f"You delegated sub-tasks to specialists. Combine their responses into one clear answer for the user.\n\n"
+                f"Combine these specialist responses into one clear, unified answer for the user. "
+                f"Attribute contributions where useful.\n\n"
                 f"## Original Request\n{message}\n\n"
                 f"## Agent Responses\n{summary_parts}\n\n"
-                f"Provide a unified, well-structured response. Attribute contributions where useful."
+                f"Write a well-structured final response."
             )
             try:
                 final = _exec_agent_message(orch_id, combine_prompt, timeout=60)
@@ -1174,29 +1195,31 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         else:
             final = plan.get("direct_answer") or raw_plan
 
-        chain.insert(0, {
-            "agent_id": orch_id,
-            "agent_name": "OrchestratorKoala",
-            "agent_emoji": "🎯",
-            "role": "orchestration",
-            "task": f"Plan: {plan.get('plan', 'analyze and combine')}",
-            "response": final,
-        })
-
         append_chat_history(orch_id, "user", message)
         append_chat_history(orch_id, "assistant", final)
-        append_chat_history(orch_id, "delegation", json.dumps({
-            "direction": "orchestration",
-            "plan": plan.get("plan", ""),
-            "agents_involved": [c["agent_name"] for c in chain],
-        }))
 
-        return {
-            "success": True,
-            "plan": plan.get("plan", ""),
-            "response": final,
-            "chain": chain,
-        }
+        self._sse_send("done", {"response": final, "chain": chain, "plan": plan.get("plan", "")})
+        self._sse_end()
+
+    def _sse_start(self):
+        """Begin an SSE response."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+    def _sse_send(self, event, data):
+        """Send one SSE event."""
+        payload = json.dumps(data, ensure_ascii=False)
+        self.wfile.write(f"event: {event}\ndata: {payload}\n\n".encode("utf-8"))
+        self.wfile.flush()
+
+    def _sse_end(self):
+        """End SSE stream."""
+        self.wfile.write(b"event: close\ndata: {}\n\n")
+        self.wfile.flush()
 
     def _get_roster(self):
         """GET /api/agents/roster — agent discovery for inter-agent communication."""

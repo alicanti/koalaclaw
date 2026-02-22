@@ -692,3 +692,58 @@
     overflow-y: auto;
 }
 
+/* ─── Live Chain Status ─── */
+.chain-status {
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    padding: 4px 0;
+}
+
+.chat-delegation-chain.live .chain-status {
+    animation: pulse-status 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.chain-step.pending .chain-step-status {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.chain-step.running .chain-step-status {
+    color: var(--warning);
+    font-size: 10px;
+}
+
+.chain-step.done .chain-step-status {
+    color: var(--success);
+    font-size: 10px;
+}
+
+.chain-step.running {
+    background: rgba(255,171,0,0.04);
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin: -2px -8px;
+}
+
+.chain-step.done {
+    opacity: 0.85;
+}
+
+.chain-spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--warning);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
