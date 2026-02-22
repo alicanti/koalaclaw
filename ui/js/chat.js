@@ -19,6 +19,11 @@ class ChatManager {
             return;
         }
 
+        // Auto-enable orchestration when connecting to OrchestratorKoala
+        if (agent.role_id === 'orchestrator-koala') {
+            this.orchestrateMode = true;
+        }
+
         this.app.addLog('info', `Chat ready: ${agent.name}`, 'Chat');
         this._renderChat();
 
