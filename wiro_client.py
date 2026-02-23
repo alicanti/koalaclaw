@@ -183,6 +183,7 @@ class WiroClient:
                     cmd += ["-F", f"{k}={'true' if v else 'false'}"]
                 else:
                     cmd += ["-F", f"{k}={v}"]
+        print(f"[WIRO] curl cmd: {' '.join(cmd[:8])}... ({len(cmd)} args)", file=sys.stderr, flush=True)
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 5)
             if result.returncode != 0:
@@ -292,16 +293,20 @@ class WiroClient:
 
     def find_best_model(self, task_type: str = "text-to-image") -> Optional[Dict[str, Any]]:
         """Search and return the top model for a task type."""
-        results = self.search_models(query=task_type, limit=3)
+        try:
+            results = self.search_models(query=task_type, limit=3)
+        except Exception as e:
+            print(f"[WIRO] find_best_model search failed: {e}", file=sys.stderr, flush=True)
+            return None
+        print(f"[WIRO] find_best_model: got {len(results)} results for '{task_type}'", file=sys.stderr, flush=True)
         if not results:
             return None
         t = results[0]
-        return {
-            "owner": t.get("cleanslugowner") or "",
-            "project": t.get("cleanslugproject") or "",
-            "name": t.get("title") or "",
-            "id": t.get("id"),
-        }
+        owner = t.get("cleanslugowner") or ""
+        project = t.get("cleanslugproject") or ""
+        name = t.get("title") or t.get("seotitle") or f"{owner}/{project}"
+        print(f"[WIRO] find_best_model: selected {owner}/{project} ({name})", file=sys.stderr, flush=True)
+        return {"owner": owner, "project": project, "name": name, "id": t.get("id")}
 
     # ── Generation ────────────────────────────────────────────
 
