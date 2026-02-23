@@ -147,38 +147,42 @@ class WiroClient:
         ).hexdigest()
 
     def _signed_headers(self) -> dict:
-        """HMAC-signed headers for Run/Task endpoints.
-        Wiro expects Content-Type: multipart/form-data even for JSON payloads.
-        """
+        """HMAC-signed headers for Run/Task endpoints."""
         nonce = str(int(time.time()))
         return {
             "x-api-key": self.api_key,
             "x-nonce": nonce,
             "x-signature": self._sign(nonce),
-            "Content-Type": "multipart/form-data",
             "Accept": "application/json",
         }
 
     def _simple_headers(self) -> dict:
-        """Headers for Tool/List (no HMAC). Also uses multipart/form-data."""
+        """Headers for Tool/List (no HMAC)."""
         return {
             "x-api-key": self.api_key,
-            "Content-Type": "multipart/form-data",
             "Accept": "application/json",
         }
 
     def _http(self, method: str, url: str, data: Optional[Dict] = None,
               headers: Optional[dict] = None, timeout: int = 30) -> Dict[str, Any]:
-        """Execute HTTP request via curl to avoid Cloudflare bot detection.
+        """Execute HTTP request via curl with multipart/form-data fields.
 
-        Wiro's Cloudflare WAF blocks Python urllib's User-Agent.
-        Using curl matches the official API examples exactly.
+        Wiro API expects real form fields (-F key=value), not a JSON body.
+        Cloudflare WAF also blocks Python urllib's User-Agent.
         """
         cmd = ["curl", "-s", "-S", "-X", method, url, "--max-time", str(timeout)]
         for k, v in (headers or {}).items():
+            if k.lower() == "content-type":
+                continue
             cmd += ["-H", f"{k}: {v}"]
         if data:
-            cmd += ["-d", json.dumps(data)]
+            for k, v in data.items():
+                if isinstance(v, (list, dict)):
+                    cmd += ["-F", f"{k}={json.dumps(v)}"]
+                elif isinstance(v, bool):
+                    cmd += ["-F", f"{k}={'true' if v else 'false'}"]
+                else:
+                    cmd += ["-F", f"{k}={v}"]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 5)
             if result.returncode != 0:
