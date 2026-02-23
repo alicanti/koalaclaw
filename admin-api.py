@@ -954,13 +954,14 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return {"error": str(e)}
 
     def _wiro_list_models(self, query):
-        """GET /api/wiro/models — return curated model catalog (no API call needed)."""
+        """GET /api/wiro/models — search Wiro models via Tool/List API."""
+        client = get_wiro_client()
+        if not client or not client.is_configured:
+            return {"error": "Wiro not configured", "models": [], "categories": {}}
         try:
-            from wiro_client import WiroClient
             params = urllib.parse.parse_qs(query) if query else {}
             category = (params.get("category") or [None])[0]
-            tmp = WiroClient("", "")
-            return tmp.list_models(category=category)
+            return client.list_models(category=category)
         except Exception as e:
             return {"error": str(e), "models": [], "categories": {}}
 
@@ -1145,7 +1146,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             client = get_wiro_client()
             if client and client.is_configured:
                 try:
-                    result = client.generate("google", "nano-banana-pro", {"prompt": wiro_prompt})
+                    result = client.smart_generate(wiro_prompt, task_type="text-to-image")
                     if result.get("output_url"):
                         img_response = f"Here is your generated image:\n\n{result['output_url']}"
                         append_chat_history(orch_id, "user", message)

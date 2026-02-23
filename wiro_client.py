@@ -1,55 +1,37 @@
 #!/usr/bin/env python3
 """
 Wiro AI API client.
-Based on real API docs from https://wiro.ai/models/{owner}/{project}/llms-full.txt
 
-Endpoints (all under /v1):
-  POST /v1/Run/{owner}/{project}  — submit a generation task
-  POST /v1/Task/Detail            — poll task status (field: taskid or tasktoken)
-  POST /v1/Task/Kill              — cancel a running task
-  POST /v1/Task/Cancel            — cancel a queued task
+Model discovery:
+  POST /v1/Tool/List  — search models (only x-api-key, no HMAC needed)
+  GET  https://wiro.ai/models/{owner}/{project}/llms-full.txt — model docs
 
-Auth headers:
-  x-api-key: API key
-  x-nonce: unix timestamp (or any random integer)
-  x-signature: HMAC-SHA256 of (secret + nonce) with key = api_key
+Generation:
+  POST /v1/Run/{owner}/{project}  — submit task (HMAC auth)
+  POST /v1/Task/Detail            — poll status (HMAC auth)
 
-Content-Type: multipart/form-data (Wiro expects this header even for JSON payloads)
+Auth for Run/Task:
+  x-api-key, x-nonce (unix ts), x-signature (HMAC-SHA256 of secret+nonce keyed by api_key)
 
 Task statuses:
-  Terminal (done):  task_postprocess_end (success), task_cancel (cancelled)
-  Running (poll):   task_queue, task_accept, task_assign, task_preprocess_start,
-                    task_preprocess_end, task_start, task_output
+  Done:    task_postprocess_end (success), task_cancel (cancelled)
+  Running: task_queue, task_accept, task_assign, task_preprocess_start/end, task_start, task_output
 """
 
 import hashlib
 import hmac
 import json
+import sys
 import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional
 
 DEFAULT_BASE_URL = "https://api.wiro.ai"
+WIRO_SITE = "https://wiro.ai"
 
 TERMINAL_STATUSES = {"task_postprocess_end", "task_cancel"}
 SUCCESS_STATUSES = {"task_postprocess_end"}
-FAILURE_STATUSES = {"task_cancel"}
-
-CURATED_MODELS: List[Dict[str, Any]] = [
-    {"owner": "google", "project": "nano-banana-pro", "name": "Nano Banana Pro (Gemini 3 Pro)", "description": "Google Gemini 3 Pro — text-to-image and image-to-image generation", "category": "Image"},
-    {"owner": "black-forest-labs", "project": "flux-1-1-pro-ultra", "name": "FLUX 1.1 Pro Ultra", "description": "High-quality text-to-image generation by Black Forest Labs", "category": "Image"},
-    {"owner": "black-forest-labs", "project": "flux-1-1-pro", "name": "FLUX 1.1 Pro", "description": "Fast text-to-image generation by Black Forest Labs", "category": "Image"},
-    {"owner": "stability-ai", "project": "stable-diffusion-3-5-large", "name": "Stable Diffusion 3.5 Large", "description": "Stability AI text-to-image model", "category": "Image"},
-    {"owner": "ideogram", "project": "ideogram-v3", "name": "Ideogram V3", "description": "Advanced text-to-image with excellent typography", "category": "Image"},
-    {"owner": "recraft-ai", "project": "recraft-v3", "name": "Recraft V3", "description": "Design-focused image generation", "category": "Image"},
-    {"owner": "seedance", "project": "seedance-2-0", "name": "Seedance 2.0", "description": "AI video generation from text or image", "category": "Video"},
-    {"owner": "kling-ai", "project": "kling-v2-master", "name": "Kling V2 Master", "description": "High-quality AI video generation", "category": "Video"},
-    {"owner": "minimax", "project": "minimax-video-01", "name": "MiniMax Video 01", "description": "Text-to-video generation", "category": "Video"},
-    {"owner": "hailuo-ai", "project": "hailuo-video", "name": "Hailuo Video", "description": "AI video generation", "category": "Video"},
-    {"owner": "eleven-labs", "project": "eleven-turbo-v2-5", "name": "ElevenLabs Turbo v2.5", "description": "Text-to-speech with natural voices", "category": "Audio"},
-    {"owner": "fish-audio", "project": "fish-speech-1-5", "name": "Fish Speech 1.5", "description": "Multilingual text-to-speech", "category": "Audio"},
-]
 
 
 class WiroClient:
@@ -66,7 +48,7 @@ class WiroClient:
             hashlib.sha256,
         ).hexdigest()
 
-    def _headers(self) -> dict:
+    def _signed_headers(self) -> dict:
         nonce = str(int(time.time()))
         return {
             "x-api-key": self.api_key,
@@ -76,16 +58,17 @@ class WiroClient:
             "Accept": "application/json",
         }
 
-    def _request(
-        self,
-        method: str,
-        path: str,
-        data: Optional[Dict[str, Any]] = None,
-        timeout: int = 30,
-    ) -> Dict[str, Any]:
-        url = f"{self.base_url}/v1{path}"
+    def _simple_headers(self) -> dict:
+        return {
+            "x-api-key": self.api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+    def _http(self, method: str, url: str, data: Optional[Dict] = None,
+              headers: Optional[dict] = None, timeout: int = 30) -> Dict[str, Any]:
         body = json.dumps(data).encode("utf-8") if data else None
-        req = urllib.request.Request(url, data=body, method=method, headers=self._headers())
+        req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
         if body:
             req.add_header("Content-Length", str(len(body)))
         try:
@@ -97,7 +80,6 @@ class WiroClient:
                 err_body = e.read().decode("utf-8", errors="replace")[:500]
             except Exception:
                 pass
-            import sys
             print(f"[WIRO] HTTP {e.code} {e.reason} for {method} {url}: {err_body}", file=sys.stderr, flush=True)
             raise Exception(f"Wiro API error {e.code}: {err_body or e.reason}") from e
 
@@ -105,31 +87,98 @@ class WiroClient:
     def is_configured(self) -> bool:
         return bool(self.api_key and self.api_secret)
 
+    # ── Model Discovery ──────────────────────────────────────
+
+    def search_models(self, query: str = "text-to-image", limit: int = 10) -> List[Dict[str, Any]]:
+        """POST /v1/Tool/List — search Wiro models. Response key is 'tool' (singular)."""
+        url = f"{self.base_url}/v1/Tool/List"
+        data = {
+            "start": "0",
+            "limit": str(limit),
+            "sort": "relevance",
+            "order": "DESC",
+            "ischat": 0,
+            "onlyfavorites": False,
+            "hideworkflows": True,
+            "search": query,
+            "summary": True,
+        }
+        result = self._http("POST", url, data=data, headers=self._simple_headers(), timeout=15)
+        return (result or {}).get("tool") or []
+
     def list_models(self, category: Optional[str] = None) -> Dict[str, Any]:
-        """Return curated model catalog (Wiro has no list endpoint)."""
-        models = CURATED_MODELS
-        if category:
-            models = [m for m in models if m.get("category", "").lower() == category.lower()]
+        """Search models by category and return grouped results."""
+        search_map = {
+            "image": "text-to-image",
+            "video": "text-to-video",
+            "audio": "text-to-speech",
+        }
+        query = search_map.get((category or "").lower(), category or "text-to-image")
+        try:
+            raw = self.search_models(query=query, limit=12)
+        except Exception as e:
+            print(f"[WIRO] search_models error: {e}", file=sys.stderr, flush=True)
+            raw = []
+
+        models = []
+        for t in raw:
+            owner = t.get("cleanslugowner") or ""
+            project = t.get("cleanslugproject") or ""
+            if not owner or not project:
+                continue
+            models.append({
+                "owner": owner,
+                "project": project,
+                "name": t.get("title") or f"{owner}/{project}",
+                "description": (t.get("description") or "")[:120],
+                "category": category or "Image",
+                "id": t.get("id"),
+                "cover": t.get("cover") or "",
+            })
+
         categories = {}
-        for m in CURATED_MODELS:
+        for m in models:
             cat = m.get("category", "Other")
             categories.setdefault(cat, []).append(m)
         return {"models": models, "categories": categories}
 
+    def fetch_model_docs(self, owner: str, project: str) -> str:
+        """Fetch llms-full.txt for a model to get input params and examples."""
+        url = f"{WIRO_SITE}/models/{owner}/{project}/llms-full.txt"
+        try:
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.read().decode("utf-8", errors="replace")
+        except Exception as e:
+            print(f"[WIRO] fetch_model_docs error for {owner}/{project}: {e}", file=sys.stderr, flush=True)
+            return ""
+
+    def find_best_model(self, task_type: str = "text-to-image") -> Optional[Dict[str, Any]]:
+        """Search and return the top model for a task type."""
+        results = self.search_models(query=task_type, limit=3)
+        if not results:
+            return None
+        t = results[0]
+        return {
+            "owner": t.get("cleanslugowner") or "",
+            "project": t.get("cleanslugproject") or "",
+            "name": t.get("title") or "",
+            "id": t.get("id"),
+        }
+
+    # ── Generation ────────────────────────────────────────────
+
     def run(self, owner: str, project: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """POST /v1/Run/{owner}/{project} — submit a generation task."""
-        path = f"/Run/{owner}/{project}"
-        return self._request("POST", path, data=params, timeout=60)
+        url = f"{self.base_url}/v1/Run/{owner}/{project}"
+        return self._http("POST", url, data=params, headers=self._signed_headers(), timeout=60)
 
     def poll_task(self, task_id: str, timeout: int = 120) -> Dict[str, Any]:
-        """POST /v1/Task/Detail — poll until terminal status or timeout.
-
-        Returns the first task from tasklist with extracted output_url.
-        """
-        path = "/Task/Detail"
+        """POST /v1/Task/Detail — poll until terminal status or timeout."""
+        url = f"{self.base_url}/v1/Task/Detail"
         deadline = time.time() + timeout
         while time.time() < deadline:
-            result = self._request("POST", path, data={"taskid": task_id}, timeout=15)
+            result = self._http("POST", url, data={"taskid": task_id}, headers=self._signed_headers(), timeout=15)
             tasklist = (result or {}).get("tasklist") or []
             if not tasklist:
                 time.sleep(3)
@@ -146,20 +195,26 @@ class WiroClient:
                     "output_url": output_url,
                     "outputs": outputs,
                     "elapsed": task.get("elapsedseconds"),
-                    "raw": task,
                 }
             time.sleep(3)
         return {"status": "timeout", "success": False, "taskid": task_id, "message": "Polling timed out"}
 
-    def generate(
-        self, owner: str, project: str, params: Dict[str, Any], poll_timeout: int = 120
-    ) -> Dict[str, Any]:
+    def generate(self, owner: str, project: str, params: Dict[str, Any], poll_timeout: int = 120) -> Dict[str, Any]:
         """Submit run then poll until done. Returns dict with output_url."""
         run_result = self.run(owner, project, params)
         errors = run_result.get("errors") or []
         if errors:
-            return {"status": "error", "success": False, "message": "; ".join(str(e) for e in errors), "raw": run_result}
+            return {"status": "error", "success": False, "message": "; ".join(str(e) for e in errors)}
         task_id = run_result.get("taskid")
         if not task_id:
-            return {"status": "error", "success": False, "message": "No taskid in run response", "raw": run_result}
+            return {"status": "error", "success": False, "message": "No taskid in run response"}
         return self.poll_task(str(task_id), timeout=poll_timeout)
+
+    def smart_generate(self, prompt: str, task_type: str = "text-to-image") -> Dict[str, Any]:
+        """Find best model, generate, return result with output_url."""
+        model = self.find_best_model(task_type)
+        if not model or not model.get("owner"):
+            return {"status": "error", "success": False, "message": f"No model found for '{task_type}'"}
+        owner, project = model["owner"], model["project"]
+        print(f"[WIRO] smart_generate: using {owner}/{project} for '{prompt[:80]}'", file=sys.stderr, flush=True)
+        return self.generate(owner, project, {"prompt": prompt, "resolution": "1K", "safetySetting": "OFF"})
