@@ -791,6 +791,8 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 self._json_response(safe_state)
             elif path == "/api/wiro/models":
                 self._json_response(self._wiro_list_models(query))
+            elif path == "/api/wiro/status":
+                self._json_response(self._wiro_status())
             elif path.startswith("/api/wiro/task/"):
                 token = path.split("/api/wiro/task/", 1)[-1].strip("/")
                 self._json_response(self._wiro_task_status(token))
@@ -821,6 +823,8 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 self._json_response(self._broadcast(data))
             elif path == "/api/wiro/generate":
                 self._json_response(self._wiro_generate(data))
+            elif path == "/api/wiro/smart-generate":
+                self._json_response(self._wiro_smart_generate(data))
             elif path == "/api/settings":
                 self._json_response(self._post_settings(data))
             elif path.startswith("/api/settings/channel/"):
@@ -994,6 +998,42 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             return {"error": str(e)}
 
+    def _wiro_status(self):
+        """GET /api/wiro/status — check if Wiro is configured and which agents have the skill."""
+        client = get_wiro_client()
+        configured = bool(client and client.is_configured)
+        skill_agents = []
+        try:
+            state = load_state()
+            agent_count = int(state.get("AGENT_COUNT", "0"))
+            for i in range(1, agent_count + 1):
+                role_id = state.get(f"AGENT_{i}_ROLE", "")
+                name = state.get(f"AGENT_{i}_NAME", f"Agent {i}")
+                skills_file = os.path.join(INSTALL_DIR, "roles", role_id, "skills.json") if role_id else ""
+                if skills_file and os.path.isfile(skills_file):
+                    with open(skills_file) as f:
+                        skills = json.load(f)
+                    enabled = skills.get("enabled", [])
+                    if "wiro" in enabled or "wiro-ai" in enabled:
+                        skill_agents.append(name)
+        except Exception:
+            pass
+        return {"configured": configured, "skill_agents": skill_agents}
+
+    def _wiro_smart_generate(self, data):
+        """POST /api/wiro/smart-generate — {prompt, task_type} -> auto-find model + generate."""
+        client = get_wiro_client()
+        if not client or not client.is_configured:
+            return {"error": "Wiro not configured", "success": False}
+        prompt = (data.get("prompt") or "").strip()
+        task_type = (data.get("task_type") or "text-to-image").strip()
+        if not prompt:
+            return {"error": "No prompt provided", "success": False}
+        try:
+            return client.smart_generate(prompt, task_type=task_type)
+        except Exception as e:
+            return {"error": str(e), "success": False}
+
     def _get_settings(self):
         """GET /api/settings — current config (keys masked, channel statuses)."""
         s = load_settings()
@@ -1077,10 +1117,11 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"SYSTEM: You are a task router. Respond with ONLY a raw JSON object. "
             f"No markdown fences, no explanation, no text before or after.\n\n"
             f"Available agents:\n{roster_text}\n\n"
-            f"You also have a built-in tool: WIRO_IMAGE_GENERATE. "
-            f"If the user wants to generate, create, or draw an image/picture/photo, "
-            f"use this tool instead of delegating to an agent. "
-            f'Include "wiro_generate":{{"prompt":"detailed image description"}} in your JSON.\n\n'
+            f"You have the wiro-ai skill for AI content generation. "
+            f"If the user wants to generate/create/draw an image, video, or audio, "
+            f"handle it yourself instead of delegating. "
+            f'Include "wiro_generate":{{"prompt":"detailed description","task_type":"text-to-image"}} in your JSON. '
+            f'Use task_type "text-to-video" for video, "text-to-speech" for audio.\n\n'
             f"User request: {message}\n\n"
             f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n"
             f"Only delegate when the task genuinely needs a specialist. "
@@ -1139,14 +1180,16 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return
 
         if plan.get("wiro_generate"):
-            wiro_prompt = plan["wiro_generate"].get("prompt", message)
-            self._sse_send("plan", {"plan": plan.get("plan", "generate image"), "delegations": []})
-            self._sse_send("phase", {"phase": "generating_image", "message": f"Generating image via Wiro AI..."})
-            print(f"[ORCH] Wiro image generate: {wiro_prompt[:120]}", file=sys.stderr, flush=True)
+            wiro_data = plan["wiro_generate"] if isinstance(plan["wiro_generate"], dict) else {"prompt": str(plan["wiro_generate"])}
+            wiro_prompt = wiro_data.get("prompt", message)
+            task_type = wiro_data.get("task_type", "text-to-image")
+            self._sse_send("plan", {"plan": plan.get("plan", f"generate {task_type}"), "delegations": []})
+            self._sse_send("phase", {"phase": "generating", "message": f"Generating via Wiro AI ({task_type})..."})
+            print(f"[ORCH] Wiro {task_type}: {wiro_prompt[:120]}", file=sys.stderr, flush=True)
             client = get_wiro_client()
             if client and client.is_configured:
                 try:
-                    result = client.smart_generate(wiro_prompt, task_type="text-to-image")
+                    result = client.smart_generate(wiro_prompt, task_type=task_type)
                     model_name = result.get("model_used", "Wiro AI")
                     if result.get("output_url"):
                         img_response = f"Generated with **{model_name}**:\n\n{result['output_url']}"

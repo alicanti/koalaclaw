@@ -13,7 +13,7 @@ class MissionControl {
         this.app = app;
         this.sidebar = null;
         this.collapsed = false;
-        this.sectionOpen = { agents: true, files: false, integrations: false, 'wiro-models': false, system: true };
+        this.sectionOpen = { agents: true, files: false, integrations: false, 'wiro-status': false, system: true };
         this.fileEditorAgent = null;
         this.fileEditorPath = null;
         this.fileEditorDirty = false;
@@ -231,95 +231,82 @@ class MissionControl {
         const wrap = document.getElementById('mc-wiro-content');
         if (!wrap) return;
         try {
-            const data = this.app?.apiGet ? await this.app.apiGet('/wiro/models') : null;
-            if (data?.error && /not configured/i.test(data.error)) {
-                wrap.innerHTML = `
-                    <div class="wiro-unconfigured">
-                        <p>Wiro AI is not configured yet.</p>
-                        <p>Go to <strong>Integrations</strong> and add your Wiro API Key &amp; Secret to enable AI generation.</p>
-                    </div>`;
-                return;
-            }
-            if (!data || !data.models || data.models.length === 0) {
-                wrap.innerHTML = '<p class="mc-placeholder">No models found.</p>';
-                return;
-            }
-            let html = '';
-            for (const [cat, models] of Object.entries(data.categories || {})) {
-                html += `<div class="wiro-category-label">${this._esc(cat)}</div>`;
-                for (const m of models) {
-                    const key = `${m.owner}/${m.project}`;
-                    const coverStyle = m.cover ? `background-image:url('${this._esc(m.cover)}')` : '';
-                    html += `
-                        <div class="wiro-model-card" data-model="${this._esc(key)}">
-                            ${m.cover ? `<div class="wiro-model-cover" style="${coverStyle}"></div>` : ''}
-                            <div class="wiro-model-info">
-                                <div class="wiro-model-name">${this._esc(m.name)}</div>
-                                <div class="wiro-model-desc">${this._esc(m.description || '')}</div>
-                                <div class="wiro-model-slug">${this._esc(key)}</div>
-                            </div>
-                            <div class="wiro-model-actions">
-                                <input type="text" class="wiro-inline-prompt" placeholder="Describe what to generate..." data-model="${this._esc(key)}">
-                                <button type="button" class="wiro-inline-gen" data-model="${this._esc(key)}" title="Generate">Go</button>
-                            </div>
-                        </div>`;
+            const data = this.app?.apiGet ? await this.app.apiGet('/wiro/status') : null;
+            const configured = data?.configured === true;
+            const skillAgents = (data?.skill_agents || []).map(a => this._esc(a)).join(', ');
+
+            wrap.innerHTML = `
+                <div class="wiro-status-panel">
+                    <div class="wiro-status-row">
+                        <span class="wiro-status-label">Status</span>
+                        <span class="wiro-status-value ${configured ? 'wiro-ok' : 'wiro-err'}">${configured ? 'Connected' : 'Not configured'}</span>
+                    </div>
+                    ${!configured ? `<p class="wiro-status-hint">Add your Wiro API Key &amp; Secret in <strong>Integrations</strong> to enable AI generation.</p>` : ''}
+                    ${configured ? `
+                    <div class="wiro-status-row">
+                        <span class="wiro-status-label">How it works</span>
+                    </div>
+                    <p class="wiro-status-hint">Agents with the <strong>wiro-ai</strong> skill can generate images, videos, and audio. Just ask them in chat — they automatically find the best model and generate.</p>
+                    <div class="wiro-status-row">
+                        <span class="wiro-status-label">Agents with skill</span>
+                        <span class="wiro-status-value">${skillAgents || 'None yet'}</span>
+                    </div>
+                    <div class="wiro-quick-test">
+                        <input type="text" class="wiro-test-prompt" placeholder="Quick test: describe an image...">
+                        <button type="button" class="wiro-test-btn" title="Test generate">Test</button>
+                    </div>
+                    <div class="wiro-test-result"></div>
+                    ` : ''}
+                </div>`;
+
+            if (configured) {
+                const testBtn = wrap.querySelector('.wiro-test-btn');
+                const testInput = wrap.querySelector('.wiro-test-prompt');
+                const testResult = wrap.querySelector('.wiro-test-result');
+                if (testBtn) {
+                    testBtn.addEventListener('click', () => this._wiroQuickTest(testInput, testBtn, testResult));
+                }
+                if (testInput) {
+                    testInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') this._wiroQuickTest(testInput, testBtn, testResult);
+                    });
                 }
             }
-            wrap.innerHTML = html;
-            wrap.addEventListener('click', (e) => {
-                const btn = e.target.closest('.wiro-inline-gen');
-                if (!btn) return;
-                this._wiroGenerate(btn);
-            });
-            wrap.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && e.target.classList.contains('wiro-inline-prompt')) {
-                    const card = e.target.closest('.wiro-model-card');
-                    const btn = card?.querySelector('.wiro-inline-gen');
-                    if (btn) this._wiroGenerate(btn);
-                }
-            });
         } catch (err) {
-            wrap.innerHTML = `<p class="mc-placeholder">Error loading models.</p>`;
+            wrap.innerHTML = `<p class="mc-placeholder">Error checking Wiro status.</p>`;
         }
     }
 
-    async _wiroGenerate(btn) {
-        const modelKey = btn.getAttribute('data-model');
-        const input = btn.closest('.wiro-model-card')?.querySelector('.wiro-inline-prompt');
+    async _wiroQuickTest(input, btn, resultEl) {
         const prompt = (input?.value || '').trim();
         if (!prompt) { input?.focus(); return; }
-        const [owner, project] = modelKey.includes('/') ? modelKey.split('/', 2) : ['', modelKey];
-        if (!owner || !project) return;
 
         btn.disabled = true;
-        btn.textContent = '⏳';
-        const card = btn.closest('.wiro-model-card');
-        let statusEl = card?.querySelector('.wiro-gen-status');
-        if (!statusEl && card) {
-            statusEl = document.createElement('div');
-            statusEl.className = 'wiro-gen-status';
-            card.appendChild(statusEl);
-        }
-        if (statusEl) statusEl.textContent = 'Generating...';
+        btn.textContent = '...';
+        resultEl.textContent = 'Finding best model and generating...';
 
         try {
-            const res = this.app?.apiPost ? await this.app.apiPost('/wiro/generate', { owner, project, params: { prompt } }) : null;
+            const res = this.app?.apiPost ? await this.app.apiPost('/wiro/smart-generate', { prompt, task_type: 'text-to-image' }) : null;
             if (res?.error) throw new Error(res.error);
             if (res?.success === false) throw new Error(res.message || 'Generation failed');
-            const url = res?.output_url || (res?.outputs?.[0]?.url) || '';
-            if (url && window.app?.chatManager) {
-                const modelName = card?.querySelector('.wiro-model-name')?.textContent || modelKey;
-                window.app.chatManager._appendRestoredAssistantBubble(`Generated with **${modelName}**:\n\n${url}`);
-                window.app.chatManager._scrollToBottom?.();
+            const url = res?.output_url || '';
+            const modelName = res?.model_used || 'Wiro AI';
+            if (url) {
+                resultEl.innerHTML = `<div class="wiro-test-success">Generated with <strong>${this._esc(modelName)}</strong>:</div><img class="wiro-test-img" src="${this._esc(url)}" alt="Generated">`;
+                if (window.app?.chatManager) {
+                    window.app.chatManager._appendRestoredAssistantBubble(`Generated with **${modelName}**:\n\n${url}`);
+                    window.app.chatManager._scrollToBottom?.();
+                }
+            } else {
+                resultEl.textContent = 'No output received.';
             }
             if (input) input.value = '';
-            if (statusEl) { statusEl.textContent = 'Done!'; setTimeout(() => statusEl.textContent = '', 3000); }
         } catch (err) {
-            this.app?.addLog?.('error', `Wiro: ${err.message}`, 'Wiro');
-            if (statusEl) { statusEl.textContent = `Error: ${err.message}`; setTimeout(() => statusEl.textContent = '', 5000); }
+            resultEl.textContent = `Error: ${err.message}`;
+            this.app?.addLog?.('error', `Wiro test: ${err.message}`, 'Wiro');
         }
         btn.disabled = false;
-        btn.textContent = 'Go';
+        btn.textContent = 'Test';
     }
 
     _esc(s) {

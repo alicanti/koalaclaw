@@ -1,7 +1,8 @@
 {
   "enabled": [
     "browser",
-    "openai-image-gen"
+    "openai-image-gen",
+    "wiro-ai"
   ],
   "disabled": []
 }
