@@ -147,19 +147,23 @@ class WiroClient:
         ).hexdigest()
 
     def _signed_headers(self) -> dict:
+        """HMAC-signed headers for Run/Task endpoints.
+        Wiro expects Content-Type: multipart/form-data even for JSON payloads.
+        """
         nonce = str(int(time.time()))
         return {
             "x-api-key": self.api_key,
             "x-nonce": nonce,
             "x-signature": self._sign(nonce),
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
             "Accept": "application/json",
         }
 
     def _simple_headers(self) -> dict:
+        """Headers for Tool/List (no HMAC). Also uses multipart/form-data."""
         return {
             "x-api-key": self.api_key,
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
             "Accept": "application/json",
         }
 
