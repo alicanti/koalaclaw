@@ -72,7 +72,7 @@ class WiroClient:
             "x-api-key": self.api_key,
             "x-nonce": nonce,
             "x-signature": self._sign(nonce),
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
             "Accept": "application/json",
         }
 
@@ -88,8 +88,18 @@ class WiroClient:
         req = urllib.request.Request(url, data=body, method=method, headers=self._headers())
         if body:
             req.add_header("Content-Length", str(len(body)))
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8", errors="replace")[:500]
+            except Exception:
+                pass
+            import sys
+            print(f"[WIRO] HTTP {e.code} {e.reason} for {method} {url}: {err_body}", file=sys.stderr, flush=True)
+            raise Exception(f"Wiro API error {e.code}: {err_body or e.reason}") from e
 
     @property
     def is_configured(self) -> bool:

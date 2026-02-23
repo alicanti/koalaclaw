@@ -13,7 +13,7 @@ class MissionControl {
         this.app = app;
         this.sidebar = null;
         this.collapsed = false;
-        this.sectionOpen = { agents: true, files: false, integrations: false, system: true };
+        this.sectionOpen = { agents: true, files: false, integrations: false, 'wiro-models': false, system: true };
         this.fileEditorAgent = null;
         this.fileEditorPath = null;
         this.fileEditorDirty = false;
@@ -27,6 +27,7 @@ class MissionControl {
         this.bindToggle();
         this.bindSectionHeaders();
         this.renderIntegrations();
+        this.loadWiroModels();
         this.renderSystemActions();
     }
 
@@ -224,6 +225,85 @@ class MissionControl {
             this.app.addLog?.('info', `Removed ${provider} integration`, 'System');
             this.renderIntegrations();
         }
+    }
+
+    async loadWiroModels() {
+        const wrap = document.getElementById('mc-wiro-content');
+        if (!wrap) return;
+        try {
+            const data = this.app?.apiGet ? await this.app.apiGet('/wiro/models') : null;
+            if (!data || !data.categories) {
+                wrap.innerHTML = '<p class="mc-placeholder">No models available.</p>';
+                return;
+            }
+            let html = '';
+            for (const [cat, models] of Object.entries(data.categories)) {
+                html += `<div class="wiro-category-label">${this._esc(cat)}</div>`;
+                for (const m of models) {
+                    const key = `${m.owner}/${m.project}`;
+                    html += `
+                        <div class="wiro-model-card" data-model="${this._esc(key)}">
+                            <div class="wiro-model-info">
+                                <div class="wiro-model-name">${this._esc(m.name)}</div>
+                                <div class="wiro-model-desc">${this._esc(m.description || '')}</div>
+                            </div>
+                            <div class="wiro-model-actions">
+                                <input type="text" class="wiro-inline-prompt" placeholder="Prompt..." data-model="${this._esc(key)}">
+                                <button type="button" class="wiro-inline-gen" data-model="${this._esc(key)}" title="Generate">Go</button>
+                            </div>
+                        </div>`;
+                }
+            }
+            wrap.innerHTML = html;
+            wrap.addEventListener('click', (e) => {
+                const btn = e.target.closest('.wiro-inline-gen');
+                if (!btn) return;
+                this._wiroGenerate(btn);
+            });
+            wrap.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.classList.contains('wiro-inline-prompt')) {
+                    const card = e.target.closest('.wiro-model-card');
+                    const btn = card?.querySelector('.wiro-inline-gen');
+                    if (btn) this._wiroGenerate(btn);
+                }
+            });
+        } catch (err) {
+            wrap.innerHTML = `<p class="mc-placeholder">Error loading models.</p>`;
+        }
+    }
+
+    async _wiroGenerate(btn) {
+        const modelKey = btn.getAttribute('data-model');
+        const input = btn.closest('.wiro-model-card')?.querySelector('.wiro-inline-prompt');
+        const prompt = (input?.value || '').trim();
+        if (!prompt) { input?.focus(); return; }
+        const [owner, project] = modelKey.includes('/') ? modelKey.split('/', 2) : ['', modelKey];
+        if (!owner || !project) return;
+
+        btn.disabled = true;
+        btn.textContent = '...';
+        try {
+            const res = this.app?.apiPost ? await this.app.apiPost('/wiro/generate', { owner, project, params: { prompt } }) : null;
+            if (res?.error) throw new Error(res.error);
+            if (res?.success === false) throw new Error(res.message || 'Generation failed');
+            const url = res?.output_url || (res?.outputs?.[0]?.url) || '';
+            if (url && window.app?.chatManager) {
+                window.app.chatManager._appendRestoredAssistantBubble(`Generated image:\n\n${url}`);
+                window.app.chatManager._scrollToBottom?.();
+            }
+            if (input) input.value = '';
+        } catch (err) {
+            this.app?.addLog?.('error', `Wiro: ${err.message}`, 'Wiro');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Go';
+    }
+
+    _esc(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = String(s);
+        return d.innerHTML;
     }
 
     renderSystemActions() {

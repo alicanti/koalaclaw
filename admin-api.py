@@ -1076,6 +1076,10 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"SYSTEM: You are a task router. Respond with ONLY a raw JSON object. "
             f"No markdown fences, no explanation, no text before or after.\n\n"
             f"Available agents:\n{roster_text}\n\n"
+            f"You also have a built-in tool: WIRO_IMAGE_GENERATE. "
+            f"If the user wants to generate, create, or draw an image/picture/photo, "
+            f"use this tool instead of delegating to an agent. "
+            f'Include "wiro_generate":{{"prompt":"detailed image description"}} in your JSON.\n\n'
             f"User request: {message}\n\n"
             f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n"
             f"Only delegate when the task genuinely needs a specialist. "
@@ -1083,7 +1087,9 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"JSON format:\n"
             f'{{"plan":"brief plan","delegations":[{{"agent_id":N,"task":"task"}}],"direct_answer":null}}\n'
             f"For simple/direct: "
-            f'{{"plan":"direct","delegations":[],"direct_answer":"your answer"}}'
+            f'{{"plan":"direct","delegations":[],"direct_answer":"your answer"}}\n'
+            f"For image generation: "
+            f'{{"plan":"generate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt"}}}}'
         )
 
         self._sse_send("phase", {"phase": "analyzing", "message": "Analyzing task..."})
@@ -1122,12 +1128,37 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             self._sse_end()
             return
 
-        if plan.get("direct_answer") and not plan.get("delegations"):
+        if plan.get("direct_answer") and not plan.get("delegations") and not plan.get("wiro_generate"):
             answer = plan["direct_answer"]
             append_chat_history(orch_id, "user", message)
             append_chat_history(orch_id, "assistant", answer)
             self._sse_send("plan", {"plan": plan.get("plan", "direct"), "delegations": []})
             self._sse_send("done", {"response": answer, "chain": [], "plan": plan.get("plan", "direct")})
+            self._sse_end()
+            return
+
+        if plan.get("wiro_generate"):
+            wiro_prompt = plan["wiro_generate"].get("prompt", message)
+            self._sse_send("plan", {"plan": plan.get("plan", "generate image"), "delegations": []})
+            self._sse_send("phase", {"phase": "generating_image", "message": f"Generating image via Wiro AI..."})
+            print(f"[ORCH] Wiro image generate: {wiro_prompt[:120]}", file=sys.stderr, flush=True)
+            client = get_wiro_client()
+            if client and client.is_configured:
+                try:
+                    result = client.generate("google", "nano-banana-pro", {"prompt": wiro_prompt})
+                    if result.get("output_url"):
+                        img_response = f"Here is your generated image:\n\n{result['output_url']}"
+                        append_chat_history(orch_id, "user", message)
+                        append_chat_history(orch_id, "assistant", img_response)
+                        self._sse_send("done", {"response": img_response, "chain": [], "plan": "image generated via Wiro AI"})
+                    else:
+                        err_msg = result.get("message") or result.get("status") or "Image generation failed"
+                        self._sse_send("done", {"response": f"Image generation failed: {err_msg}", "chain": [], "plan": "image generation error"})
+                except Exception as e:
+                    print(f"[ORCH] Wiro generate error: {e}", file=sys.stderr, flush=True)
+                    self._sse_send("done", {"response": f"Image generation error: {e}", "chain": [], "plan": "image generation error"})
+            else:
+                self._sse_send("done", {"response": "Wiro AI is not configured. Please add your API key and secret in Settings > Integrations > Wiro AI.", "chain": [], "plan": "wiro not configured"})
             self._sse_end()
             return
 
