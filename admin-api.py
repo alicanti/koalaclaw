@@ -980,7 +980,11 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return {"error": str(e), "status": "error"}
 
     def _wiro_generate(self, data):
-        """POST /api/wiro/generate — {model, params} or {owner, project, params} -> run + poll."""
+        """POST /api/wiro/generate — generate with specific or auto-selected model.
+
+        With owner/project: fetches model docs, builds params, generates.
+        Without: falls back to smart_generate.
+        """
         client = get_wiro_client()
         if not client or not client.is_configured:
             return {"error": "Wiro not configured"}
@@ -991,9 +995,18 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             if "/" in model:
                 owner, _, project = model.partition("/")
             else:
-                return {"error": "Provide model (owner/project) or owner and project"}
-        params = data.get("params") or {}
+                prompt = (data.get("params") or {}).get("prompt", "")
+                if prompt:
+                    return client.smart_generate(prompt)
+                return {"error": "Provide model (owner/project) or owner+project, or params.prompt for auto-select"}
+        prompt = (data.get("params") or {}).get("prompt", "")
         try:
+            inputs = client.get_model_inputs(owner.strip(), project.strip())
+            if inputs and prompt:
+                from wiro_client import build_params_from_docs
+                params = build_params_from_docs(inputs, prompt)
+            else:
+                params = data.get("params") or {}
             return client.generate(owner.strip(), project.strip(), params)
         except Exception as e:
             return {"error": str(e)}
@@ -1131,7 +1144,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"For simple/direct: "
             f'{{"plan":"direct","delegations":[],"direct_answer":"your answer"}}\n'
             f"For image generation: "
-            f'{{"plan":"generate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt"}}}}'
+            f'{{"plan":"generate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt","task_type":"text-to-image"}}}}'
         )
 
         self._sse_send("phase", {"phase": "analyzing", "message": "Analyzing task..."})

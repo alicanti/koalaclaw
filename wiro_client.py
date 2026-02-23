@@ -17,7 +17,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 DEFAULT_BASE_URL = "https://api.wiro.ai"
 WIRO_SITE = "https://wiro.ai"
