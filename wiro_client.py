@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import json
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -25,7 +26,6 @@ WIRO_SITE = "https://wiro.ai"
 TERMINAL_STATUSES = {"task_postprocess_end", "task_cancel"}
 SUCCESS_STATUSES = {"task_postprocess_end"}
 
-# Cache parsed model docs to avoid re-fetching within the same process
 _model_docs_cache: Dict[str, Dict[str, Any]] = {}
 
 
@@ -169,21 +169,33 @@ class WiroClient:
 
     def _http(self, method: str, url: str, data: Optional[Dict] = None,
               headers: Optional[dict] = None, timeout: int = 30) -> Dict[str, Any]:
-        body = json.dumps(data).encode("utf-8") if data else None
-        req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
-        if body:
-            req.add_header("Content-Length", str(len(body)))
+        """Execute HTTP request via curl to avoid Cloudflare bot detection.
+
+        Wiro's Cloudflare WAF blocks Python urllib's User-Agent.
+        Using curl matches the official API examples exactly.
+        """
+        cmd = ["curl", "-s", "-S", "-X", method, url, "--max-time", str(timeout)]
+        for k, v in (headers or {}).items():
+            cmd += ["-H", f"{k}: {v}"]
+        if data:
+            cmd += ["-d", json.dumps(data)]
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            err_body = ""
-            try:
-                err_body = e.read().decode("utf-8", errors="replace")[:500]
-            except Exception:
-                pass
-            print(f"[WIRO] HTTP {e.code} {e.reason} for {method} {url}: {err_body}", file=sys.stderr, flush=True)
-            raise Exception(f"Wiro API error {e.code}: {err_body or e.reason}") from e
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 5)
+            if result.returncode != 0:
+                err = result.stderr.strip()[:300]
+                print(f"[WIRO] curl error for {method} {url}: {err}", file=sys.stderr, flush=True)
+                raise Exception(f"Wiro request failed: {err}")
+            body = result.stdout.strip()
+            if not body:
+                raise Exception("Empty response from Wiro API")
+            parsed = json.loads(body)
+            return parsed
+        except json.JSONDecodeError:
+            snippet = result.stdout[:300] if result.stdout else "(empty)"
+            print(f"[WIRO] Non-JSON response for {method} {url}: {snippet}", file=sys.stderr, flush=True)
+            raise Exception(f"Wiro API returned non-JSON: {snippet[:100]}")
+        except subprocess.TimeoutExpired:
+            raise Exception(f"Wiro API timeout after {timeout}s")
 
     @property
     def is_configured(self) -> bool:
@@ -245,12 +257,14 @@ class WiroClient:
         return {"models": models, "categories": categories}
 
     def fetch_model_docs(self, owner: str, project: str) -> str:
-        """Fetch llms-full.txt for a model."""
+        """Fetch llms-full.txt for a model via curl."""
         url = f"{WIRO_SITE}/models/{owner}/{project}/llms-full.txt"
         try:
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return resp.read().decode("utf-8", errors="replace")
+            result = subprocess.run(
+                ["curl", "-s", "-S", "--max-time", "10", url],
+                capture_output=True, text=True, timeout=15,
+            )
+            return result.stdout if result.returncode == 0 else ""
         except Exception as e:
             print(f"[WIRO] fetch_model_docs error for {owner}/{project}: {e}", file=sys.stderr, flush=True)
             return ""
