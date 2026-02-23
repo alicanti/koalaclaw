@@ -194,6 +194,9 @@ class WiroClient:
             if not body:
                 raise Exception("Empty response from Wiro API")
             parsed = json.loads(body)
+            if "/Tool/List" in url:
+                tool_count = len(parsed.get("tool") or [])
+                print(f"[WIRO] Tool/List response: {tool_count} tools, errors={parsed.get('errors')}, body[:200]={body[:200]}", file=sys.stderr, flush=True)
             return parsed
         except json.JSONDecodeError:
             snippet = result.stdout[:300] if result.stdout else "(empty)"
@@ -214,13 +217,8 @@ class WiroClient:
         data = {
             "start": "0",
             "limit": str(limit),
-            "sort": "relevance",
-            "order": "DESC",
-            "ischat": 0,
-            "onlyfavorites": False,
-            "hideworkflows": True,
             "search": query,
-            "summary": True,
+            "summary": "true",
         }
         result = self._http("POST", url, data=data, headers=self._simple_headers(), timeout=15)
         return (result or {}).get("tool") or []
