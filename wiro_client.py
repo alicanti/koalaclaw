@@ -290,20 +290,46 @@ class WiroClient:
         return inputs
 
     def find_best_model(self, task_type: str = "text-to-image") -> Optional[Dict[str, Any]]:
-        """Search and return the top model for a task type."""
+        """Search and return the best fast model for a task type.
+
+        Prefers models tagged with 'fast-inference' or from known fast providers.
+        Falls back to first result if no fast model found.
+        """
         try:
-            results = self.search_models(query=task_type, limit=3)
+            results = self.search_models(query=task_type, limit=10)
         except Exception as e:
             print(f"[WIRO] find_best_model search failed: {e}", file=sys.stderr, flush=True)
             return None
         print(f"[WIRO] find_best_model: got {len(results)} results for '{task_type}'", file=sys.stderr, flush=True)
         if not results:
             return None
-        t = results[0]
+
+        FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai", "stability-ai"}
+
+        def _score(t):
+            cats = t.get("categories") or []
+            owner = (t.get("cleanslugowner") or "").lower()
+            score = 0
+            if "fast-inference" in cats:
+                score += 10
+            if "partner" in cats:
+                score += 5
+            if owner in FAST_OWNERS:
+                score += 8
+            stat = t.get("taskstat") or {}
+            runs = int(stat.get("runcount") or 0)
+            if runs > 10000:
+                score += 3
+            elif runs > 1000:
+                score += 1
+            return score
+
+        ranked = sorted(results, key=_score, reverse=True)
+        t = ranked[0]
         owner = t.get("cleanslugowner") or ""
         project = t.get("cleanslugproject") or ""
         name = t.get("title") or t.get("seotitle") or f"{owner}/{project}"
-        print(f"[WIRO] find_best_model: selected {owner}/{project} ({name})", file=sys.stderr, flush=True)
+        print(f"[WIRO] find_best_model: selected {owner}/{project} ({name}) [score={_score(t)}]", file=sys.stderr, flush=True)
         return {"owner": owner, "project": project, "name": name, "id": t.get("id")}
 
     # ── Generation ────────────────────────────────────────────
@@ -339,7 +365,7 @@ class WiroClient:
             time.sleep(3)
         return {"status": "timeout", "success": False, "taskid": task_id, "message": "Polling timed out"}
 
-    def generate(self, owner: str, project: str, params: Dict[str, Any], poll_timeout: int = 120) -> Dict[str, Any]:
+    def generate(self, owner: str, project: str, params: Dict[str, Any], poll_timeout: int = 300) -> Dict[str, Any]:
         """Submit run then poll until done. Returns dict with output_url."""
         run_result = self.run(owner, project, params)
         errors = run_result.get("errors") or []
