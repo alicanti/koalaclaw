@@ -286,6 +286,22 @@ _apply_role_to_agent() {
     if [[ -f "${role_dir}/skills.json" ]]; then
         local skills_file="${agent_dir}/role-skills.json"
         cp "${role_dir}/skills.json" "$skills_file"
+        
+        # Auto-install custom skills referenced in skills.json
+        local custom_skills_dir="${script_dir}/custom-skills"
+        if [[ ! -d "$custom_skills_dir" ]]; then
+            custom_skills_dir="${REPO_DIR:-${INSTALL_DIR}/repo}/custom-skills"
+        fi
+        if [[ -d "$custom_skills_dir" ]]; then
+            local skills_workspace="${workspace_dir}/skills"
+            mkdir -p "$skills_workspace"
+            local skill_name
+            for skill_name in $(python3 -c "import json,sys; d=json.load(open('${role_dir}/skills.json')); [print(s) for s in d.get('enabled',[])]" 2>/dev/null); do
+                if [[ -d "${custom_skills_dir}/${skill_name}" ]]; then
+                    cp -r "${custom_skills_dir}/${skill_name}" "${skills_workspace}/${skill_name}"
+                fi
+            done
+        fi
     fi
     
     _info "Applied role '${role}' to Agent ${agent_num}"

@@ -1020,9 +1020,12 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             state = load_state()
             agent_count = int(state.get("AGENT_COUNT", "0"))
             for i in range(1, agent_count + 1):
-                role_id = state.get(f"AGENT_{i}_ROLE", "")
-                name = state.get(f"AGENT_{i}_NAME", f"Agent {i}")
+                role_id = state.get(f"ROLE_{i}", "")
+                info = get_role_info(role_id)
+                name = info.get("name", f"Agent {i}") if info else f"Agent {i}"
                 skills_file = os.path.join(INSTALL_DIR, "roles", role_id, "skills.json") if role_id else ""
+                if not skills_file or not os.path.isfile(skills_file):
+                    skills_file = os.path.join(REPO_DIR, "roles", role_id, "skills.json") if role_id else ""
                 if skills_file and os.path.isfile(skills_file):
                     with open(skills_file) as f:
                         skills = json.load(f)

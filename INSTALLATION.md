@@ -41,12 +41,21 @@ Click the **⚙️** button in the Web UI tab bar to open Settings:
 
 ## Post-Install: Wiro AI
 
-If you skipped the Wiro key during install, add it via Settings (⚙️) in the Web UI. Once configured:
-1. Open a chat with any agent
-2. Click the **✨** button next to the message input
-3. Browse models by category (Image, Video, Audio, LLM)
-4. Enter a prompt and click Generate
-5. The result appears in the chat
+If you skipped the Wiro key during install, add it via Settings (⚙️) or the Integrations section in the sidebar. Once configured:
+
+**How it works:** Agents with the `wiro-ai` skill (OrchestratorKoala, GenerativeKoala, DesignKoala) can generate images, videos, and audio autonomously. Just ask them in chat — they automatically:
+1. Search Wiro's model marketplace via `POST /v1/Tool/List`
+2. Fetch the model's documentation (`llms-full.txt`) to learn input parameters
+3. Build the correct request body with proper field names and defaults
+4. Submit the task and poll until complete
+5. Display the result inline in chat with a **download button** (⬇ on hover)
+
+**Quick test:** Open the "Wiro AI" section in the sidebar — it shows connection status, which agents have the skill, and a test input.
+
+**Manual skill install:** To add the wiro-ai skill to any agent:
+```bash
+sudo koalaclaw skills add ./custom-skills/wiro-ai [agent-id]
+```
 
 ## Post-Install: Image Upload
 
@@ -1708,7 +1717,7 @@ python3 admin-api.py &
 | Orchestrated Chat | 🎯 Orchestrate toggle routes messages through OrchestratorKoala; live delegation chain shows each agent working in real time (SSE streaming) |
 | Isometric Office | Visual representation of all agents at their desks |
 | Admin Panel | Agent list, status, skill toggles, quick actions |
-| Chat + Image Upload | Send messages to any agent, attach images (📎), Wiro AI generation (✨) |
+| Chat + Image Upload | Send messages to any agent, attach images (📎), download generated images (⬇) |
 | Live Logs | Real-time, color-coded, filterable log stream |
 | Workflows | Chain agents together (Blog Post, Product Launch, etc.) |
 | Monitoring | CPU/RAM metrics, alert thresholds, cron jobs |
@@ -1737,8 +1746,10 @@ python3 admin-api.py &
 | `/api/roles` | GET | All 20 available roles |
 | `/api/stats` | GET | Docker container resource usage |
 | `/api/config` | GET | System configuration (safe, no secrets) |
-| `/api/wiro/models` | GET | List Wiro AI models by category |
-| `/api/wiro/generate` | POST | Generate content via Wiro AI |
+| `/api/wiro/status` | GET | Wiro connection status and skill agents |
+| `/api/wiro/models` | GET | Search Wiro models via Tool/List API |
+| `/api/wiro/generate` | POST | Generate with specific model (auto-parses docs) |
+| `/api/wiro/smart-generate` | POST | Auto-find best model + generate |
 | `/api/settings` | GET/POST | General settings (Wiro keys, channels, model) |
 
 ### Running as a Service
@@ -1817,10 +1828,11 @@ mkdir -p roles/my-custom-role
 
 ## Custom Skills
 
-KoalaClaw includes 12 pre-built custom skill templates in `custom-skills/`:
+KoalaClaw includes 13 pre-built custom skill templates in `custom-skills/`:
 
 | Skill | Used By | API |
 |-------|---------|-----|
+| **wiro-ai** | **OrchestratorKoala, GenerativeKoala, DesignKoala** | **Wiro AI (smart model discovery + generation)** |
 | twitter-api | MarketerKoala | Twitter API v2 |
 | reddit-api | MarketerKoala | Reddit OAuth |
 | email-responder | CustomerKoala, SalesKoala, HRKoala | IMAP/SMTP |

@@ -94,17 +94,26 @@ A browser-based dashboard at `:3099` with:
 - **Isometric office** — manager room at the top (OrchestratorKoala at a larger executive desk), glass divider, then open office with other agents at desks; hover tooltips and desk click zoom
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
 - **Admin panel** — agent list, status, skill toggles, quick actions
-- **Chat with image upload** — talk to any agent, attach images (📎), view images in responses
+- **Chat with image upload** — talk to any agent, attach images (📎), view images in responses, download generated images (⬇ button on hover)
 - **Orchestrate mode** — toggle 🎯 in chat to route messages through OrchestratorKoala with live delegation chain
-- **Wiro AI integration** — generate images/video/audio via 500+ models (✨ button in chat)
+- **Wiro AI skill** — agents with the `wiro-ai` skill can generate images/video/audio; they auto-discover models via Wiro API, read model docs, and build correct parameters
+- **Wiro AI status panel** — sidebar shows connection status, which agents have the skill, and a quick test input
 - **Settings page** — configure Wiro API keys, channel integrations, default model (⚙️)
 - **Live logs** — color-coded, filterable, real-time log stream
 - **Workflow pipelines** — chain agents together (Blog Post, Product Launch, Security Audit)
 - **Monitoring dashboard** — CPU/RAM per agent, alerts, cron jobs
 - **Gamification** — XP, levels (1-50), achievements, leaderboard, outfits, desk rewards
 
-### Wiro AI Model Marketplace
-Connect to [Wiro AI](https://wiro.ai) for 500+ generative models (image, video, audio, LLM). Enter your API key in Settings, then use the ✨ button in chat to browse models by category, enter a prompt, and generate content directly in the conversation.
+### Wiro AI Skill (Smart Generation)
+Connect to [Wiro AI](https://wiro.ai) for 500+ generative models. Agents with the `wiro-ai` skill handle generation autonomously:
+
+1. **Model discovery** — searches Wiro's marketplace via `POST /v1/Tool/List`
+2. **Documentation parsing** — fetches each model's `llms-full.txt` to learn input parameters
+3. **Smart parameter building** — detects prompt fields, applies defaults, skips file-upload fields
+4. **Model ranking** — prefers fast-inference models from known providers (Google, Black Forest Labs, etc.)
+5. **Generate & poll** — submits the task and polls until complete, returns the output URL
+
+Just ask an agent to "generate an image of X" — it handles model selection, parameter building, and result delivery automatically. Generated images appear inline in chat with a download button.
 
 ### Inter-Agent Communication & Orchestration
 OrchestratorKoala analyzes complex requests, breaks them into sub-tasks, and delegates to specialist agents in real time. The orchestration uses **Server-Sent Events (SSE)** so you see each step live in the chat:
@@ -122,8 +131,8 @@ API endpoints:
 ### Channel Integrations
 Connect Telegram, WhatsApp, Slack, or Discord to the OrchestratorKoala agent via the Settings page. Messages from external channels are routed to the orchestrator, which can delegate to any specialist agent.
 
-### 12 Custom Skills
-Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-api, elevenlabs-tts, web-scraper, csv-analyzer, server-monitor, crypto-tracker, seo-writer, vuln-scanner, calendar-sync.
+### 13 Custom Skills
+Pre-built skill templates: **wiro-ai** (smart image/video/audio generation), twitter-api, reddit-api, email-responder, replicate-api, elevenlabs-tts, web-scraper, csv-analyzer, server-monitor, crypto-tracker, seo-writer, vuln-scanner, calendar-sync. Custom skills are auto-installed to agent workspaces based on role configuration.
 
 ### Production-Ready Infrastructure
 - Auto-installs Docker CE + Compose v2
@@ -145,12 +154,12 @@ Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-a
 | 2 | MarketerKoala | 📣 | Social media, campaigns, analytics |
 | 3 | StrategyKoala | 🧠 | Business strategy, OKRs, roadmaps |
 | 4 | CustomerKoala | 🎧 | Customer support, live chat, FAQ |
-| 5 | GenerativeKoala | 🎨 | Image/video/audio generation (+ Wiro AI) |
+| 5 | GenerativeKoala | 🎨 | Image/video/audio generation (wiro-ai skill) |
 | 6 | ResearchKoala | 🔬 | Deep research, reports, analysis |
 | 7 | DataKoala | 📊 | Data analysis, charts, SQL |
 | 8 | DevOpsKoala | ⚙️ | Server ops, monitoring, CI/CD |
 | 9 | FinanceKoala | 💰 | Crypto, stocks, portfolio tracking |
-| 10 | ContentKoala | ✍️ | Blog writing, newsletters, SEO (+ Wiro AI) |
+| 10 | ContentKoala | ✍️ | Blog writing, newsletters, SEO |
 | 11 | SecurityKoala | 🔒 | Vulnerability scanning, audits |
 | 12 | SchedulerKoala | 📅 | Calendar, reminders, cron jobs |
 | 13 | TranslatorKoala | 🌍 | Translation, localization |
@@ -158,9 +167,9 @@ Pre-built skill templates: twitter-api, reddit-api, email-responder, replicate-a
 | 15 | HRKoala | 👥 | Hiring, onboarding, HR tasks |
 | 16 | SalesKoala | 💼 | Lead gen, CRM, proposals |
 | 17 | QAKoala | 🧪 | Testing, bug reports, QA |
-| 18 | DesignKoala | 🎯 | UI/UX feedback, design review |
+| 18 | DesignKoala | 🎯 | UI/UX feedback, design review (wiro-ai skill) |
 | 19 | CustomKoala | 🛠️ | User-defined custom role |
-| 20 | OrchestratorKoala | 🎯 | Task orchestration, delegation, channels |
+| 20 | OrchestratorKoala | 🎯 | Task orchestration, delegation, channels (wiro-ai skill) |
 
 Each role includes:
 - `IDENTITY.md` — name, emoji, personality, speaking style
@@ -292,7 +301,7 @@ graph TB
 GitHub repo:
 ├── koalaclaw.sh              # CLI installer
 ├── admin-api.py              # Web UI backend + Orchestration/SSE/Delegation API
-├── wiro_client.py            # Wiro AI API client (HMAC auth, run/poll)
+├── wiro_client.py            # Wiro AI client (Tool/List search, llms-full.txt parse, smart_generate)
 ├── ui/                       # Web UI frontend
 │   ├── index.html
 │   ├── css/                  # 9 CSS modules (main, chat, office, mission-control, etc.)
@@ -310,7 +319,7 @@ GitHub repo:
 │   ├── PROJECTS.template.md
 │   ├── DECISIONS.template.md
 │   └── ERRORS.template.md
-├── custom-skills/            # 12 skill templates
+├── custom-skills/            # 13 skill templates (incl. wiro-ai)
 │   └── <skill-name>/SKILL.md
 ├── workflows/                # 4 preset pipelines
 ├── INSTALLATION.md           # Detailed setup guide
