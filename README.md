@@ -94,7 +94,7 @@ A browser-based dashboard at `:3099` with:
 - **Isometric office** — manager room at the top (OrchestratorKoala at a larger executive desk), glass divider, then open office with other agents at desks; hover tooltips and desk click zoom
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
 - **Admin panel** — agent list, status, skill toggles, quick actions
-- **Chat with image upload** — talk to any agent, attach images (📎), view images in responses, download generated images (⬇ button on hover)
+- **Chat with media support** — talk to any agent, attach images (📎), generated images/videos/audio render inline with player controls and ⬇ download button
 - **Orchestrate mode** — toggle 🎯 in chat to route messages through OrchestratorKoala with live delegation chain
 - **Wiro AI skill** — agents with the `wiro-ai` skill can generate images/video/audio; they auto-discover models via Wiro API, read model docs, and build correct parameters
 - **Wiro AI status panel** — sidebar shows connection status, which agents have the skill, and a quick test input
@@ -113,7 +113,7 @@ Connect to [Wiro AI](https://wiro.ai) for 500+ generative models. Agents with th
 4. **Model ranking** — prefers fast-inference models from known providers (Google, Black Forest Labs, etc.)
 5. **Generate & poll** — submits the task and polls until complete, returns the output URL
 
-Just ask an agent to "generate an image of X" — it handles model selection, parameter building, and result delivery automatically. Generated images appear inline in chat with a download button.
+Just ask an agent to "generate an image of X" — it handles model selection, parameter building, and result delivery automatically. Generated content appears inline in chat: images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a ⬇ download button.
 
 ### Inter-Agent Communication & Orchestration
 OrchestratorKoala analyzes complex requests, breaks them into sub-tasks, and delegates to specialist agents in real time. The orchestration uses **Server-Sent Events (SSE)** so you see each step live in the chat:

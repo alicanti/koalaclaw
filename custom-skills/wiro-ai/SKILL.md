@@ -85,6 +85,7 @@ The system searches Wiro's marketplace which includes 100+ models:
 - The system handles model selection — you focus on the creative description
 - For image editing, describe what changes to make clearly
 - Results are returned as URLs — include them in your response to the user
+- The chat UI auto-renders images, videos (with player controls), and audio inline with a download button
 
 ## Rate Limits
 - Depends on Wiro subscription tier

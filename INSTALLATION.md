@@ -48,7 +48,7 @@ If you skipped the Wiro key during install, add it via Settings (⚙️) or the 
 2. Fetch the model's documentation (`llms-full.txt`) to learn input parameters
 3. Build the correct request body with proper field names and defaults
 4. Submit the task and poll until complete
-5. Display the result inline in chat with a **download button** (⬇ on hover)
+5. Display the result inline in chat — images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a **⬇ download button**
 
 **Quick test:** Open the "Wiro AI" section in the sidebar — it shows connection status, which agents have the skill, and a test input.
 
@@ -1717,7 +1717,7 @@ python3 admin-api.py &
 | Orchestrated Chat | 🎯 Orchestrate toggle routes messages through OrchestratorKoala; live delegation chain shows each agent working in real time (SSE streaming) |
 | Isometric Office | Visual representation of all agents at their desks |
 | Admin Panel | Agent list, status, skill toggles, quick actions |
-| Chat + Image Upload | Send messages to any agent, attach images (📎), download generated images (⬇) |
+| Chat + Media | Send messages to any agent, attach images (📎), inline video/audio players, ⬇ download for all media |
 | Live Logs | Real-time, color-coded, filterable log stream |
 | Workflows | Chain agents together (Blog Post, Product Launch, etc.) |
 | Monitoring | CPU/RAM metrics, alert thresholds, cron jobs |
