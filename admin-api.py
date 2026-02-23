@@ -13,7 +13,7 @@ import subprocess
 import time
 import hashlib
 from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from http import HTTPStatus
 import threading
 import urllib.parse
@@ -954,14 +954,13 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             return {"error": str(e)}
 
     def _wiro_list_models(self, query):
-        """GET /api/wiro/models — list models, optional category from query."""
-        client = get_wiro_client()
-        if not client or not client.is_configured:
-            return {"error": "Wiro not configured", "models": [], "categories": {}}
+        """GET /api/wiro/models — return curated model catalog (no API call needed)."""
         try:
+            from wiro_client import WiroClient
             params = urllib.parse.parse_qs(query) if query else {}
             category = (params.get("category") or [None])[0]
-            return client.list_models(category=category)
+            tmp = WiroClient("", "")
+            return tmp.list_models(category=category)
         except Exception as e:
             return {"error": str(e), "models": [], "categories": {}}
 
@@ -1386,7 +1385,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
 # ─── Server ──────────────────────────────────────────────────────
 def run_server():
     """Start the Admin API server."""
-    server = HTTPServer(("0.0.0.0", API_PORT), AdminAPIHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", API_PORT), AdminAPIHandler)
     print(f"🦞 KoalaClaw Admin API running on http://0.0.0.0:{API_PORT}")
     print(f"   UI:  http://0.0.0.0:{API_PORT}/")
     print(f"   API: http://0.0.0.0:{API_PORT}/api/status")

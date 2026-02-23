@@ -43,7 +43,18 @@
 
     function sendResultToChat(result) {
         const app = getApp();
-        const text = typeof result === 'string' ? result : (result && result.url) ? result.url : (result && result.output) ? result.output : JSON.stringify(result);
+        let text;
+        if (typeof result === 'string') {
+            text = result;
+        } else if (result && result.output_url) {
+            text = result.output_url;
+        } else if (result && result.outputs && result.outputs.length > 0 && result.outputs[0].url) {
+            text = result.outputs[0].url;
+        } else if (result && result.url) {
+            text = result.url;
+        } else {
+            text = JSON.stringify(result);
+        }
         window.dispatchEvent(new CustomEvent('koalaclaw-wiro-result', { detail: { agent: currentAgent, result: text, raw: result } }));
     }
 
@@ -163,6 +174,7 @@
                         params: { prompt: prompt || 'Generate' }
                     });
                     if (res.error) throw new Error(res.error);
+                    if (res.success === false) throw new Error(res.message || res.status || 'Generation failed');
                     sendResultToChat(res);
                     closeModal();
                 } catch (err) {
