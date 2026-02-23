@@ -333,6 +333,8 @@
 /* In-message images */
 .chat-image-wrap {
     margin: 8px 0;
+    position: relative;
+    display: inline-block;
 }
 
 .chat-image {
@@ -348,6 +350,33 @@
 
 .chat-image:hover {
     opacity: 0.95;
+}
+
+.chat-image-download {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 16px;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.chat-image-wrap:hover .chat-image-download {
+    opacity: 1;
+}
+
+.chat-image-download:hover {
+    background: rgba(0, 229, 255, 0.7);
 }
 
 /* Wiro generation progress */

@@ -350,6 +350,32 @@ class ChatManager {
         });
         input.focus();
 
+        this.chatContainer.addEventListener('click', (e) => {
+            const dl = e.target.closest('.chat-image-download');
+            if (!dl) return;
+            e.preventDefault();
+            const url = dl.getAttribute('href');
+            if (!url) return;
+            dl.textContent = '...';
+            fetch(url)
+                .then(r => r.blob())
+                .then(blob => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    const ext = url.split('.').pop()?.split('?')[0] || 'png';
+                    a.download = `wiro-generated.${ext}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                    dl.textContent = '⬇';
+                })
+                .catch(() => {
+                    window.open(url, '_blank');
+                    dl.textContent = '⬇';
+                });
+        });
+
         window.addEventListener('koalaclaw-wiro-result', (e) => {
             if (!this.agent || !e.detail || e.detail.agent !== this.agent) return;
             const text = e.detail.result || (e.detail.raw && e.detail.raw.url) || '';
@@ -595,7 +621,7 @@ class ChatManager {
         // Links
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
         // Image URLs (standalone .png/.jpg/.jpeg/.webp/.gif)
-        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))(?:[\s)]|$)/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"></div>');
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))(?:[\s)]|$)/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"><a class="chat-image-download" href="$1" download title="Download image">⬇</a></div>');
         // Line breaks
         html = html.replace(/\n/g, '<br>');
 
