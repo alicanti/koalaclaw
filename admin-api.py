@@ -1147,11 +1147,12 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             if client and client.is_configured:
                 try:
                     result = client.smart_generate(wiro_prompt, task_type="text-to-image")
+                    model_name = result.get("model_used", "Wiro AI")
                     if result.get("output_url"):
-                        img_response = f"Here is your generated image:\n\n{result['output_url']}"
+                        img_response = f"Generated with **{model_name}**:\n\n{result['output_url']}"
                         append_chat_history(orch_id, "user", message)
                         append_chat_history(orch_id, "assistant", img_response)
-                        self._sse_send("done", {"response": img_response, "chain": [], "plan": "image generated via Wiro AI"})
+                        self._sse_send("done", {"response": img_response, "chain": [], "plan": f"image generated via {model_name}"})
                     else:
                         err_msg = result.get("message") or result.get("status") or "Image generation failed"
                         self._sse_send("done", {"response": f"Image generation failed: {err_msg}", "chain": [], "plan": "image generation error"})

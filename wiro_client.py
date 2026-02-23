@@ -1,37 +1,135 @@
 #!/usr/bin/env python3
 """
-Wiro AI API client.
+Wiro AI API client with automatic model discovery and parameter resolution.
 
-Model discovery:
-  POST /v1/Tool/List  — search models (only x-api-key, no HMAC needed)
-  GET  https://wiro.ai/models/{owner}/{project}/llms-full.txt — model docs
-
-Generation:
-  POST /v1/Run/{owner}/{project}  — submit task (HMAC auth)
-  POST /v1/Task/Detail            — poll status (HMAC auth)
-
-Auth for Run/Task:
-  x-api-key, x-nonce (unix ts), x-signature (HMAC-SHA256 of secret+nonce keyed by api_key)
-
-Task statuses:
-  Done:    task_postprocess_end (success), task_cancel (cancelled)
-  Running: task_queue, task_accept, task_assign, task_preprocess_start/end, task_start, task_output
+Flow:
+  1. POST /v1/Tool/List — search models (x-api-key only)
+  2. GET  wiro.ai/models/{owner}/{project}/llms-full.txt — parse input params
+  3. POST /v1/Run/{owner}/{project} — submit task (HMAC auth)
+  4. POST /v1/Task/Detail — poll result (HMAC auth)
 """
 
 import hashlib
 import hmac
 import json
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_BASE_URL = "https://api.wiro.ai"
 WIRO_SITE = "https://wiro.ai"
 
 TERMINAL_STATUSES = {"task_postprocess_end", "task_cancel"}
 SUCCESS_STATUSES = {"task_postprocess_end"}
+
+# Cache parsed model docs to avoid re-fetching within the same process
+_model_docs_cache: Dict[str, Dict[str, Any]] = {}
+
+
+def parse_model_inputs(llms_text: str) -> List[Dict[str, Any]]:
+    """Parse the '## Model Inputs:' section of llms-full.txt.
+
+    Returns list of dicts with keys: name, label, help, type, default, options.
+    """
+    inputs: List[Dict[str, Any]] = []
+    section = ""
+    m = re.search(r"## Model Inputs:\s*\n(.*?)(?=\n## |\Z)", llms_text, re.DOTALL)
+    if not m:
+        return inputs
+    section = m.group(1)
+
+    current: Optional[Dict[str, Any]] = None
+    collecting_options = False
+
+    for line in section.split("\n"):
+        stripped = line.strip()
+
+        if stripped.startswith("- name:"):
+            if current:
+                inputs.append(current)
+            current = {
+                "name": stripped.split(":", 1)[1].strip(),
+                "label": "",
+                "help": "",
+                "type": "text",
+                "default": "",
+                "options": [],
+                "required": False,
+            }
+            collecting_options = False
+            continue
+
+        if current is None:
+            continue
+
+        if stripped.startswith("label:"):
+            current["label"] = stripped.split(":", 1)[1].strip()
+            collecting_options = False
+        elif stripped.startswith("help:"):
+            current["help"] = stripped.split(":", 1)[1].strip()
+            collecting_options = False
+        elif stripped.startswith("type:"):
+            current["type"] = stripped.split(":", 1)[1].strip()
+            collecting_options = False
+        elif stripped.startswith("default:"):
+            current["default"] = stripped.split(":", 1)[1].strip()
+            collecting_options = False
+        elif stripped == "options:":
+            collecting_options = True
+        elif collecting_options and stripped.startswith("- value:"):
+            val = stripped.split(":", 1)[1].strip().strip('"')
+            current["options"].append({"value": val, "label": ""})
+        elif collecting_options and stripped.startswith("label:") and current["options"]:
+            current["options"][-1]["label"] = stripped.split(":", 1)[1].strip()
+
+    if current:
+        inputs.append(current)
+
+    return inputs
+
+
+def build_params_from_docs(inputs: List[Dict[str, Any]], prompt: str) -> Dict[str, Any]:
+    """Build a Run request body using parsed model inputs.
+
+    Strategy:
+    - Find the prompt/text field and set it to the user's prompt
+    - For other fields, use sensible defaults from the docs
+    - Skip file-upload fields (combinefileinput, fileinput) unless user provides them
+    """
+    params: Dict[str, Any] = {}
+    prompt_field_found = False
+
+    prompt_field_names = {"prompt", "text", "input_text", "message", "query"}
+
+    for inp in inputs:
+        name = inp["name"]
+        field_type = inp["type"]
+
+        # Skip file upload fields for text-only generation
+        if field_type in ("combinefileinput", "fileinput", "imageinput"):
+            continue
+
+        # Detect prompt field by name or type
+        if name.lower() in prompt_field_names or (field_type == "textarea" and not prompt_field_found):
+            params[name] = prompt
+            prompt_field_found = True
+            continue
+
+        # Use default value if available
+        if inp["default"]:
+            params[name] = inp["default"]
+        elif inp["options"]:
+            first_non_empty = next((o["value"] for o in inp["options"] if o["value"]), None)
+            if first_non_empty:
+                params[name] = first_non_empty
+
+    if not prompt_field_found:
+        params["prompt"] = prompt
+
+    return params
 
 
 class WiroClient:
@@ -90,7 +188,7 @@ class WiroClient:
     # ── Model Discovery ──────────────────────────────────────
 
     def search_models(self, query: str = "text-to-image", limit: int = 10) -> List[Dict[str, Any]]:
-        """POST /v1/Tool/List — search Wiro models. Response key is 'tool' (singular)."""
+        """POST /v1/Tool/List — search Wiro models."""
         url = f"{self.base_url}/v1/Tool/List"
         data = {
             "start": "0",
@@ -143,7 +241,7 @@ class WiroClient:
         return {"models": models, "categories": categories}
 
     def fetch_model_docs(self, owner: str, project: str) -> str:
-        """Fetch llms-full.txt for a model to get input params and examples."""
+        """Fetch llms-full.txt for a model."""
         url = f"{WIRO_SITE}/models/{owner}/{project}/llms-full.txt"
         try:
             req = urllib.request.Request(url)
@@ -152,6 +250,23 @@ class WiroClient:
         except Exception as e:
             print(f"[WIRO] fetch_model_docs error for {owner}/{project}: {e}", file=sys.stderr, flush=True)
             return ""
+
+    def get_model_inputs(self, owner: str, project: str) -> List[Dict[str, Any]]:
+        """Fetch and parse model inputs. Results are cached per owner/project."""
+        cache_key = f"{owner}/{project}"
+        if cache_key in _model_docs_cache:
+            return _model_docs_cache[cache_key]
+
+        docs = self.fetch_model_docs(owner, project)
+        if not docs or docs.startswith("{"):
+            print(f"[WIRO] No valid docs for {cache_key}, using fallback params", file=sys.stderr, flush=True)
+            _model_docs_cache[cache_key] = []
+            return []
+
+        inputs = parse_model_inputs(docs)
+        print(f"[WIRO] Parsed {len(inputs)} inputs for {cache_key}: {[i['name'] for i in inputs]}", file=sys.stderr, flush=True)
+        _model_docs_cache[cache_key] = inputs
+        return inputs
 
     def find_best_model(self, task_type: str = "text-to-image") -> Optional[Dict[str, Any]]:
         """Search and return the top model for a task type."""
@@ -211,10 +326,31 @@ class WiroClient:
         return self.poll_task(str(task_id), timeout=poll_timeout)
 
     def smart_generate(self, prompt: str, task_type: str = "text-to-image") -> Dict[str, Any]:
-        """Find best model, generate, return result with output_url."""
+        """Full pipeline: find model -> fetch docs -> build params -> generate -> poll.
+
+        1. Search Tool/List for best model matching task_type
+        2. Fetch llms-full.txt and parse input parameters
+        3. Build request body with correct field names and defaults
+        4. Submit Run and poll Task/Detail until done
+        """
         model = self.find_best_model(task_type)
         if not model or not model.get("owner"):
             return {"status": "error", "success": False, "message": f"No model found for '{task_type}'"}
+
         owner, project = model["owner"], model["project"]
-        print(f"[WIRO] smart_generate: using {owner}/{project} for '{prompt[:80]}'", file=sys.stderr, flush=True)
-        return self.generate(owner, project, {"prompt": prompt, "resolution": "1K", "safetySetting": "OFF"})
+        model_name = model.get("name", f"{owner}/{project}")
+        print(f"[WIRO] smart_generate: selected '{model_name}' ({owner}/{project})", file=sys.stderr, flush=True)
+
+        inputs = self.get_model_inputs(owner, project)
+        if inputs:
+            params = build_params_from_docs(inputs, prompt)
+            print(f"[WIRO] smart_generate: built params from docs: {list(params.keys())}", file=sys.stderr, flush=True)
+        else:
+            params = {"prompt": prompt}
+            print(f"[WIRO] smart_generate: no docs available, using fallback {{prompt}}", file=sys.stderr, flush=True)
+
+        result = self.generate(owner, project, params)
+        result["model_used"] = model_name
+        result["model_owner"] = owner
+        result["model_project"] = project
+        return result

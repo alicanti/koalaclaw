@@ -599,13 +599,33 @@
     opacity: 0.7;
 }
 
+.wiro-unconfigured {
+    padding: 10px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+.wiro-unconfigured strong {
+    color: var(--accent);
+}
+
 .wiro-model-card {
-    padding: 6px 0;
+    padding: 8px 0;
     border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 
 .wiro-model-card:last-child {
     border-bottom: none;
+}
+
+.wiro-model-cover {
+    width: 100%;
+    height: 48px;
+    border-radius: 4px;
+    background-size: cover;
+    background-position: center;
+    margin-bottom: 6px;
+    opacity: 0.85;
 }
 
 .wiro-model-name {
@@ -623,6 +643,20 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.wiro-model-slug {
+    font-size: 8px;
+    color: rgba(255,255,255,0.2);
+    font-family: monospace;
+    margin-top: 1px;
+}
+
+.wiro-gen-status {
+    font-size: 9px;
+    color: var(--accent);
+    margin-top: 4px;
+    min-height: 14px;
 }
 
 .wiro-model-actions {

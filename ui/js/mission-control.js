@@ -232,23 +232,34 @@ class MissionControl {
         if (!wrap) return;
         try {
             const data = this.app?.apiGet ? await this.app.apiGet('/wiro/models') : null;
-            if (!data || !data.categories) {
-                wrap.innerHTML = '<p class="mc-placeholder">No models available.</p>';
+            if (data?.error && /not configured/i.test(data.error)) {
+                wrap.innerHTML = `
+                    <div class="wiro-unconfigured">
+                        <p>Wiro AI is not configured yet.</p>
+                        <p>Go to <strong>Integrations</strong> and add your Wiro API Key &amp; Secret to enable AI generation.</p>
+                    </div>`;
+                return;
+            }
+            if (!data || !data.models || data.models.length === 0) {
+                wrap.innerHTML = '<p class="mc-placeholder">No models found.</p>';
                 return;
             }
             let html = '';
-            for (const [cat, models] of Object.entries(data.categories)) {
+            for (const [cat, models] of Object.entries(data.categories || {})) {
                 html += `<div class="wiro-category-label">${this._esc(cat)}</div>`;
                 for (const m of models) {
                     const key = `${m.owner}/${m.project}`;
+                    const coverStyle = m.cover ? `background-image:url('${this._esc(m.cover)}')` : '';
                     html += `
                         <div class="wiro-model-card" data-model="${this._esc(key)}">
+                            ${m.cover ? `<div class="wiro-model-cover" style="${coverStyle}"></div>` : ''}
                             <div class="wiro-model-info">
                                 <div class="wiro-model-name">${this._esc(m.name)}</div>
                                 <div class="wiro-model-desc">${this._esc(m.description || '')}</div>
+                                <div class="wiro-model-slug">${this._esc(key)}</div>
                             </div>
                             <div class="wiro-model-actions">
-                                <input type="text" class="wiro-inline-prompt" placeholder="Prompt..." data-model="${this._esc(key)}">
+                                <input type="text" class="wiro-inline-prompt" placeholder="Describe what to generate..." data-model="${this._esc(key)}">
                                 <button type="button" class="wiro-inline-gen" data-model="${this._esc(key)}" title="Generate">Go</button>
                             </div>
                         </div>`;
@@ -281,19 +292,31 @@ class MissionControl {
         if (!owner || !project) return;
 
         btn.disabled = true;
-        btn.textContent = '...';
+        btn.textContent = '⏳';
+        const card = btn.closest('.wiro-model-card');
+        let statusEl = card?.querySelector('.wiro-gen-status');
+        if (!statusEl && card) {
+            statusEl = document.createElement('div');
+            statusEl.className = 'wiro-gen-status';
+            card.appendChild(statusEl);
+        }
+        if (statusEl) statusEl.textContent = 'Generating...';
+
         try {
             const res = this.app?.apiPost ? await this.app.apiPost('/wiro/generate', { owner, project, params: { prompt } }) : null;
             if (res?.error) throw new Error(res.error);
             if (res?.success === false) throw new Error(res.message || 'Generation failed');
             const url = res?.output_url || (res?.outputs?.[0]?.url) || '';
             if (url && window.app?.chatManager) {
-                window.app.chatManager._appendRestoredAssistantBubble(`Generated image:\n\n${url}`);
+                const modelName = card?.querySelector('.wiro-model-name')?.textContent || modelKey;
+                window.app.chatManager._appendRestoredAssistantBubble(`Generated with **${modelName}**:\n\n${url}`);
                 window.app.chatManager._scrollToBottom?.();
             }
             if (input) input.value = '';
+            if (statusEl) { statusEl.textContent = 'Done!'; setTimeout(() => statusEl.textContent = '', 3000); }
         } catch (err) {
             this.app?.addLog?.('error', `Wiro: ${err.message}`, 'Wiro');
+            if (statusEl) { statusEl.textContent = `Error: ${err.message}`; setTimeout(() => statusEl.textContent = '', 5000); }
         }
         btn.disabled = false;
         btn.textContent = 'Go';
