@@ -71,7 +71,46 @@
     z-index: 2;
 }
 
-/* Desk Grid */
+/* Manager room (orchestrator desk at top) */
+.manager-room {
+    position: relative;
+    width: 100%;
+    padding: 120px 40px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 5;
+    border-bottom: 2px dashed rgba(0,229,255,0.3);
+}
+
+/* Glass divider label */
+.office-divider {
+    position: relative;
+    width: 100%;
+    height: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 5;
+}
+
+.office-divider-label {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--pixel-font);
+    font-size: 9px;
+    color: var(--text-dim);
+    background: var(--bg-dark, #1a1932);
+    padding: 2px 12px;
+    white-space: nowrap;
+}
+
+/* Desk Grid (open office) */
+.desk-grid.open-office {
+    padding-top: 24px;
+}
+
 .desk-grid {
     position: relative;
     display: flex;
@@ -103,6 +142,61 @@
     transform: scale(1.06);
     filter: drop-shadow(0 0 12px rgba(0,229,255,0.4));
     box-shadow: 0 0 0 2px rgba(0,229,255,0.3);
+}
+
+/* Manager desk (orchestrator): larger, executive styling */
+.manager-room .desk-unit.desk-manager {
+    width: 220px;
+    height: 200px;
+    box-shadow: 0 0 0 1px rgba(0,229,255,0.2), 0 0 16px rgba(0,229,255,0.15);
+}
+
+.manager-room .desk-unit.desk-manager .desk-surface {
+    height: 28px;
+    background: #6a4a2e;
+    border-color: #4a3520;
+}
+
+.manager-room .desk-unit.desk-manager .desk-monitor {
+    width: 72px;
+    height: 52px;
+    bottom: 76px;
+}
+
+.manager-room .desk-unit.desk-manager .desk-monitor-stand {
+    bottom: 72px;
+    width: 16px;
+    height: 8px;
+}
+
+.manager-room .desk-unit.desk-manager .desk-chair-seat {
+    background: #6a4a2e;
+    border-color: #4a3520;
+}
+
+.manager-room .desk-unit.desk-manager .desk-chair-back {
+    background: #7a5a3e;
+    border-color: #5a4a2e;
+}
+
+.manager-room .desk-unit.desk-manager .koala-char {
+    font-size: 42px;
+    bottom: 58px;
+}
+
+.manager-room .desk-unit.desk-manager .desk-nameplate .np-name {
+    font-size: 9px;
+}
+
+.manager-room .desk-unit.desk-manager .desk-nameplate .np-role {
+    font-size: 10px;
+    color: var(--accent);
+}
+
+.manager-room .desk-unit.desk-manager .desk-item.item-badge {
+    bottom: 70px;
+    left: 16px;
+    font-size: 18px;
 }
 
 /* Tooltip card on hover */

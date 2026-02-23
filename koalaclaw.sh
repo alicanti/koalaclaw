@@ -1791,11 +1791,13 @@ cmd_install() {
     # ─── Generate ───
     _header "Generating Configuration"
 
-    # Generate tokens and select roles
+    # Generate tokens and select roles (Agent 1 is always OrchestratorKoala)
     _step "Generating tokens and selecting roles..."
-    for i in $(seq 1 "$AGENT_COUNT"); do
+    eval "TOKEN_1=$(openssl rand -hex 32)"
+    ROLE_1="orchestrator-koala"
+    _info "Agent 1 → OrchestratorKoala (auto-assigned as manager)"
+    for i in $(seq 2 "$AGENT_COUNT"); do
         eval "TOKEN_${i}=$(openssl rand -hex 32)"
-        # Select role for each agent
         local selected_role
         selected_role=$(_select_role "$i")
         eval "ROLE_${i}=${selected_role}"

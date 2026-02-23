@@ -62,7 +62,7 @@ sudo ./koalaclaw.sh install
 # http://SERVER_IP:3099
 ```
 
-The installer handles **everything** — Docker, networking, reverse proxy, role assignment, tokens, permissions, healthchecks, and the web dashboard.
+The installer handles **everything** — Docker, networking, reverse proxy, role assignment (Agent 1 is always **OrchestratorKoala** as manager; you choose roles for agents 2 and up), tokens, permissions, healthchecks, and the web dashboard.
 
 ---
 
@@ -91,7 +91,7 @@ Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pr
 A browser-based dashboard at `:3099` with:
 - **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Integrations (OpenAI, Anthropic, Wiro, etc.), and System (restart, backup)
 - **Animated office** — canvas overlay with procedural pixel koalas, dust particles, coffee steam, thinking sparkles, screen glow, and day/night tint
-- **Isometric office** — each agent sits at a desk with role-specific decorations; hover tooltips and desk click zoom
+- **Isometric office** — manager room at the top (OrchestratorKoala at a larger executive desk), glass divider, then open office with other agents at desks; hover tooltips and desk click zoom
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
 - **Admin panel** — agent list, status, skill toggles, quick actions
 - **Chat with image upload** — talk to any agent, attach images (📎), view images in responses
@@ -199,7 +199,7 @@ Each role includes:
 The web UI runs on port `3099` and provides a complete management interface:
 
 ### Isometric Office & Mission Control
-Each agent has a desk in the office. Click an agent to see details, toggle skills, view logs, or open their OpenClaw Canvas. The **Mission Control** sidebar (collapse with ◀) lets you edit agent files (Identity, Soul, Memory, Protocol), manage API keys (OpenAI, Anthropic, Wiro, etc.), and run system actions (Restart All, Backup). The office view uses a canvas overlay for pixel-art style characters, ambient effects (dust, steam, sparkles), and day/night tint.
+The office has a **manager room** at the top (OrchestratorKoala at a larger executive desk), a glass divider, and an **open office** area below with the other agents at desks. In the Mission Control sidebar, the orchestrator is marked with a **Manager** badge. Click any agent to see details, toggle skills, view logs, or open their OpenClaw Canvas. The **Mission Control** sidebar (collapse with ◀) lets you edit agent files (Identity, Soul, Memory, Protocol), manage API keys (OpenAI, Anthropic, Wiro, etc.), and run system actions (Restart All, Backup). The office view uses a canvas overlay for pixel-art style characters, ambient effects (dust, steam, sparkles), and day/night tint.
 
 ### Orchestrated Chat
 Enable the **🎯 Orchestrate** toggle in any agent's chat to route messages through OrchestratorKoala. For complex tasks, the orchestrator automatically delegates to specialist agents and shows a **live delegation chain** — you see each agent start working, finish, and can expand their individual responses. Simple questions are answered directly without unnecessary delegation.

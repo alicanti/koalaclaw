@@ -209,13 +209,15 @@ class KoalaClawApp {
             const item = document.createElement('div');
             item.className = 'agent-item' + (this.selectedAgent?.id === agent.id ? ' selected' : '');
             item.dataset.agentId = agent.id;
+            if (agent.role_id) item.dataset.roleId = agent.role_id;
             item.onclick = () => this.selectAgent(agent.id);
 
+            const managerBadge = agent.role_id === 'orchestrator-koala' ? '<span class="manager-badge">Manager</span>' : '';
             item.innerHTML = `
                 <span class="emoji">${agent.emoji || '🐨'}</span>
                 <div class="info">
                     <div class="name">${agent.name || 'Agent ' + agent.id}</div>
-                    <div class="role">${agent.role || agent.role_id || ''}</div>
+                    <div class="role">${agent.role || agent.role_id || ''} ${managerBadge}</div>
                 </div>
                 <div class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}"></div>
             `;

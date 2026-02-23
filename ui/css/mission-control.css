@@ -266,6 +266,22 @@
     text-overflow: ellipsis;
 }
 
+.mission-control .agent-list .agent-item .manager-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(0,229,255,0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+.mission-control .agent-list .agent-item[data-role-id="orchestrator-koala"] {
+    border-color: rgba(0,229,255,0.15);
+}
+
 .mission-control .agent-list .agent-item .status-dot {
     width: 7px;
     height: 7px;

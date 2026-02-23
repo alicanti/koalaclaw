@@ -35,14 +35,30 @@ class OfficeRenderer {
         clock.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         scene.appendChild(clock);
 
-        // Desk grid
+        // Split: orchestrator (manager room) vs workers (open office)
+        const orchestrator = agents.find(a => a.role_id === 'orchestrator-koala');
+        const workers = agents.filter(a => a.role_id !== 'orchestrator-koala');
+
+        // Manager room (orchestrator desk at top)
+        const managerRoom = document.createElement('div');
+        managerRoom.className = 'manager-room';
+        if (orchestrator) {
+            managerRoom.appendChild(this._createDesk(orchestrator, 0, true));
+        }
+        scene.appendChild(managerRoom);
+
+        // Glass divider + "Open Office" label
+        const divider = document.createElement('div');
+        divider.className = 'office-divider';
+        divider.innerHTML = '<span class="office-divider-label">Open Office</span>';
+        scene.appendChild(divider);
+
+        // Open office: worker desks in grid
         const grid = document.createElement('div');
-        grid.className = 'desk-grid';
-
-        agents.forEach((agent, idx) => {
-            grid.appendChild(this._createDesk(agent, idx));
+        grid.className = 'desk-grid open-office';
+        workers.forEach((agent, idx) => {
+            grid.appendChild(this._createDesk(agent, idx, false));
         });
-
         scene.appendChild(grid);
 
         // Office decorations
@@ -58,9 +74,10 @@ class OfficeRenderer {
         this._startClock();
     }
 
-    _createDesk(agent, idx) {
+    _createDesk(agent, idx, isManager) {
         const unit = document.createElement('div');
         unit.className = 'desk-unit' +
+            (isManager ? ' desk-manager' : '') +
             (agent.status === 'online' ? ' active' : '') +
             (agent.id === this.selectedId ? ' selected' : '');
         unit.dataset.agentId = agent.id;
@@ -86,6 +103,7 @@ class OfficeRenderer {
         unit.title = `${agent.name || 'Agent ' + agent.id} · ${agent.role || ''} · ${speech}`;
         unit.setAttribute('data-tooltip', `${agent.name || 'Agent ' + agent.id}\n${agent.role || ''}\n${speech}`);
 
+        const roleLabel = isManager ? 'Manager' : (agent.role || '');
         unit.innerHTML = `
             <div class="desk-status-light ${statusClass}"></div>
             <div class="speech-bubble">${speech}</div>
@@ -99,11 +117,12 @@ class OfficeRenderer {
                 <div class="desk-chair-leg"></div>
             </div>
             <div class="desk-item item-coffee">☕</div>
-            ${idx % 3 === 0 ? '<div class="desk-item item-plant">🌱</div>' : ''}
-            ${idx % 2 === 1 ? '<div class="desk-item item-book">📚</div>' : ''}
+            ${!isManager && idx % 3 === 0 ? '<div class="desk-item item-plant">🌱</div>' : ''}
+            ${!isManager && idx % 2 === 1 ? '<div class="desk-item item-book">📚</div>' : ''}
+            ${isManager ? '<div class="desk-item item-badge">🎯</div>' : ''}
             <div class="desk-nameplate">
                 <div class="np-name">${agent.name || 'Agent ' + agent.id}</div>
-                <div class="np-role">${agent.role || ''}</div>
+                <div class="np-role">${roleLabel}</div>
             </div>
         `;
 
