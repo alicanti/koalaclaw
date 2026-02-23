@@ -351,7 +351,7 @@ class ChatManager {
         input.focus();
 
         this.chatContainer.addEventListener('click', (e) => {
-            const dl = e.target.closest('.chat-image-download');
+            const dl = e.target.closest('.chat-media-download');
             if (!dl) return;
             e.preventDefault();
             const url = dl.getAttribute('href');
@@ -620,8 +620,12 @@ class ChatManager {
         html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
         // Links
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-        // Image URLs (standalone .png/.jpg/.jpeg/.webp/.gif)
-        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))(?:[\s)]|$)/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"><a class="chat-image-download" href="$1" download title="Download image">⬇</a></div>');
+        // Image URLs
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))(?:[\s)]|$)/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"><a class="chat-media-download" href="$1" download title="Download image">⬇</a></div>');
+        // Video URLs
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp4|webm|mov))(?:[\s)]|$)/gi, '<div class="chat-video-wrap"><video class="chat-video" src="$1" controls preload="metadata"></video><a class="chat-media-download" href="$1" download title="Download video">⬇</a></div>');
+        // Audio URLs
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp3|wav|ogg|m4a|aac))(?:[\s)]|$)/gi, '<div class="chat-audio-wrap"><audio class="chat-audio" src="$1" controls preload="metadata"></audio><a class="chat-media-download" href="$1" download title="Download audio">⬇</a></div>');
         // Line breaks
         html = html.replace(/\n/g, '<br>');
 
