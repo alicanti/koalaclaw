@@ -913,7 +913,7 @@ _install_deps() {
             missing+=("$cmd")
             # Map command names to apt package names
             case "$cmd" in
-                python3) apt_packages+=("python3") ;;
+                python3) apt_packages+=("python3" "python3-pip") ;;
                 *)       apt_packages+=("$cmd") ;;
             esac
         fi
