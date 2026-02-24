@@ -1151,17 +1151,36 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 f'For image-to-video: set task_type to "image-to-video" and include "input_image":"{recent_media_url}" in wiro_generate.\n'
             )
 
+        # Check if user is selecting a previously suggested model
+        model_selection = ""
+        try:
+            history = load_chat_history(orch_id, limit=5)
+            for entry in reversed(history):
+                if entry.get("role") == "assistant" and "wiro_model_options" in entry.get("content", ""):
+                    model_selection = entry["content"]
+                    break
+        except Exception:
+            pass
+
+        selection_hint = ""
+        if model_selection:
+            selection_hint = (
+                f"\nThe user was previously shown model options. If they are selecting one "
+                f"(by number, name, or description), use wiro_generate with the selected model. "
+                f'Include "model":"owner/project" in wiro_generate to use that specific model.\n'
+                f"Previous options shown:\n{model_selection[:500]}\n"
+            )
+
         analysis_prompt = (
             f"SYSTEM: You are a task router. Respond with ONLY a raw JSON object. "
             f"No markdown fences, no explanation, no text before or after.\n\n"
             f"Available agents:\n{roster_text}\n\n"
-            f"You have the wiro-ai skill for AI content generation. "
-            f"If the user wants to generate/create/draw an image, video, or audio, "
-            f"handle it yourself instead of delegating. "
-            f'Include "wiro_generate":{{"prompt":"description","task_type":"text-to-image"}} in your JSON. '
-            f'Use task_type "text-to-video" for video from text, "image-to-video" to animate an image, "text-to-speech" for audio. '
+            f"You have the wiro-ai skill for AI content generation.\n"
+            f"When the user wants to generate/create/draw an image, video, or audio:\n"
+            f"- FIRST TIME: use wiro_suggest to show model options with costs\n"
+            f"- AFTER USER SELECTS: use wiro_generate with the chosen model\n"
             f'For image-to-video, include "input_image":"URL" in wiro_generate.\n'
-            f"{context_hint}\n"
+            f"{context_hint}{selection_hint}\n"
             f"User request: {message}\n\n"
             f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n"
             f"Only delegate when the task genuinely needs a specialist. "
@@ -1170,10 +1189,12 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f'{{"plan":"brief plan","delegations":[{{"agent_id":N,"task":"task"}}],"direct_answer":null}}\n'
             f"For simple/direct: "
             f'{{"plan":"direct","delegations":[],"direct_answer":"your answer"}}\n'
-            f"For image generation: "
-            f'{{"plan":"generate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt","task_type":"text-to-image"}}}}\n'
-            f"For image-to-video: "
-            f'{{"plan":"animate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"description of motion","task_type":"image-to-video","input_image":"https://..."}}}}'
+            f"To suggest models (first time): "
+            f'{{"plan":"suggest models","delegations":[],"direct_answer":null,"wiro_suggest":{{"prompt":"detailed prompt","task_type":"text-to-image"}}}}\n'
+            f"To generate with chosen model: "
+            f'{{"plan":"generate","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt","task_type":"text-to-image","model":"owner/project"}}}}\n'
+            f"To generate without asking (user says 'just do it' or picks a model): "
+            f'{{"plan":"generate","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt","task_type":"text-to-image"}}}}'
         )
 
         self._sse_send("phase", {"phase": "analyzing", "message": "Analyzing task..."})
@@ -1212,7 +1233,39 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             self._sse_end()
             return
 
-        if plan.get("direct_answer") and not plan.get("delegations") and not plan.get("wiro_generate"):
+        if plan.get("wiro_suggest"):
+            suggest_data = plan["wiro_suggest"] if isinstance(plan["wiro_suggest"], dict) else {"task_type": "text-to-image"}
+            suggest_prompt = suggest_data.get("prompt", message)
+            task_type = suggest_data.get("task_type", "text-to-image")
+            self._sse_send("plan", {"plan": plan.get("plan", "suggest models"), "delegations": []})
+            self._sse_send("phase", {"phase": "searching_models", "message": "Searching for best models..."})
+            client = get_wiro_client()
+            if client and client.is_configured:
+                suggestions = client.suggest_models(task_type=task_type, count=3)
+                if suggestions:
+                    lines = [f"I found these models for your request. Pick one and I'll generate:\n"]
+                    for idx, s in enumerate(suggestions, 1):
+                        speed = f" | {s['avg_time']}" if s.get('avg_time') else ""
+                        lines.append(f"**{idx}. {s['name']}**")
+                        lines.append(f"   {s['description']}")
+                        lines.append(f"   Cost: {s['cost']}{speed} | {s['runs']:,} runs")
+                        lines.append("")
+                    lines.append(f"_Your prompt: \"{suggest_prompt[:100]}\"_")
+                    lines.append(f"\nJust reply with the number (1, 2, or 3) to generate.")
+                    answer = "\n".join(lines)
+                    # Tag with wiro_model_options so next turn can detect selection
+                    tagged = f"<!-- wiro_model_options: {json.dumps([{'owner': s['owner'], 'project': s['project'], 'name': s['name']} for s in suggestions])} -->\n<!-- wiro_prompt: {suggest_prompt} -->\n<!-- wiro_task_type: {task_type} -->\n{answer}"
+                    append_chat_history(orch_id, "user", message)
+                    append_chat_history(orch_id, "assistant", tagged)
+                    self._sse_send("done", {"response": answer, "chain": [], "plan": "model suggestions"})
+                else:
+                    self._sse_send("done", {"response": "No models found for this task type. Try a different request.", "chain": [], "plan": "no models"})
+            else:
+                self._sse_send("done", {"response": "Wiro AI is not configured. Please add your API key and secret in Settings > Integrations.", "chain": [], "plan": "wiro not configured"})
+            self._sse_end()
+            return
+
+        if plan.get("direct_answer") and not plan.get("delegations") and not plan.get("wiro_generate") and not plan.get("wiro_suggest"):
             answer = plan["direct_answer"]
             append_chat_history(orch_id, "user", message)
             append_chat_history(orch_id, "assistant", answer)
@@ -1226,13 +1279,46 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             wiro_prompt = wiro_data.get("prompt", message)
             task_type = wiro_data.get("task_type", "text-to-image")
             input_image = wiro_data.get("input_image", "")
+            chosen_model = wiro_data.get("model", "")
+
+            # If user selected a model from suggestions, recover prompt from history
+            if not wiro_prompt or wiro_prompt == message:
+                try:
+                    hist = load_chat_history(orch_id, limit=5)
+                    for entry in reversed(hist):
+                        c = entry.get("content", "")
+                        if "wiro_prompt:" in c:
+                            import re as _re
+                            pm = _re.search(r'wiro_prompt:\s*(.+?)\s*-->', c)
+                            if pm:
+                                wiro_prompt = pm.group(1).strip()
+                            tm = _re.search(r'wiro_task_type:\s*(.+?)\s*-->', c)
+                            if tm:
+                                task_type = tm.group(1).strip()
+                            break
+                except Exception:
+                    pass
+
             self._sse_send("plan", {"plan": plan.get("plan", f"generate {task_type}"), "delegations": []})
             self._sse_send("phase", {"phase": "generating", "message": f"Generating via Wiro AI ({task_type})..."})
-            print(f"[ORCH] Wiro {task_type}: prompt={wiro_prompt[:80]}, input_image={input_image[:80] if input_image else 'none'}", file=sys.stderr, flush=True)
+            print(f"[ORCH] Wiro {task_type}: prompt={wiro_prompt[:80]}, model={chosen_model or 'auto'}, input_image={input_image[:80] if input_image else 'none'}", file=sys.stderr, flush=True)
             client = get_wiro_client()
             if client and client.is_configured:
                 try:
-                    result = client.smart_generate(wiro_prompt, task_type=task_type, input_image=input_image)
+                    if chosen_model and "/" in chosen_model:
+                        owner, project = chosen_model.split("/", 1)
+                        inputs = client.get_model_inputs(owner, project)
+                        if inputs:
+                            from wiro_client import build_params_from_docs
+                            params = build_params_from_docs(inputs, wiro_prompt, input_image=input_image)
+                        else:
+                            params = {"prompt": wiro_prompt}
+                            if input_image:
+                                params["inputImage"] = [input_image]
+                        result = client.generate(owner, project, params)
+                        result["model_used"] = chosen_model
+                    else:
+                        result = client.smart_generate(wiro_prompt, task_type=task_type, input_image=input_image)
                     model_name = result.get("model_used", "Wiro AI")
                     if result.get("output_url"):
                         img_response = f"Generated with **{model_name}**:\n\n{result['output_url']}"

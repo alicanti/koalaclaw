@@ -334,6 +334,88 @@ class WiroClient:
         print(f"[WIRO] find_best_model: selected {owner}/{project} ({name}) [score={_score(t)}]", file=sys.stderr, flush=True)
         return {"owner": owner, "project": project, "name": name, "id": t.get("id")}
 
+    def suggest_models(self, task_type: str = "text-to-image", count: int = 3) -> List[Dict[str, Any]]:
+        """Return top N models with cost info for user selection."""
+        try:
+            results = self.search_models(query=task_type, limit=10)
+        except Exception as e:
+            print(f"[WIRO] suggest_models search failed: {e}", file=sys.stderr, flush=True)
+            return []
+        if not results:
+            return []
+
+        FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai", "stability-ai"}
+
+        def _score(t):
+            cats = t.get("categories") or []
+            owner = (t.get("cleanslugowner") or "").lower()
+            score = 0
+            if "fast-inference" in cats:
+                score += 10
+            if "partner" in cats:
+                score += 5
+            if owner in FAST_OWNERS:
+                score += 8
+            stat = t.get("taskstat") or {}
+            runs = int(stat.get("runcount") or 0)
+            if runs > 10000:
+                score += 3
+            elif runs > 1000:
+                score += 1
+            return score
+
+        def _parse_cost(t):
+            dp = t.get("dynamicprice") or ""
+            if isinstance(dp, str):
+                try:
+                    dp = json.loads(dp)
+                except Exception:
+                    dp = []
+            if isinstance(dp, list) and dp:
+                price = dp[0].get("price", 0)
+                method = dp[0].get("priceMethod", "")
+                return price, method
+            ac = t.get("approximatelycost")
+            if ac:
+                return float(ac), "approx"
+            return 0, "unknown"
+
+        ranked = sorted(results, key=_score, reverse=True)
+        suggestions = []
+        seen = set()
+        for t in ranked:
+            owner = t.get("cleanslugowner") or ""
+            project = t.get("cleanslugproject") or ""
+            if not owner or not project:
+                continue
+            key = f"{owner}/{project}"
+            if key in seen:
+                continue
+            seen.add(key)
+            price, price_method = _parse_cost(t)
+            stat = t.get("taskstat") or {}
+            avg_time = ""
+            runs = int(stat.get("runcount") or 0)
+            success = int(stat.get("successcount") or 0)
+            if runs > 0 and float(stat.get("elapsedseconds") or 0) > 0:
+                avg_time = f"~{float(stat['elapsedseconds']) / max(success, 1):.0f}s"
+            suggestions.append({
+                "owner": owner,
+                "project": project,
+                "name": t.get("title") or t.get("seotitle") or key,
+                "description": (t.get("description") or "")[:100],
+                "cost": f"${price:.3f}" if price else "free/unknown",
+                "cost_raw": price,
+                "cost_method": price_method,
+                "avg_time": avg_time or t.get("computingtime", ""),
+                "runs": runs,
+                "cover": t.get("image") or "",
+            })
+            if len(suggestions) >= count:
+                break
+
+        return suggestions
+
     # ── Generation ────────────────────────────────────────────
 
     def run(self, owner: str, project: str, params: Dict[str, Any]) -> Dict[str, Any]:
