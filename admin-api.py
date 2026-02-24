@@ -1256,9 +1256,9 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         rag_context = ""
         if vector_store and vector_store.is_available():
             try:
-                doc_results = vector_store.search_docs(orch_id, message, limit=3)
+                doc_results = vector_store.search_docs(orch_id, message, limit=5)
                 if doc_results:
-                    snippets = [f"[{r['filename']}]: {r['content'][:200]}" for r in doc_results if r.get("score", 0) > 0.3]
+                    snippets = [f"[{r['filename']}]: {r['content']}" for r in doc_results if r.get("score", 0) > 0.3]
                     if snippets:
                         rag_context = "\nRelevant context from uploaded documents:\n" + "\n".join(snippets) + "\n"
             except Exception:

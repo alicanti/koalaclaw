@@ -175,7 +175,7 @@ def search_chat(agent_id: int, query: str, limit: int = 10) -> List[Dict[str, An
 
 # ── Documents (RAG) ──────────────────────────────────────
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 200, overlap: int = 30) -> List[str]:
     words = text.split()
     chunks = []
     start = 0
