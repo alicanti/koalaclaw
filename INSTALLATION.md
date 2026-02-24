@@ -64,6 +64,17 @@ sudo koalaclaw skills add ./custom-skills/wiro-ai [agent-id]
 
 In the chat view, click the **📎** button to attach an image before sending a message. Images are displayed inline in the chat history.
 
+## Post-Install: Vector DB & RAG
+
+KoalaClaw includes a **Qdrant** vector database for persistent chat memory and document-based RAG:
+
+- **Chat history** is automatically indexed in Qdrant. Use the **🔍** button in chat to semantically search past conversations.
+- **Document upload**: Select an agent in the sidebar, open the **Documents** section, and drag & drop PDF/MD/TXT files. Documents are chunked, embedded, and indexed per agent.
+- **RAG context**: When you chat with the orchestrator, it automatically retrieves relevant snippets from uploaded documents and includes them in the agent's context.
+- **Per-agent isolation**: Each agent has separate `agent_{id}_chat` and `agent_{id}_docs` collections in Qdrant.
+
+Qdrant runs as a Docker container (`koala-qdrant`) on the internal network at `172.30.0.200:6333`. Data is persisted in the `qdrant_data` Docker volume.
+
 ## Manual Install (Step by Step)
 
 If you prefer to set things up manually, follow the sections below.
@@ -1753,6 +1764,10 @@ python3 admin-api.py &
 | `/api/wiro/models` | GET | Search Wiro models via Tool/List API |
 | `/api/wiro/generate` | POST | Generate with specific model (auto-parses docs) |
 | `/api/wiro/smart-generate` | POST | Auto-find best model + generate |
+| `/api/agents/{id}/history/search` | GET | Semantic search over chat history (Qdrant) |
+| `/api/agents/{id}/documents` | GET/POST | List or upload documents for RAG |
+| `/api/agents/{id}/documents/{name}` | DELETE | Delete a document |
+| `/api/agents/{id}/documents/search` | POST | Semantic search over uploaded documents |
 | `/api/settings` | GET/POST | General settings (Wiro keys, channels, model) |
 
 ### Running as a Service

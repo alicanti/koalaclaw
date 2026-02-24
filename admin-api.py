@@ -25,6 +25,11 @@ try:
 except ImportError:
     WiroClient = None
 
+try:
+    import vector_store
+except ImportError:
+    vector_store = None
+
 # ─── Configuration ───────────────────────────────────────────────
 API_PORT = int(os.environ.get("KOALACLAW_API_PORT", "3099"))
 INSTALL_DIR = os.environ.get("KOALACLAW_INSTALL_DIR", "/opt/koalaclaw")
@@ -264,14 +269,15 @@ def read_chat_history(agent_id, limit=100):
 
 
 def append_chat_history(agent_id, role, content, image_base64=None):
-    """Append a message to chat history JSONL file. Optional image_base64 for user messages."""
+    """Append a message to chat history JSONL file + Qdrant vector store."""
     path = get_history_path(agent_id)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     entry = {
         "role": role,
         "content": content,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        "timestamp": ts,
     }
     if image_base64 is not None:
         entry["image_base64"] = image_base64
@@ -281,6 +287,12 @@ def append_chat_history(agent_id, role, content, image_base64=None):
             f.write(json.dumps(entry) + "\n")
     except Exception:
         pass
+
+    if vector_store and content and content.strip():
+        try:
+            vector_store.add_chat_message(int(agent_id), role, content, ts)
+        except Exception:
+            pass
 
 
 # ─── Docker Helpers ──────────────────────────────────────────────
@@ -646,13 +658,15 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         if path.startswith("/api/integrations/"):
-            # DELETE /api/integrations/{provider} — no trailing /test
             parts = [p for p in path.split("/") if p]
             if len(parts) >= 4 and parts[2] == "integrations":
                 provider = parts[3]
                 if provider != "test":
                     self._json_response(delete_integration(provider))
                     return
+        elif path.startswith("/api/agents/") and "/documents/" in path:
+            self._handle_document_delete(path)
+            return
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
 
     def _proxy_to_agent(self, method):
@@ -748,6 +762,21 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     params = urllib.parse.parse_qs(query)
                     tail = int(params.get("tail", [50])[0])
                 self._json_response({"logs": docker_logs(agent_id, tail)})
+            elif path.startswith("/api/agents/") and "/history/search" in path:
+                agent_id = int(path.split("/")[3])
+                q = ""
+                limit = 10
+                if query:
+                    params = urllib.parse.parse_qs(query)
+                    q = params.get("q", [""])[0]
+                    limit = int(params.get("limit", [10])[0])
+                if not q:
+                    self._json_response({"results": [], "error": "q parameter required"})
+                elif not vector_store or not vector_store.is_available():
+                    self._json_response({"results": [], "error": "Vector store not available"})
+                else:
+                    results = vector_store.search_chat(agent_id, q, limit)
+                    self._json_response({"results": results})
             elif path.startswith("/api/agents/") and path.endswith("/history"):
                 agent_id = int(path.split("/")[3])
                 limit = 100
@@ -755,6 +784,17 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     params = urllib.parse.parse_qs(query)
                     limit = int(params.get("limit", [100])[0])
                 self._json_response({"history": read_chat_history(agent_id, limit)})
+            elif path.startswith("/api/agents/") and "/documents" in path and "/search" not in path:
+                agent_id = int(path.split("/")[3])
+                docs_dir = os.path.join(DATA_DIR, f"koala-agent-{agent_id}", "docs")
+                docs = []
+                if os.path.isdir(docs_dir):
+                    for fname in sorted(os.listdir(docs_dir)):
+                        fpath = os.path.join(docs_dir, fname)
+                        if os.path.isfile(fpath):
+                            stat = os.stat(fpath)
+                            docs.append({"filename": fname, "size": stat.st_size, "modified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat.st_mtime))})
+                self._json_response({"documents": docs})
             elif path.startswith("/api/agents/") and "/files" in path:
                 # GET /api/agents/{id}/files or GET /api/agents/{id}/files/{path}
                 parts = [p for p in path.split("/") if p]
@@ -814,6 +854,19 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
 
             if path == "/api/agents/chat":
                 self._json_response(self._send_chat(data))
+            elif path.startswith("/api/agents/") and "/documents/search" in path:
+                agent_id = int(path.split("/")[3])
+                q = (data.get("query") or data.get("q") or "").strip()
+                limit = int(data.get("limit", 5))
+                if not q:
+                    self._json_response({"results": [], "error": "query required"})
+                elif not vector_store or not vector_store.is_available():
+                    self._json_response({"results": [], "error": "Vector store not available"})
+                else:
+                    results = vector_store.search_docs(agent_id, q, limit)
+                    self._json_response({"results": results})
+            elif path.startswith("/api/agents/") and "/documents" in path and "/search" not in path:
+                self._handle_document_upload(path, data)
             elif path == "/api/agents/delegate":
                 self._json_response(self._delegate(data))
             elif path == "/api/agents/orchestrate":
@@ -930,6 +983,54 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         if "talking" in text or "responding" in text:
             return "talking"
         return "idle"
+
+    def _handle_document_upload(self, path, data):
+        """POST /api/agents/{id}/documents — upload a document for RAG."""
+        agent_id = int(path.split("/")[3])
+        content = data.get("content", "")
+        filename = data.get("filename", "document.txt")
+
+        if not content:
+            self._json_response({"error": "content required"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        docs_dir = os.path.join(DATA_DIR, f"koala-agent-{agent_id}", "docs")
+        os.makedirs(docs_dir, exist_ok=True)
+        filepath = os.path.join(docs_dir, os.path.basename(filename))
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+        except Exception as e:
+            self._json_response({"error": f"Failed to save: {e}"})
+            return
+
+        chunks_added = 0
+        if vector_store and vector_store.is_available():
+            chunks_added = vector_store.add_document(agent_id, filename, content)
+
+        self._json_response({"success": True, "filename": filename, "chunks": chunks_added, "size": len(content)})
+
+    def _handle_document_delete(self, path):
+        """DELETE /api/agents/{id}/documents/{filename}"""
+        parts = [p for p in path.split("/") if p]
+        agent_id = int(parts[2])
+        filename = "/".join(parts[4:])
+        if not filename:
+            self._json_response({"error": "filename required"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        docs_dir = os.path.join(DATA_DIR, f"koala-agent-{agent_id}", "docs")
+        filepath = os.path.join(docs_dir, os.path.basename(filename))
+        deleted_file = False
+        if os.path.isfile(filepath):
+            os.remove(filepath)
+            deleted_file = True
+
+        deleted_vectors = False
+        if vector_store and vector_store.is_available():
+            deleted_vectors = vector_store.delete_document(agent_id, filename)
+
+        self._json_response({"success": deleted_file or deleted_vectors, "filename": filename})
 
     def _send_chat(self, data):
         """Send a chat message to an agent via OpenClaw CLI (docker exec)."""
@@ -1151,6 +1252,18 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 f'For image-to-video: set task_type to "image-to-video" and include "input_image":"{recent_media_url}" in wiro_generate.\n'
             )
 
+        # RAG: search uploaded documents for relevant context
+        rag_context = ""
+        if vector_store and vector_store.is_available():
+            try:
+                doc_results = vector_store.search_docs(orch_id, message, limit=3)
+                if doc_results:
+                    snippets = [f"[{r['filename']}]: {r['content'][:200]}" for r in doc_results if r.get("score", 0) > 0.3]
+                    if snippets:
+                        rag_context = "\nRelevant context from uploaded documents:\n" + "\n".join(snippets) + "\n"
+            except Exception:
+                pass
+
         # Check if user is selecting a previously suggested model
         model_selection = ""
         try:
@@ -1180,7 +1293,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"- FIRST TIME: use wiro_suggest to show model options with costs\n"
             f"- AFTER USER SELECTS: use wiro_generate with the chosen model\n"
             f'For image-to-video, include "input_image":"URL" in wiro_generate.\n'
-            f"{context_hint}{selection_hint}\n"
+            f"{context_hint}{selection_hint}{rag_context}\n"
             f"User request: {message}\n\n"
             f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n"
             f"Only delegate when the task genuinely needs a specialist. "

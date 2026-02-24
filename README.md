@@ -89,7 +89,7 @@ Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pr
 
 ### Isometric Office Web UI
 A browser-based dashboard at `:3099` with:
-- **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Integrations (OpenAI, Anthropic, Wiro, etc.), and System (restart, backup)
+- **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Documents (drag & drop upload for RAG), Integrations (OpenAI, Anthropic, Wiro, etc.), Wiro AI status, and System (restart, backup)
 - **Animated office** — canvas overlay with procedural pixel koalas, dust particles, coffee steam, thinking sparkles, screen glow, and day/night tint
 - **Isometric office** — manager room at the top (OrchestratorKoala at a larger executive desk), glass divider, then open office with other agents at desks; hover tooltips and desk click zoom
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
@@ -134,12 +134,21 @@ Connect Telegram, WhatsApp, Slack, or Discord to the OrchestratorKoala agent via
 ### 13 Custom Skills
 Pre-built skill templates: **wiro-ai** (smart image/video/audio generation), twitter-api, reddit-api, email-responder, replicate-api, elevenlabs-tts, web-scraper, csv-analyzer, server-monitor, crypto-tracker, seo-writer, vuln-scanner, calendar-sync. Custom skills are auto-installed to agent workspaces based on role configuration.
 
+### Vector DB + RAG (Qdrant)
+Each agent gets its own vector collections for persistent memory and document knowledge:
+- **Chat history search** — semantic search over past conversations ("what did we discuss about deployment?")
+- **Document upload** — drag & drop PDF/MD/TXT files in the sidebar, auto-chunked and indexed
+- **RAG context injection** — orchestrator automatically retrieves relevant document snippets when answering questions
+- **Per-agent isolation** — each agent has separate `agent_{id}_chat` and `agent_{id}_docs` collections
+- **Auto-provisioned** — collections created on install/add-agent, deleted on remove-agent
+
 ### Production-Ready Infrastructure
 - Auto-installs Docker CE + Compose v2
 - Pre-flight checks (OS, RAM, disk, ports, firewall, subnet)
 - API key validation and model discovery
 - Unique 256-bit tokens per agent
 - Network isolation, static IPs, trusted proxies
+- Qdrant vector database for persistent memory and RAG
 - Backup/restore, one-command updates
 - Browser relay (CDP proxy chain + Chrome extension) for Chromium automation
 - Auto-installs Node.js 22, OpenClaw CLI, and Chrome extension during setup
@@ -302,6 +311,8 @@ GitHub repo:
 ├── koalaclaw.sh              # CLI installer
 ├── admin-api.py              # Web UI backend + Orchestration/SSE/Delegation API
 ├── wiro_client.py            # Wiro AI client (Tool/List search, llms-full.txt parse, smart_generate)
+├── vector_store.py           # Qdrant vector DB wrapper (chat history + RAG documents)
+├── requirements.txt          # Python deps (qdrant-client, fastembed)
 ├── ui/                       # Web UI frontend
 │   ├── index.html
 │   ├── css/                  # 9 CSS modules (main, chat, office, mission-control, etc.)

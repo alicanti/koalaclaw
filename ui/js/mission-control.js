@@ -13,7 +13,8 @@ class MissionControl {
         this.app = app;
         this.sidebar = null;
         this.collapsed = false;
-        this.sectionOpen = { agents: true, files: false, integrations: false, 'wiro-status': false, system: true };
+        this.sectionOpen = { agents: true, files: false, documents: false, integrations: false, 'wiro-status': false, system: true };
+        this.docsAgent = null;
         this.fileEditorAgent = null;
         this.fileEditorPath = null;
         this.fileEditorDirty = false;
@@ -55,9 +56,10 @@ class MissionControl {
         });
     }
 
-    /** Called when app selects an agent: show Agent Files section and file editor */
+    /** Called when app selects an agent: show Agent Files section, file editor, and documents */
     onAgentSelected(agent) {
         this.fileEditorAgent = agent;
+        if (agent?.id) this.loadDocuments(agent.id);
         const section = this.sidebar?.querySelector('[data-section="files"]');
         const content = document.getElementById('mc-files-content');
         if (!section || !content) return;
@@ -307,6 +309,100 @@ class MissionControl {
         }
         btn.disabled = false;
         btn.textContent = 'Test';
+    }
+
+    // ── Documents ─────────────────────────────────────────
+
+    loadDocuments(agentId) {
+        this.docsAgent = agentId;
+        const wrap = document.getElementById('mc-documents-content');
+        if (!wrap) return;
+        wrap.innerHTML = '<p class="mc-placeholder">Loading...</p>';
+
+        this.app.apiGet(`/agents/${agentId}/documents`).then(data => {
+            const docs = data?.documents || [];
+            let html = `
+                <div class="docs-upload-area" id="docs-upload-area">
+                    <div class="docs-upload-label">Drop files here or click to upload</div>
+                    <div class="docs-upload-hint">PDF, MD, TXT (max 10MB)</div>
+                    <input type="file" id="docs-file-input" accept=".pdf,.md,.txt,.csv,.json" style="display:none">
+                </div>
+                <div class="docs-list" id="docs-list">`;
+
+            if (docs.length === 0) {
+                html += '<div class="docs-empty">No documents uploaded yet.</div>';
+            } else {
+                for (const d of docs) {
+                    const sizeKB = (d.size / 1024).toFixed(1);
+                    html += `
+                        <div class="docs-item" data-filename="${this._esc(d.filename)}">
+                            <div class="docs-item-info">
+                                <div class="docs-item-name">${this._esc(d.filename)}</div>
+                                <div class="docs-item-meta">${sizeKB} KB · ${d.modified || ''}</div>
+                            </div>
+                            <button class="docs-item-delete" data-filename="${this._esc(d.filename)}" title="Delete">✕</button>
+                        </div>`;
+                }
+            }
+            html += '</div>';
+            wrap.innerHTML = html;
+
+            const uploadArea = document.getElementById('docs-upload-area');
+            const fileInput = document.getElementById('docs-file-input');
+            if (uploadArea && fileInput) {
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+                uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    if (e.dataTransfer.files.length) this._uploadDocument(e.dataTransfer.files[0]);
+                });
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length) this._uploadDocument(e.target.files[0]);
+                });
+            }
+
+            wrap.addEventListener('click', (e) => {
+                const delBtn = e.target.closest('.docs-item-delete');
+                if (delBtn) this._deleteDocument(delBtn.getAttribute('data-filename'));
+            });
+        }).catch(() => {
+            wrap.innerHTML = '<p class="mc-placeholder">Error loading documents.</p>';
+        });
+    }
+
+    async _uploadDocument(file) {
+        if (!this.docsAgent || !file) return;
+        const uploadArea = document.getElementById('docs-upload-area');
+        const label = uploadArea?.querySelector('.docs-upload-label');
+        if (label) label.textContent = 'Uploading & indexing...';
+
+        try {
+            const text = await file.text();
+            const res = await this.app.apiPost(`/agents/${this.docsAgent}/documents`, {
+                filename: file.name,
+                content: text,
+            });
+            if (res?.error) throw new Error(res.error);
+            this.app.addLog?.('success', `Uploaded ${file.name} (${res.chunks || 0} chunks indexed)`, 'Documents');
+            this.loadDocuments(this.docsAgent);
+        } catch (err) {
+            this.app.addLog?.('error', `Upload failed: ${err.message}`, 'Documents');
+            if (label) label.textContent = `Error: ${err.message}`;
+            setTimeout(() => { if (label) label.textContent = 'Drop files here or click to upload'; }, 3000);
+        }
+    }
+
+    async _deleteDocument(filename) {
+        if (!this.docsAgent || !filename) return;
+        try {
+            await this.app.apiDelete(`/agents/${this.docsAgent}/documents/${filename}`);
+            this.app.addLog?.('info', `Deleted ${filename}`, 'Documents');
+            this.loadDocuments(this.docsAgent);
+        } catch (err) {
+            this.app.addLog?.('error', `Delete failed: ${err.message}`, 'Documents');
+        }
     }
 
     _esc(s) {

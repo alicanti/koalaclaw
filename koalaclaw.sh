@@ -854,6 +854,13 @@ _setup_admin_api() {
         _warn "wiro_client.py not found. Wiro AI integration will not be available."
     fi
 
+    # Install Python dependencies (Qdrant, FastEmbed)
+    if [[ -f "${REPO_DIR}/requirements.txt" ]]; then
+        _step "Installing Python dependencies..."
+        pip3 install -q -r "${REPO_DIR}/requirements.txt" 2>/dev/null || \
+            _warn "pip install failed. Vector DB features may not work."
+    fi
+
     # Create systemd service
     cat > /etc/systemd/system/koalaclaw-ui.service << UIEOF
 [Unit]
@@ -1081,6 +1088,20 @@ AGENT_EOF
 AGENT_EOF2
     done
 
+    # Qdrant vector database
+    cat >> "$compose_file" << QDRANT_EOF
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: koala-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      koala-net:
+        ipv4_address: 172.30.0.200
+
+QDRANT_EOF
+
     # Caddy service
     cat >> "$compose_file" << CADDY_HEAD
   caddy:
@@ -1128,6 +1149,7 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  qdrant_data:
 CADDY_TAIL
 
     _info "docker-compose.yml created"
@@ -1835,6 +1857,19 @@ cmd_install() {
     _header "Web UI"
     _setup_admin_api || true
 
+    # ─── Vector Store ───
+    _step "Initializing vector store collections..."
+    for i in $(seq 1 "$AGENT_COUNT"); do
+        python3 -c "
+import sys; sys.path.insert(0, '${REPO_DIR}')
+try:
+    import vector_store
+    vector_store.init_agent($i)
+except Exception as e:
+    print(f'[VECTOR] Init agent $i failed: {e}', file=sys.stderr)
+" 2>&1 || true
+    done
+
     _print_summary
 
     # Symlink for easy access
@@ -1927,6 +1962,18 @@ cmd_add_agent() {
     _reset_device_identity
     _verify_endpoints
 
+    # Initialize vector store collections for new agents
+    for i in $(seq $(( old_count + 1 )) "$new_total"); do
+        python3 -c "
+import sys; sys.path.insert(0, '${REPO_DIR}')
+try:
+    import vector_store
+    vector_store.init_agent($i)
+except Exception as e:
+    print(f'[VECTOR] Init agent $i failed: {e}', file=sys.stderr)
+" 2>&1 || true
+    done
+
     echo ""
     echo -e "  ${GREEN}✅ ${add_count} agent(s) added (total: ${new_total})${NC}"
     echo ""
@@ -1969,6 +2016,16 @@ cmd_remove_agent() {
         _info "Cancelled."
         exit 0
     fi
+
+    # Delete vector store collections for removed agent
+    python3 -c "
+import sys; sys.path.insert(0, '${REPO_DIR}')
+try:
+    import vector_store
+    vector_store.delete_agent(${agent_id})
+except Exception as e:
+    print(f'[VECTOR] Delete agent ${agent_id} failed: {e}', file=sys.stderr)
+" 2>&1 || true
 
     # Stop specific agent
     cd "${INSTALL_DIR}"

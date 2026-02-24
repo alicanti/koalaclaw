@@ -714,3 +714,69 @@ body.mc-collapsed #agent-detail-panel.visible {
 @media (max-width: 900px) {
     :root { --sidebar-width: 240px; }
 }
+
+/* ═══════════════════════════════════════════
+   Documents Section
+   ═══════════════════════════════════════════ */
+.docs-upload-area {
+    border: 2px dashed rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 10px;
+}
+.docs-upload-area:hover,
+.docs-upload-area.dragover {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.05);
+}
+.docs-upload-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+}
+.docs-upload-hint {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+}
+.docs-empty {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 8px 0;
+}
+.docs-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.docs-item:last-child {
+    border-bottom: none;
+}
+.docs-item-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+}
+.docs-item-meta {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 1px;
+}
+.docs-item-delete {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.docs-item-delete:hover {
+    color: #f44336;
+    background: rgba(244,67,54,0.1);
+}

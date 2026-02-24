@@ -310,6 +310,7 @@ class ChatManager {
                     <input type="text" id="chat-msg-input" class="chat-msg-input"
                            placeholder="Message ${this.agent.name}..."
                            autocomplete="off">
+                    <button type="button" id="chat-search-btn" class="chat-search-btn" title="Search chat history">🔍</button>
                     <button type="button" id="chat-wiro-btn" class="chat-wiro-btn" title="Generate with Wiro AI">✨</button>
                     <button type="button" id="chat-send-btn" class="chat-send-btn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -346,6 +347,8 @@ class ChatManager {
         fileInput.addEventListener('change', (e) => this._onImageSelect(e));
         if (clearPreview) clearPreview.addEventListener('click', () => this._clearUploadPreview());
         if (wiroBtn) wiroBtn.addEventListener('click', () => this._openWiroModal());
+        const searchBtn = document.getElementById('chat-search-btn');
+        if (searchBtn) searchBtn.addEventListener('click', () => this._openSearchModal());
         const orchToggle = document.getElementById('chat-orchestrate-toggle');
         if (orchToggle) orchToggle.addEventListener('change', (e) => {
             this.orchestrateMode = e.target.checked;
@@ -510,6 +513,73 @@ class ChatManager {
             btn.textContent = `⬇ Download ${typeLabel}`;
             el.insertAdjacentElement('afterend', btn);
         });
+    }
+
+    _openSearchModal() {
+        if (!this.agent) return;
+        let modal = document.getElementById('chat-search-modal');
+        if (modal) { modal.remove(); }
+        modal = document.createElement('div');
+        modal.id = 'chat-search-modal';
+        modal.className = 'chat-search-modal';
+        modal.innerHTML = `
+            <div class="chat-search-overlay"></div>
+            <div class="chat-search-dialog">
+                <div class="chat-search-header">
+                    <span>Search Chat History</span>
+                    <button class="chat-search-close">✕</button>
+                </div>
+                <input type="text" class="chat-search-input" placeholder="Search conversations..." autofocus>
+                <div class="chat-search-results"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const closeBtn = modal.querySelector('.chat-search-close');
+        const overlay = modal.querySelector('.chat-search-overlay');
+        const input = modal.querySelector('.chat-search-input');
+        const resultsEl = modal.querySelector('.chat-search-results');
+
+        const close = () => modal.remove();
+        closeBtn.addEventListener('click', close);
+        overlay.addEventListener('click', close);
+
+        let debounce = null;
+        input.addEventListener('input', () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => this._doSearch(input.value, resultsEl), 400);
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close();
+        });
+    }
+
+    async _doSearch(query, resultsEl) {
+        if (!query.trim() || !this.agent) {
+            resultsEl.innerHTML = '<div class="chat-search-empty">Type to search...</div>';
+            return;
+        }
+        resultsEl.innerHTML = '<div class="chat-search-empty">Searching...</div>';
+        try {
+            const data = await this.app.apiGet(`/agents/${this.agent.id}/history/search?q=${encodeURIComponent(query)}&limit=10`);
+            if (data?.error) {
+                resultsEl.innerHTML = `<div class="chat-search-empty">${data.error}</div>`;
+                return;
+            }
+            const results = data?.results || [];
+            if (!results.length) {
+                resultsEl.innerHTML = '<div class="chat-search-empty">No results found.</div>';
+                return;
+            }
+            resultsEl.innerHTML = results.map(r => `
+                <div class="chat-search-result">
+                    <div class="chat-search-result-meta">${r.role || ''} · ${r.timestamp || ''} · score: ${r.score}</div>
+                    <div class="chat-search-result-text">${this._escapeHtml((r.content || '').substring(0, 200))}</div>
+                </div>
+            `).join('');
+        } catch (e) {
+            resultsEl.innerHTML = `<div class="chat-search-empty">Search failed: ${e.message}</div>`;
+        }
     }
 
     _appendAssistantBubble() {
