@@ -21,13 +21,12 @@ class KoalaClawApp {
         this.startPolling();
         this.wsManager = new WebSocketManager(this);
         this.chatManager = new ChatManager(this);
-        missionControl = new MissionControl(this);
-        adminPanel = new AdminPanel(this);
-        workflowEngine = new WorkflowEngine(this);
-        messageBus = new AgentMessageBus(this);
-        monitor = new MonitoringDashboard(this);
-        monitor.startMonitoring();
-        gamification = new GamificationSystem(this);
+        try { window.missionControl = new MissionControl(this); } catch(e) { console.warn('MissionControl init failed:', e); }
+        try { window.adminPanel = new AdminPanel(this); } catch(e) { console.warn('AdminPanel init failed:', e); }
+        try { window.workflowEngine = new WorkflowEngine(this); } catch(e) { console.warn('WorkflowEngine init failed:', e); }
+        try { window.messageBus = new AgentMessageBus(this); } catch(e) { console.warn('AgentMessageBus init failed:', e); }
+        try { window.monitor = new MonitoringDashboard(this); window.monitor.startMonitoring(); } catch(e) { console.warn('Monitor init failed:', e); }
+        try { window.gamification = new GamificationSystem(this); } catch(e) { console.warn('Gamification init failed:', e); }
     }
 
     // ─── Tabs ───────────────────────────────────────────────
