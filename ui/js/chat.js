@@ -277,6 +277,7 @@ class ChatManager {
             bubble.removeAttribute('id');
             bubble.innerHTML = this._renderMarkdown(text);
             bubble.closest('.chat-bubble')?.classList.remove('streaming');
+            this._injectDownloadButtons(bubble);
         }
         this._scrollToBottom();
     }
@@ -492,6 +493,23 @@ class ChatManager {
             </div>
         `;
         messages.appendChild(bubble);
+        this._injectDownloadButtons(bubble);
+    }
+
+    _injectDownloadButtons(container) {
+        container.querySelectorAll('img.chat-image, video.chat-video, audio.chat-audio').forEach(el => {
+            const src = el.src || el.querySelector('source')?.src;
+            if (!src || src.startsWith('data:')) return;
+            if (el.parentElement.querySelector('.chat-media-download')) return;
+            const ext = src.split('.').pop()?.split('?')[0] || '';
+            const typeLabel = /mp4|webm|mov/i.test(ext) ? 'Video' : /mp3|wav|ogg|m4a|aac/i.test(ext) ? 'Audio' : 'Image';
+            const btn = document.createElement('a');
+            btn.className = 'chat-media-download';
+            btn.href = src;
+            btn.download = `wiro-generated.${ext}`;
+            btn.textContent = `⬇ Download ${typeLabel}`;
+            el.insertAdjacentElement('afterend', btn);
+        });
     }
 
     _appendAssistantBubble() {
