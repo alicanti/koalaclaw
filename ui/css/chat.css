@@ -390,14 +390,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
     border-radius: 6px;
     color: #fff;
     font-size: 16px;
     text-decoration: none;
-    opacity: 0;
+    opacity: 0.6;
     transition: opacity 0.2s;
+    z-index: 2;
+    cursor: pointer;
 }
 
 .chat-audio-wrap .chat-media-download {
@@ -414,7 +416,8 @@
 }
 
 .chat-media-download:hover {
-    background: rgba(0, 229, 255, 0.7);
+    background: rgba(0, 229, 255, 0.8);
+    opacity: 1;
 }
 
 /* Wiro generation progress */
