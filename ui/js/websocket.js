@@ -128,8 +128,14 @@ class WebSocketManager {
     }
 
     scheduleReconnect(agent) {
+        const key = `retry_${agent.id}`;
+        const retries = (this._retries || {})[key] || 0;
+        if (retries >= 3) return;
+        this._retries = this._retries || {};
+        this._retries[key] = retries + 1;
+
         const currentDelay = this.reconnectTimers.get(agent.id) || this.baseReconnectDelay;
-        const nextDelay = Math.min(currentDelay * 1.5, this.maxReconnectDelay);
+        const nextDelay = Math.min(currentDelay * 2, this.maxReconnectDelay);
         this.reconnectTimers.set(agent.id, nextDelay);
 
         setTimeout(() => {

@@ -14,7 +14,7 @@ class WorkflowEngine {
 
     async loadWorkflows() {
         // Load preset workflows from API
-        const data = await this.app.apiGet('/api/workflows');
+        const data = await this.app.apiGet('/workflows');
         if (data && data.workflows) {
             this.workflows = data.workflows;
         } else {
