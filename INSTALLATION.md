@@ -43,12 +43,15 @@ Click the **⚙️** button in the Web UI tab bar to open Settings:
 
 If you skipped the Wiro key during install, add it via Settings (⚙️) or the Integrations section in the sidebar. Once configured:
 
-**How it works:** Agents with the `wiro-ai` skill (OrchestratorKoala, GenerativeKoala, DesignKoala) can generate images, videos, and audio autonomously. Just ask them in chat — they automatically:
-1. Search Wiro's model marketplace via `POST /v1/Tool/List`
-2. Fetch the model's documentation (`llms-full.txt`) to learn input parameters
-3. Build the correct request body with proper field names and defaults
-4. Submit the task and poll until complete
-5. Display the result inline in chat — images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a **⬇ download button**
+**How it works:** Agents with the `wiro-ai` skill (OrchestratorKoala, GenerativeKoala, DesignKoala) can generate images, videos, and audio. The flow is:
+1. You ask the agent to generate something (e.g. "draw a space cat")
+2. The agent searches Wiro's marketplace and **suggests 2-3 models** with name, estimated cost, and average generation time
+3. You pick a model by replying with a number (1, 2, or 3)
+4. The agent fetches the model's documentation (`llms-full.txt`) to learn its input parameters
+5. Builds the correct request body, submits the task, and polls until complete
+6. Result appears inline in chat — images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a **⬇ download button**
+
+For **image-to-video**, the agent automatically uses the previously generated image as input — just say "convert this to video".
 
 **Quick test:** Open the "Wiro AI" section in the sidebar — it shows connection status, which agents have the skill, and a test input.
 

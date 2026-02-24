@@ -20,43 +20,55 @@ Get credentials at: https://wiro.ai/dashboard
 
 ## How It Works
 
-### Model Discovery
-When you need to generate content, the system automatically:
-1. Searches Wiro's model marketplace via `POST /v1/Tool/List`
-2. Finds the best model for the task type (e.g. "text-to-image")
-3. Fetches the model's documentation (`llms-full.txt`) to learn its input parameters
-4. Builds the correct request body with proper field names and defaults
+### Two-Step Flow: Suggest Then Generate
+When a user asks to generate content:
 
-### Generation Flow
-1. You describe what to generate in your response
-2. The system picks the best model (e.g. Nano Banana Pro for images)
-3. Sends the request with correct parameters
-4. Polls for completion
-5. Returns the output URL (image/video/audio)
+**Step 1 — Suggest models:** Use `wiro_suggest` to show 2-3 model options with cost and speed info. The system searches Wiro's marketplace, ranks models, and returns options for the user to pick.
+
+**Step 2 — Generate:** After the user picks a model (by number or name), use `wiro_generate` with the chosen model. The system fetches the model's documentation (`llms-full.txt`), builds correct parameters, generates, and returns the output URL.
+
+### Model Discovery
+The system automatically:
+1. Searches Wiro's model marketplace via `POST /v1/Tool/List`
+2. Ranks models by speed (fast-inference tag), popularity, and provider reputation
+3. Fetches the chosen model's documentation to learn its exact input parameters
+4. Builds the correct request body with proper field names and defaults
 
 ## Usage
 
-### Image Generation
-When a user asks you to create, generate, draw, or design an image, include this in your JSON response:
+### Step 1: Suggest Models (first time)
+When a user asks to generate something, first suggest models:
 
 ```json
 {
-  "wiro_generate": {
-    "prompt": "detailed description of the image to generate",
+  "wiro_suggest": {
+    "prompt": "detailed description of what to generate",
     "task_type": "text-to-image"
   }
 }
 ```
 
-The system will automatically:
-- Find the best text-to-image model (e.g. Google Nano Banana Pro, FLUX, Stable Diffusion)
-- Fetch its documentation to learn the correct input fields
-- Generate the image and return the URL
+The system will return 2-3 model options with name, cost, and speed. The user picks one.
+
+### Step 2: Generate with chosen model
+After the user picks a model (e.g. "1" or "nano banana"):
+
+```json
+{
+  "wiro_generate": {
+    "prompt": "detailed description",
+    "task_type": "text-to-image",
+    "model": "google/nano-banana-pro"
+  }
+}
+```
+
+If no model specified, the system auto-selects the best one.
 
 ### Video Generation
 ```json
 {
-  "wiro_generate": {
+  "wiro_suggest": {
     "prompt": "description of the video to generate",
     "task_type": "text-to-video"
   }

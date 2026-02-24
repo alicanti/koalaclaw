@@ -105,15 +105,15 @@ A browser-based dashboard at `:3099` with:
 - **Gamification** — XP, levels (1-50), achievements, leaderboard, outfits, desk rewards
 
 ### Wiro AI Skill (Smart Generation)
-Connect to [Wiro AI](https://wiro.ai) for 500+ generative models. Agents with the `wiro-ai` skill handle generation autonomously:
+Connect to [Wiro AI](https://wiro.ai) for 500+ generative models. Agents with the `wiro-ai` skill handle generation with a two-step flow:
 
-1. **Model discovery** — searches Wiro's marketplace via `POST /v1/Tool/List`
-2. **Documentation parsing** — fetches each model's `llms-full.txt` to learn input parameters
-3. **Smart parameter building** — detects prompt fields, applies defaults, skips file-upload fields
-4. **Model ranking** — prefers fast-inference models from known providers (Google, Black Forest Labs, etc.)
+1. **Model suggestions** — when you ask to generate something, the agent searches Wiro's marketplace, ranks models by speed/quality/cost, and presents 2-3 options with estimated cost and average generation time
+2. **User picks a model** — reply with a number (1, 2, or 3) to select
+3. **Documentation parsing** — fetches the chosen model's `llms-full.txt` to learn its exact input parameters
+4. **Smart parameter building** — detects prompt fields, applies defaults, passes input images for image-to-video
 5. **Generate & poll** — submits the task and polls until complete, returns the output URL
 
-Just ask an agent to "generate an image of X" — it handles model selection, parameter building, and result delivery automatically. Generated content appears inline in chat: images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a ⬇ download button.
+Generated content appears inline in chat: images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a ⬇ download button. For image-to-video, the agent automatically uses the previously generated image as input.
 
 ### Inter-Agent Communication & Orchestration
 OrchestratorKoala analyzes complex requests, breaks them into sub-tasks, and delegates to specialist agents in real time. The orchestration uses **Server-Sent Events (SSE)** so you see each step live in the chat:
