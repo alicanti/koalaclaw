@@ -91,34 +91,36 @@ def parse_model_inputs(llms_text: str) -> List[Dict[str, Any]]:
     return inputs
 
 
-def build_params_from_docs(inputs: List[Dict[str, Any]], prompt: str) -> Dict[str, Any]:
+def build_params_from_docs(inputs: List[Dict[str, Any]], prompt: str, input_image: str = "") -> Dict[str, Any]:
     """Build a Run request body using parsed model inputs.
 
     Strategy:
     - Find the prompt/text field and set it to the user's prompt
+    - If input_image provided, fill the first file-upload field with it
     - For other fields, use sensible defaults from the docs
-    - Skip file-upload fields (combinefileinput, fileinput) unless user provides them
     """
     params: Dict[str, Any] = {}
     prompt_field_found = False
+    image_field_found = False
 
     prompt_field_names = {"prompt", "text", "input_text", "message", "query"}
+    image_field_types = {"combinefileinput", "fileinput", "imageinput"}
 
     for inp in inputs:
         name = inp["name"]
         field_type = inp["type"]
 
-        # Skip file upload fields for text-only generation
-        if field_type in ("combinefileinput", "fileinput", "imageinput"):
+        if field_type in image_field_types:
+            if input_image and not image_field_found:
+                params[name] = [input_image]
+                image_field_found = True
             continue
 
-        # Detect prompt field by name or type
         if name.lower() in prompt_field_names or (field_type == "textarea" and not prompt_field_found):
             params[name] = prompt
             prompt_field_found = True
             continue
 
-        # Use default value if available
         if inp["default"]:
             params[name] = inp["default"]
         elif inp["options"]:
@@ -376,13 +378,14 @@ class WiroClient:
             return {"status": "error", "success": False, "message": "No taskid in run response"}
         return self.poll_task(str(task_id), timeout=poll_timeout)
 
-    def smart_generate(self, prompt: str, task_type: str = "text-to-image") -> Dict[str, Any]:
+    def smart_generate(self, prompt: str, task_type: str = "text-to-image", input_image: str = "") -> Dict[str, Any]:
         """Full pipeline: find model -> fetch docs -> build params -> generate -> poll.
 
         1. Search Tool/List for best model matching task_type
         2. Fetch llms-full.txt and parse input parameters
         3. Build request body with correct field names and defaults
-        4. Submit Run and poll Task/Detail until done
+        4. If input_image provided, pass it to the image input field
+        5. Submit Run and poll Task/Detail until done
         """
         model = self.find_best_model(task_type)
         if not model or not model.get("owner"):
@@ -390,15 +393,17 @@ class WiroClient:
 
         owner, project = model["owner"], model["project"]
         model_name = model.get("name", f"{owner}/{project}")
-        print(f"[WIRO] smart_generate: selected '{model_name}' ({owner}/{project})", file=sys.stderr, flush=True)
+        print(f"[WIRO] smart_generate: selected '{model_name}' ({owner}/{project}), input_image={'yes' if input_image else 'no'}", file=sys.stderr, flush=True)
 
         inputs = self.get_model_inputs(owner, project)
         if inputs:
-            params = build_params_from_docs(inputs, prompt)
+            params = build_params_from_docs(inputs, prompt, input_image=input_image)
             print(f"[WIRO] smart_generate: built params from docs: {list(params.keys())}", file=sys.stderr, flush=True)
         else:
             params = {"prompt": prompt}
-            print(f"[WIRO] smart_generate: no docs available, using fallback {{prompt}}", file=sys.stderr, flush=True)
+            if input_image:
+                params["inputImage"] = input_image
+            print(f"[WIRO] smart_generate: no docs, fallback params: {list(params.keys())}", file=sys.stderr, flush=True)
 
         result = self.generate(owner, project, params)
         result["model_used"] = model_name

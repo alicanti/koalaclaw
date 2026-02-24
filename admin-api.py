@@ -1129,6 +1129,28 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             for a in agents_roster
         )
 
+        # Find the most recent image/video URL from chat history for context
+        recent_media_url = ""
+        try:
+            history = load_chat_history(orch_id, limit=20)
+            for entry in reversed(history):
+                content = entry.get("content", "")
+                import re as _re
+                media_match = _re.search(r'(https?://[^\s<>"]+\.(?:png|jpe?g|webp|gif|mp4|webm))\b', content)
+                if media_match:
+                    recent_media_url = media_match.group(1)
+                    break
+        except Exception:
+            pass
+
+        context_hint = ""
+        if recent_media_url:
+            context_hint = (
+                f'\nRecent media in conversation: {recent_media_url}\n'
+                f'If the user refers to "this image/video" or "convert this", use this URL as input_image.\n'
+                f'For image-to-video: set task_type to "image-to-video" and include "input_image":"{recent_media_url}" in wiro_generate.\n'
+            )
+
         analysis_prompt = (
             f"SYSTEM: You are a task router. Respond with ONLY a raw JSON object. "
             f"No markdown fences, no explanation, no text before or after.\n\n"
@@ -1136,8 +1158,10 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"You have the wiro-ai skill for AI content generation. "
             f"If the user wants to generate/create/draw an image, video, or audio, "
             f"handle it yourself instead of delegating. "
-            f'Include "wiro_generate":{{"prompt":"detailed description","task_type":"text-to-image"}} in your JSON. '
-            f'Use task_type "text-to-video" for video, "text-to-speech" for audio.\n\n'
+            f'Include "wiro_generate":{{"prompt":"description","task_type":"text-to-image"}} in your JSON. '
+            f'Use task_type "text-to-video" for video from text, "image-to-video" to animate an image, "text-to-speech" for audio. '
+            f'For image-to-video, include "input_image":"URL" in wiro_generate.\n'
+            f"{context_hint}\n"
             f"User request: {message}\n\n"
             f"You are Agent {orch_id} (OrchestratorKoala). Do NOT delegate to yourself.\n"
             f"Only delegate when the task genuinely needs a specialist. "
@@ -1147,7 +1171,9 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             f"For simple/direct: "
             f'{{"plan":"direct","delegations":[],"direct_answer":"your answer"}}\n'
             f"For image generation: "
-            f'{{"plan":"generate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt","task_type":"text-to-image"}}}}'
+            f'{{"plan":"generate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"detailed prompt","task_type":"text-to-image"}}}}\n'
+            f"For image-to-video: "
+            f'{{"plan":"animate image","delegations":[],"direct_answer":null,"wiro_generate":{{"prompt":"description of motion","task_type":"image-to-video","input_image":"https://..."}}}}'
         )
 
         self._sse_send("phase", {"phase": "analyzing", "message": "Analyzing task..."})
@@ -1199,13 +1225,14 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             wiro_data = plan["wiro_generate"] if isinstance(plan["wiro_generate"], dict) else {"prompt": str(plan["wiro_generate"])}
             wiro_prompt = wiro_data.get("prompt", message)
             task_type = wiro_data.get("task_type", "text-to-image")
+            input_image = wiro_data.get("input_image", "")
             self._sse_send("plan", {"plan": plan.get("plan", f"generate {task_type}"), "delegations": []})
             self._sse_send("phase", {"phase": "generating", "message": f"Generating via Wiro AI ({task_type})..."})
-            print(f"[ORCH] Wiro {task_type}: {wiro_prompt[:120]}", file=sys.stderr, flush=True)
+            print(f"[ORCH] Wiro {task_type}: prompt={wiro_prompt[:80]}, input_image={input_image[:80] if input_image else 'none'}", file=sys.stderr, flush=True)
             client = get_wiro_client()
             if client and client.is_configured:
                 try:
-                    result = client.smart_generate(wiro_prompt, task_type=task_type)
+                    result = client.smart_generate(wiro_prompt, task_type=task_type, input_image=input_image)
                     model_name = result.get("model_used", "Wiro AI")
                     if result.get("output_url"):
                         img_response = f"Generated with **{model_name}**:\n\n{result['output_url']}"
