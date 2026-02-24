@@ -80,14 +80,16 @@ class ChatManager {
         this.sending = true;
         this.app.updateAgentStatus(this.agent.id, 'online', 'thinking');
 
-        if (this.orchestrateMode) {
-            await this._sendOrchestrated(text);
-        } else {
-            await this._sendDirect(text, img);
+        try {
+            if (this.orchestrateMode) {
+                await this._sendOrchestrated(text);
+            } else {
+                await this._sendDirect(text, img);
+            }
+        } finally {
+            this.sending = false;
+            this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
         }
-
-        this.sending = false;
-        this.app.updateAgentStatus(this.agent.id, 'online', 'idle');
     }
 
     async _sendDirect(text, img) {
@@ -607,7 +609,8 @@ class ChatManager {
     }
 
     _renderMarkdown(text) {
-        // Simple markdown: code blocks, bold, italic, links
+        // Strip HTML comments (internal metadata like wiro_model_options)
+        text = text.replace(/<!--[\s\S]*?-->/g, '').trim();
         let html = this._escapeHtml(text);
 
         // Code blocks
