@@ -351,7 +351,9 @@ class ChatManager {
         });
         input.focus();
 
-        this.chatContainer.addEventListener('click', (e) => {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        chatMessages.addEventListener('click', (e) => {
             const dl = e.target.closest('.chat-media-download');
             if (!dl) return;
             e.preventDefault();
