@@ -140,10 +140,12 @@ class ChatManager {
                 buffer = lines.pop() || '';
 
                 let currentEvent = '';
+                let streamDone = false;
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
                         currentEvent = line.slice(7).trim();
                     } else if (line.startsWith('data: ') && currentEvent) {
+                        if (currentEvent === 'close') { streamDone = true; break; }
                         try {
                             const data = JSON.parse(line.slice(6));
                             this._handleOrchEvent(currentEvent, data, chainEl);
@@ -151,6 +153,7 @@ class ChatManager {
                         currentEvent = '';
                     }
                 }
+                if (streamDone) break;
             }
         } catch (e) {
             this._removeLiveChain(chainEl);
