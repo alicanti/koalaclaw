@@ -154,9 +154,9 @@ def search_chat(agent_id: int, query: str, limit: int = 10) -> List[Dict[str, An
     if not vectors:
         return []
     try:
-        results = client.search(
+        results = client.query_points(
             collection_name=_chat_collection(agent_id),
-            query_vector=vectors[0],
+            query=vectors[0],
             limit=limit,
         )
         return [
@@ -166,7 +166,7 @@ def search_chat(agent_id: int, query: str, limit: int = 10) -> List[Dict[str, An
                 "timestamp": r.payload.get("timestamp", ""),
                 "score": round(r.score, 3),
             }
-            for r in results
+            for r in results.points
         ]
     except Exception as e:
         print(f"[VECTOR] search_chat error: {e}", file=sys.stderr, flush=True)
@@ -229,9 +229,9 @@ def search_docs(agent_id: int, query: str, limit: int = 5) -> List[Dict[str, Any
     if not vectors:
         return []
     try:
-        results = client.search(
+        results = client.query_points(
             collection_name=_docs_collection(agent_id),
-            query_vector=vectors[0],
+            query=vectors[0],
             limit=limit,
         )
         return [
@@ -241,7 +241,7 @@ def search_docs(agent_id: int, query: str, limit: int = 5) -> List[Dict[str, Any
                 "chunk_index": r.payload.get("chunk_index", 0),
                 "score": round(r.score, 3),
             }
-            for r in results
+            for r in results.points
         ]
     except Exception as e:
         print(f"[VECTOR] search_docs error: {e}", file=sys.stderr, flush=True)
