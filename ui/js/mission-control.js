@@ -13,7 +13,7 @@ class MissionControl {
         this.app = app;
         this.sidebar = null;
         this.collapsed = false;
-        this.sectionOpen = { agents: true, files: false, documents: false, integrations: false, 'wiro-status': false, system: true };
+        this.sectionOpen = { agents: true, files: false, documents: false, channels: false, integrations: false, 'wiro-status': false, system: true };
         this.docsAgent = null;
         this.fileEditorAgent = null;
         this.fileEditorPath = null;
@@ -60,6 +60,7 @@ class MissionControl {
     onAgentSelected(agent) {
         this.fileEditorAgent = agent;
         if (agent?.id) this.loadDocuments(agent.id);
+        if (agent?.id) this.loadChannels(agent.id);
         const section = this.sidebar?.querySelector('[data-section="files"]');
         const content = document.getElementById('mc-files-content');
         if (!section || !content) return;
@@ -309,6 +310,110 @@ class MissionControl {
         }
         btn.disabled = false;
         btn.textContent = 'Test';
+    }
+
+    // ── Channels ─────────────────────────────────────────
+
+    loadChannels(agentId) {
+        this._channelsAgent = agentId;
+        const wrap = document.getElementById('mc-channels-content');
+        if (!wrap) return;
+        wrap.innerHTML = '<p class="mc-placeholder">Loading channels...</p>';
+
+        const CHANNELS = [
+            { id: 'telegram', name: 'Telegram', icon: '✈️', tokenLabel: 'Bot Token' },
+            { id: 'whatsapp', name: 'WhatsApp', icon: '💬', tokenLabel: null },
+            { id: 'slack', name: 'Slack', icon: '💼', tokenLabel: 'Bot Token', extraLabel: 'App Token' },
+            { id: 'discord', name: 'Discord', icon: '🎮', tokenLabel: 'Bot Token' },
+        ];
+
+        let html = '';
+        for (const ch of CHANNELS) {
+            const tokenInput = ch.tokenLabel
+                ? `<input type="password" class="channel-token-input" placeholder="${ch.tokenLabel}" data-channel="${ch.id}" data-field="token">`
+                : '';
+            const extraInput = ch.extraLabel
+                ? `<input type="password" class="channel-token-input" placeholder="${ch.extraLabel}" data-channel="${ch.id}" data-field="app_token">`
+                : '';
+            const connectLabel = ch.id === 'whatsapp' ? 'QR Login' : 'Connect';
+            html += `
+                <div class="channel-card" data-channel="${ch.id}">
+                    <div class="channel-card-header">
+                        <span class="channel-icon">${ch.icon}</span>
+                        <span class="channel-name">${ch.name}</span>
+                        <span class="channel-status-dot" id="ch-status-${ch.id}" title="checking..."></span>
+                    </div>
+                    ${tokenInput}${extraInput}
+                    <div class="channel-card-actions">
+                        <button class="channel-connect-btn" data-channel="${ch.id}">${connectLabel}</button>
+                        <span class="channel-status-text" id="ch-text-${ch.id}"></span>
+                    </div>
+                </div>`;
+        }
+        wrap.innerHTML = html;
+
+        wrap.addEventListener('click', (e) => {
+            const btn = e.target.closest('.channel-connect-btn');
+            if (btn) this._connectChannel(btn.getAttribute('data-channel'));
+        });
+
+        this._pollChannelStatuses(agentId);
+    }
+
+    async _pollChannelStatuses(agentId) {
+        try {
+            const data = await this.app.apiGet(`/agents/${agentId}/channels`);
+            if (!data?.channels) return;
+            for (const [name, info] of Object.entries(data.channels)) {
+                const dot = document.getElementById(`ch-status-${name}`);
+                const text = document.getElementById(`ch-text-${name}`);
+                if (dot) {
+                    dot.className = `channel-status-dot ${info.status === 'connected' ? 'connected' : 'disconnected'}`;
+                    dot.title = info.status;
+                }
+                if (text) text.textContent = info.status;
+            }
+        } catch {}
+    }
+
+    async _connectChannel(name) {
+        if (!this._channelsAgent) return;
+        const card = document.querySelector(`.channel-card[data-channel="${name}"]`);
+        if (!card) return;
+        const btn = card.querySelector('.channel-connect-btn');
+        const textEl = document.getElementById(`ch-text-${name}`);
+
+        const tokenInput = card.querySelector('.channel-token-input[data-field="token"]');
+        const appInput = card.querySelector('.channel-token-input[data-field="app_token"]');
+
+        const body = {};
+        if (tokenInput) body.token = tokenInput.value.trim();
+        if (appInput) body.app_token = appInput.value.trim();
+
+        if (name !== 'whatsapp' && !body.token) {
+            if (textEl) textEl.textContent = 'Token required';
+            return;
+        }
+
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        if (textEl) textEl.textContent = 'Connecting...';
+
+        try {
+            const res = await this.app.apiPost(`/agents/${this._channelsAgent}/channels/${name}`, body);
+            if (res?.error) {
+                if (textEl) textEl.textContent = res.error;
+            } else if (res?.qr_url) {
+                if (textEl) textEl.innerHTML = `<a href="${this._esc(res.qr_url)}" target="_blank">Scan QR</a>`;
+            } else {
+                if (textEl) textEl.textContent = res?.success ? 'Connected!' : (res?.message || 'Done');
+                this._pollChannelStatuses(this._channelsAgent);
+            }
+            if (tokenInput) tokenInput.value = '';
+            if (appInput) appInput.value = '';
+        } catch (err) {
+            if (textEl) textEl.textContent = `Error: ${err.message}`;
+        }
+        if (btn) { btn.disabled = false; btn.textContent = name === 'whatsapp' ? 'QR Login' : 'Connect'; }
     }
 
     // ── Documents ─────────────────────────────────────────

@@ -839,9 +839,26 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             elif path == "/api/settings":
                 self._json_response(self._get_settings())
             elif path.startswith("/api/settings/channel/") and path.endswith("/status"):
-                # GET /api/settings/channel/{name}/status
+                # GET /api/settings/channel/{name}/status (legacy, orchestrator only)
                 name = path.split("/api/settings/channel/")[1].replace("/status", "").strip("/")
                 self._json_response(self._channel_status(name))
+            elif path.startswith("/api/agents/") and "/channels" in path:
+                parts = [p for p in path.split("/") if p]
+                agent_id = int(parts[2])
+                if len(parts) >= 5 and parts[4] == "status":
+                    # GET /api/agents/{id}/channels/{name}/status
+                    ch_name = parts[3].replace("channels", "").strip("/") if parts[3] != "channels" else ""
+                    if not ch_name and len(parts) >= 5:
+                        ch_name = parts[4] if parts[4] != "status" else ""
+                    # Re-parse: /api/agents/6/channels/telegram/status
+                    ch_parts = path.split("/channels/")[1].split("/") if "/channels/" in path else []
+                    ch_name = ch_parts[0] if ch_parts else ""
+                    self._json_response(self._channel_status_for_agent(agent_id, ch_name))
+                elif "/channels/" not in path or path.endswith("/channels"):
+                    # GET /api/agents/{id}/channels — list all channel statuses
+                    self._json_response(self._all_channel_statuses(agent_id))
+                else:
+                    self._json_response({"error": "Invalid channel path"}, HTTPStatus.BAD_REQUEST)
             else:
                 self._json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
         except Exception as e:
@@ -881,9 +898,18 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             elif path == "/api/settings":
                 self._json_response(self._post_settings(data))
             elif path.startswith("/api/settings/channel/"):
-                # POST /api/settings/channel/{name}
+                # POST /api/settings/channel/{name} (legacy, orchestrator only)
                 name = path.split("/api/settings/channel/")[1].strip("/").split("/")[0]
                 self._json_response(self._channel_configure(name, data))
+            elif path.startswith("/api/agents/") and "/channels/" in path:
+                # POST /api/agents/{id}/channels/{name}
+                parts = [p for p in path.split("/") if p]
+                agent_id = int(parts[2])
+                ch_name = path.split("/channels/")[1].split("/")[0] if "/channels/" in path else ""
+                if ch_name:
+                    self._json_response(self._channel_configure_for_agent(agent_id, ch_name, data))
+                else:
+                    self._json_response({"error": "Channel name required"}, HTTPStatus.BAD_REQUEST)
             elif path.startswith("/api/agents/") and "/files/" in path:
                 # POST /api/agents/{id}/files/{path}
                 parts = [p for p in path.split("/") if p]
@@ -1668,6 +1694,79 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     capture_output=True, text=True, timeout=30
                 )
                 return {"success": result.returncode == 0, "message": result.stdout or result.stderr}
+            except Exception as e:
+                return {"error": str(e)}
+        return {"error": f"Unknown channel: {name}"}
+
+    def _channel_status_for_agent(self, agent_id, name):
+        """GET /api/agents/{id}/channels/{name}/status"""
+        container = f"koala-agent-{agent_id}"
+        try:
+            result = subprocess.run(
+                ["docker", "exec", container, "node", "openclaw.mjs", "channels", "status", name],
+                capture_output=True, text=True, timeout=10
+            )
+            out = (result.stdout or "").strip()
+            connected = result.returncode == 0 and out and "error" not in out.lower()
+            return {"channel": name, "agent_id": agent_id, "status": "connected" if connected else "disconnected", "detail": out or result.stderr}
+        except Exception as e:
+            return {"channel": name, "agent_id": agent_id, "status": "error", "detail": str(e)}
+
+    def _all_channel_statuses(self, agent_id):
+        """GET /api/agents/{id}/channels — list all channel statuses."""
+        channels = {}
+        for name in ["telegram", "whatsapp", "slack", "discord"]:
+            channels[name] = self._channel_status_for_agent(agent_id, name)
+        return {"agent_id": agent_id, "channels": channels}
+
+    def _channel_configure_for_agent(self, agent_id, name, data):
+        """POST /api/agents/{id}/channels/{name} — configure channel for specific agent."""
+        container = f"koala-agent-{agent_id}"
+        if name == "telegram":
+            token = (data.get("token") or data.get("bot_token") or "").strip()
+            if not token:
+                return {"error": "token required"}
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "telegram", "--token", token],
+                    capture_output=True, text=True, timeout=30
+                )
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": result.stdout or result.stderr}
+            except Exception as e:
+                return {"error": str(e)}
+        elif name == "whatsapp":
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "whatsapp"],
+                    capture_output=True, text=True, timeout=60
+                )
+                out = result.stdout or result.stderr
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out, "qr_url": out if "http" in out else None}
+            except Exception as e:
+                return {"error": str(e)}
+        elif name == "slack":
+            bot = (data.get("bot_token") or data.get("token") or "").strip()
+            app = (data.get("app_token") or "").strip()
+            if not bot:
+                return {"error": "bot_token required"}
+            try:
+                args = ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "slack", "--token", bot]
+                if app:
+                    args.extend(["--app-token", app])
+                result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": result.stdout or result.stderr}
+            except Exception as e:
+                return {"error": str(e)}
+        elif name == "discord":
+            token = (data.get("token") or data.get("bot_token") or "").strip()
+            if not token:
+                return {"error": "token required"}
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "discord", "--token", token],
+                    capture_output=True, text=True, timeout=30
+                )
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": result.stdout or result.stderr}
             except Exception as e:
                 return {"error": str(e)}
         return {"error": f"Unknown channel: {name}"}
