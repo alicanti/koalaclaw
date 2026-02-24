@@ -89,7 +89,7 @@ Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pr
 
 ### Isometric Office Web UI
 A browser-based dashboard at `:3099` with:
-- **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Documents (drag & drop upload for RAG), Integrations (OpenAI, Anthropic, Wiro, etc.), Wiro AI status, and System (restart, backup)
+- **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Documents (drag & drop upload for RAG), Channels (per-agent Telegram/WhatsApp/Slack/Discord config), Integrations (OpenAI, Anthropic, Wiro, etc.), Wiro AI status, and System (restart, backup)
 - **Animated office** — canvas overlay with procedural pixel koalas, dust particles, coffee steam, thinking sparkles, screen glow, and day/night tint
 - **Isometric office** — manager room at the top (OrchestratorKoala at a larger executive desk), glass divider, then open office with other agents at desks; hover tooltips and desk click zoom
 - **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
@@ -128,8 +128,8 @@ API endpoints:
 - `POST /api/agents/broadcast` — send to multiple agents at once
 - `GET /api/agents/roster` — discover all agents and their roles
 
-### Channel Integrations
-Connect Telegram, WhatsApp, Slack, or Discord to the OrchestratorKoala agent via the Settings page. Messages from external channels are routed to the orchestrator, which can delegate to any specialist agent.
+### Per-Agent Channel Integrations
+Connect Telegram, WhatsApp, Slack, or Discord to **any agent** via the sidebar Channels section. Select an agent, enter the bot token, and connect. Each agent can have independent channel connections — connect OrchestratorKoala to Telegram while connecting ContentKoala to Slack, for example. Channel status (connected/disconnected) is shown per agent with live status indicators.
 
 ### 13 Custom Skills
 Pre-built skill templates: **wiro-ai** (smart image/video/audio generation), twitter-api, reddit-api, email-responder, replicate-api, elevenlabs-tts, web-scraper, csv-analyzer, server-monitor, crypto-tracker, seo-writer, vuln-scanner, calendar-sync. Custom skills are auto-installed to agent workspaces based on role configuration.

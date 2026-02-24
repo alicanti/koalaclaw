@@ -36,7 +36,7 @@ Open `http://SERVER_IP:3099` in your browser.
 Click the **⚙️** button in the Web UI tab bar to open Settings:
 
 - **Wiro AI**: Enter your API key and secret, test the connection, save.
-- **Channel Integrations**: Connect Telegram (bot token), WhatsApp (QR login), Slack, or Discord to the OrchestratorKoala agent.
+- **Channel Integrations**: Connect Telegram (bot token), WhatsApp (QR login), Slack, or Discord to any agent. Use the sidebar **Channels** section to configure per-agent connections.
 - **General**: Change the default AI model for all agents.
 
 ## Post-Install: Wiro AI
@@ -1768,6 +1768,9 @@ python3 admin-api.py &
 | `/api/agents/{id}/documents` | GET/POST | List or upload documents for RAG |
 | `/api/agents/{id}/documents/{name}` | DELETE | Delete a document |
 | `/api/agents/{id}/documents/search` | POST | Semantic search over uploaded documents |
+| `/api/agents/{id}/channels` | GET | List all channel statuses for an agent |
+| `/api/agents/{id}/channels/{name}` | POST | Configure/connect a channel (Telegram/WhatsApp/Slack/Discord) |
+| `/api/agents/{id}/channels/{name}/status` | GET | Check single channel connection status |
 | `/api/settings` | GET/POST | General settings (Wiro keys, channels, model) |
 
 ### Running as a Service

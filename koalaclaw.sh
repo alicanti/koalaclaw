@@ -303,6 +303,11 @@ _apply_role_to_agent() {
             done
         fi
     fi
+
+    # Apply channels from role
+    if [[ -f "${role_dir}/channels.json" ]]; then
+        cp "${role_dir}/channels.json" "${agent_dir}/role-channels.json"
+    fi
     
     _info "Applied role '${role}' to Agent ${agent_num}"
 }
