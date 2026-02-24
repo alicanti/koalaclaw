@@ -41,26 +41,21 @@ class ChatManager {
         const messages = document.getElementById('chat-messages');
         if (!messages) return;
 
-        // Show loading
-        this._appendSystemMessage('Loading history...', 'info');
+        try {
+            const data = await this.app.apiGet(`/agents/${this.agent.id}/history?limit=100`);
 
-        const data = await this.app.apiGet(`/agents/${this.agent.id}/history?limit=100`);
-        
-        // Remove loading message
-        const loadingMsg = messages.querySelector('.chat-system-msg:last-child');
-        if (loadingMsg && loadingMsg.textContent === 'Loading history...') {
-            loadingMsg.remove();
-        }
-
-        if (data && data.history && data.history.length > 0) {
-            data.history.forEach(msg => {
-                if (msg.role === 'user') {
-                    this._appendUserBubble(msg.content, msg.timestamp, true, msg.image_base64);
-                } else if (msg.role === 'assistant') {
-                    this._appendRestoredAssistantBubble(msg.content, msg.timestamp);
-                }
-            });
-            this._appendSystemMessage(`${data.history.length} previous messages loaded`, 'info');
+            if (data && data.history && data.history.length > 0) {
+                data.history.forEach(msg => {
+                    if (msg.role === 'user') {
+                        this._appendUserBubble(msg.content, msg.timestamp, true, msg.image_base64);
+                    } else if (msg.role === 'assistant') {
+                        this._appendRestoredAssistantBubble(msg.content, msg.timestamp);
+                    }
+                });
+                this._appendSystemMessage(`${data.history.length} previous messages loaded`, 'info');
+            }
+        } catch (err) {
+            this.app.addLog('error', `History load failed: ${err.message}`, 'Chat');
         }
 
         this._scrollToBottom();
