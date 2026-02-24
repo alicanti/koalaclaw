@@ -624,11 +624,11 @@ class ChatManager {
         // Links
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
         // Image URLs
-        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))\b/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"><a class="chat-media-download" href="$1" download title="Download image">⬇</a></div>');
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:png|jpe?g|webp|gif))\b/gi, '<div class="chat-image-wrap"><img class="chat-image" src="$1" alt="Image" loading="lazy"><br><a class="chat-media-download" href="$1" download>⬇ Download Image</a></div>');
         // Video URLs
-        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp4|webm|mov))\b/gi, '<div class="chat-video-wrap"><video class="chat-video" src="$1" controls preload="metadata"></video><a class="chat-media-download" href="$1" download title="Download video">⬇</a></div>');
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp4|webm|mov))\b/gi, '<div class="chat-video-wrap"><video class="chat-video" src="$1" controls preload="metadata"></video><br><a class="chat-media-download" href="$1" download>⬇ Download Video</a></div>');
         // Audio URLs
-        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp3|wav|ogg|m4a|aac))\b/gi, '<div class="chat-audio-wrap"><audio class="chat-audio" src="$1" controls preload="metadata"></audio><a class="chat-media-download" href="$1" download title="Download audio">⬇</a></div>');
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp3|wav|ogg|m4a|aac))\b/gi, '<div class="chat-audio-wrap"><audio class="chat-audio" src="$1" controls preload="metadata"></audio> <a class="chat-media-download" href="$1" download>⬇ Download Audio</a></div>');
         // Line breaks
         html = html.replace(/\n/g, '<br>');
 

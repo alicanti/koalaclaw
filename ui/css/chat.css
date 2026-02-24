@@ -333,8 +333,7 @@
 /* In-message images */
 .chat-image-wrap {
     margin: 8px 0;
-    position: relative;
-    display: inline-block;
+    display: block;
 }
 
 .chat-image {
@@ -354,8 +353,7 @@
 
 .chat-video-wrap {
     margin: 8px 0;
-    position: relative;
-    display: inline-block;
+    display: block;
 }
 
 .chat-video {
@@ -382,42 +380,25 @@
 }
 
 .chat-media-download {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 32px;
-    height: 32px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    gap: 4px;
+    margin-top: 6px;
+    padding: 5px 12px;
+    background: rgba(0, 229, 255, 0.1);
+    border: 1px solid rgba(0, 229, 255, 0.25);
     border-radius: 6px;
-    color: #fff;
-    font-size: 16px;
+    color: var(--accent, #00e5ff);
+    font-size: 12px;
+    font-weight: 600;
     text-decoration: none;
-    opacity: 0.6;
-    transition: opacity 0.2s;
-    z-index: 2;
     cursor: pointer;
-}
-
-.chat-audio-wrap .chat-media-download {
-    position: static;
-    opacity: 1;
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
-}
-
-.chat-image-wrap:hover .chat-media-download,
-.chat-video-wrap:hover .chat-media-download {
-    opacity: 1;
+    transition: background 0.2s;
 }
 
 .chat-media-download:hover {
-    background: rgba(0, 229, 255, 0.8);
-    opacity: 1;
+    background: rgba(0, 229, 255, 0.2);
 }
 
 /* Wiro generation progress */
