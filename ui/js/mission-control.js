@@ -64,8 +64,7 @@ class MissionControl {
         const section = this.sidebar?.querySelector('[data-section="files"]');
         const content = document.getElementById('mc-files-content');
         if (!section || !content) return;
-        section.classList.add('open');
-        this.sectionOpen.files = true;
+        // Keep files section collapsed by default when selecting an agent
 
         content.innerHTML = `
             <div class="mc-file-editor">
