@@ -364,24 +364,14 @@ class ChatManager {
             e.preventDefault();
             const url = dl.getAttribute('href');
             if (!url) return;
-            dl.textContent = '...';
-            fetch(url)
-                .then(r => r.blob())
-                .then(blob => {
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    const ext = url.split('.').pop()?.split('?')[0] || 'png';
-                    a.download = `wiro-generated.${ext}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(a.href);
-                    dl.textContent = '⬇';
-                })
-                .catch(() => {
-                    window.open(url, '_blank');
-                    dl.textContent = '⬇';
-                });
+            const a = document.createElement('a');
+            a.href = url;
+            const ext = url.split('.').pop()?.split('?')[0] || 'png';
+            a.download = `wiro-generated.${ext}`;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         });
 
         window.addEventListener('koalaclaw-wiro-result', (e) => {

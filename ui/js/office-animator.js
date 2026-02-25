@@ -265,8 +265,8 @@ class OfficeAnimator {
             const agent = agentsById[pos.agentId];
             if (agent && agent.status === 'online') {
                 const g = ctx.createRadialGradient(pos.x, pos.y - 25, 0, pos.x, pos.y - 25, 45);
-                g.addColorStop(0, 'rgba(45,212,168,0.08)');
-                g.addColorStop(1, 'rgba(45,212,168,0)');
+                g.addColorStop(0, 'rgba(62,207,160,0.08)');
+                g.addColorStop(1, 'rgba(62,207,160,0)');
                 ctx.fillStyle = g;
                 ctx.fillRect(pos.x - 50, pos.y - 70, 100, 70);
             }

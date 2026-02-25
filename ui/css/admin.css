@@ -8,7 +8,7 @@
     width: 380px;
     height: 100vh;
     background: var(--bg-mid, #1a1932);
-    border-right: 2px solid var(--accent, #2DD4A8);
+    border-right: 2px solid var(--accent, #3ECFA0);
     z-index: 200;
     overflow-y: auto;
     transition: left 0.3s ease;
