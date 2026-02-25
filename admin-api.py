@@ -1672,15 +1672,12 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         return {"agent_id": agent_id, "channels": channels}
 
     def _channel_configure_for_agent(self, agent_id, name, data):
-        """POST /api/agents/{id}/channels/{name} — configure channel via openclaw.json config."""
-        config_path = os.path.join(DATA_DIR, f"koala-agent-{agent_id}", "openclaw.json")
-        container = f"koala-agent-{agent_id}"
+        """POST /api/agents/{id}/channels/{name} — configure channel for specific agent.
 
-        token_map = {
-            "telegram": ("token", "bot_token", "TELEGRAM_BOT_TOKEN"),
-            "discord": ("token", "bot_token", "DISCORD_BOT_TOKEN"),
-            "slack": ("bot_token", "token", "SLACK_BOT_TOKEN"),
-        }
+        Telegram/Discord/Slack use 'channels add --channel X --token T'.
+        WhatsApp uses 'channels login --channel whatsapp' (QR flow).
+        """
+        container = f"koala-agent-{agent_id}"
 
         if name == "whatsapp":
             try:
@@ -1688,54 +1685,55 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     ["docker", "exec", container, "node", "openclaw.mjs", "channels", "login", "--channel", "whatsapp", "--verbose"],
                     capture_output=True, text=True, timeout=60
                 )
-                out = result.stdout or result.stderr
-                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out, "qr_url": out if "http" in out else None}
+                out = (result.stdout or "") + (result.stderr or "")
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out[:500], "qr_url": out if "http" in out else None}
             except Exception as e:
                 return {"error": str(e)}
 
-        if name not in token_map:
-            return {"error": f"Unknown channel: {name}"}
-
-        field1, field2, env_name = token_map[name]
-        token = (data.get(field1) or data.get(field2) or "").strip()
-        if not token:
-            return {"error": f"{field1} required"}
-
-        app_token = (data.get("app_token") or "").strip() if name == "slack" else ""
-
-        try:
-            cfg = {}
-            if os.path.isfile(config_path):
-                with open(config_path) as f:
-                    cfg = json.load(f)
-
-            if "channels" not in cfg:
-                cfg["channels"] = {}
-            cfg["channels"][name] = {"enabled": True}
-
-            with open(config_path, "w") as f:
-                json.dump(cfg, f, indent=4)
-
-            env_cmd = f"{env_name}={token}"
-            if name == "slack" and app_token:
-                env_cmd += f" SLACK_APP_TOKEN={app_token}"
-
-            result = subprocess.run(
-                ["docker", "exec", "-e", env_cmd, container, "node", "openclaw.mjs", "channels", "login", "--channel", name, "--verbose"],
-                capture_output=True, text=True, timeout=30
-            )
-            out = (result.stdout or "") + (result.stderr or "")
-
-            if result.returncode != 0 and "--channel" in out:
+        if name == "telegram":
+            token = (data.get("token") or data.get("bot_token") or "").strip()
+            if not token:
+                return {"error": "Bot token required"}
+            try:
                 result = subprocess.run(
-                    ["docker", "exec", "-e", env_cmd, container, "node", "openclaw.mjs", "channels", "login", name],
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "add", "--channel", "telegram", "--token", token],
                     capture_output=True, text=True, timeout=30
                 )
                 out = (result.stdout or "") + (result.stderr or "")
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out[:500]}
+            except Exception as e:
+                return {"error": str(e)}
 
-            return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out[:500]}
-        except Exception as e:
-            return {"error": str(e)}
+        if name == "discord":
+            token = (data.get("token") or data.get("bot_token") or "").strip()
+            if not token:
+                return {"error": "Bot token required"}
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", container, "node", "openclaw.mjs", "channels", "add", "--channel", "discord", "--token", token],
+                    capture_output=True, text=True, timeout=30
+                )
+                out = (result.stdout or "") + (result.stderr or "")
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out[:500]}
+            except Exception as e:
+                return {"error": str(e)}
+
+        if name == "slack":
+            bot = (data.get("bot_token") or data.get("token") or "").strip()
+            app = (data.get("app_token") or "").strip()
+            if not bot:
+                return {"error": "Bot token required"}
+            try:
+                args = ["docker", "exec", container, "node", "openclaw.mjs", "channels", "add", "--channel", "slack", "--token", bot]
+                if app:
+                    args.extend(["--app-token", app])
+                result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+                out = (result.stdout or "") + (result.stderr or "")
+                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out[:500]}
+            except Exception as e:
+                return {"error": str(e)}
+
+        return {"error": f"Unknown channel: {name}"}
 
     def _json_response(self, data, status=HTTPStatus.OK):
         """Send a JSON response."""
