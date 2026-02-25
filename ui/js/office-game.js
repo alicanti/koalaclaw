@@ -636,7 +636,7 @@ class BootScene extends Phaser.Scene {
     constructor() { super('BootScene'); }
 
     preload() {
-        this.load.image('tiles', 'assets/tileset.png');
+        this.load.image('office-bg', 'assets/office-bg.png');
         this.load.image('particle', 'assets/particle.png');
 
         const agents = window._officeAgents || [];
@@ -666,19 +666,38 @@ class OfficeScene extends Phaser.Scene {
     constructor() { super('OfficeScene'); }
 
     create() {
-        const { map, collision, furniture, desks } = generateMapData();
+        // Background image (pre-rendered office scene)
+        const BG_W = 768, BG_H = 576;
+        this.add.image(BG_W / 2, BG_H / 2, 'office-bg').setDepth(0);
 
-        const tilemap = this.make.tilemap({ data: map, tileWidth: TILE, tileHeight: TILE });
-        const tileset = tilemap.addTilesetImage('tiles', 'tiles', TILE, TILE, 0, 0);
-        this.groundLayer = tilemap.createLayer(0, tileset, 0, 0);
-
-        const furnitureMap = this.make.tilemap({ data: furniture, tileWidth: TILE, tileHeight: TILE });
-        const furnitureTileset = furnitureMap.addTilesetImage('tiles', 'tiles', TILE, TILE, 0, 0);
-        this.furnitureLayer = furnitureMap.createLayer(0, furnitureTileset, 0, 0);
-
-        this._furnitureData = furniture;
-        this._collisionData = collision;
+        // Desk positions in pixel coordinates (matching the background image)
+        const desks = [
+            // Manager desk
+            { x: 384, y: 90, isManager: true },
+            // Work area row 1
+            { x: 66, y: 220 }, { x: 206, y: 220 }, { x: 346, y: 220 },
+            // Work area row 2
+            { x: 66, y: 330 }, { x: 206, y: 330 }, { x: 346, y: 330 },
+            // Work area row 3
+            { x: 66, y: 440 }, { x: 206, y: 440 },
+        ];
         this._deskPositions = desks;
+
+        // Simple collision grid (32px cells)
+        const gridW = Math.ceil(BG_W / TILE), gridH = Math.ceil(BG_H / TILE);
+        const collision = Array.from({ length: gridH }, () => Array(gridW).fill(1));
+
+        // Mark walkable areas
+        function fillWalk(x1, y1, x2, y2) {
+            for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) {
+                if (y >= 0 && y < gridH && x >= 0 && x < gridW) collision[y][x] = 0;
+            }
+        }
+        fillWalk(1, 1, gridW - 2, 4);    // Manager room
+        fillWalk(1, 5, 14, gridH - 2);   // Work area
+        fillWalk(15, 5, gridW - 2, gridH - 2); // Break + lounge
+
+        this._collisionData = collision;
 
         // Pathfinding
         this.easystar = new EasyStar.js();
@@ -693,7 +712,9 @@ class OfficeScene extends Phaser.Scene {
 
         agents.forEach((agent, idx) => {
             const isManager = agent.role_id === 'orchestrator-koala';
-            const desk = isManager ? { x: 11, y: 3 } : desks[idx % desks.length];
+            const mgrDesk = desks.find(d => d.isManager);
+            const workerDesks = desks.filter(d => !d.isManager);
+            const desk = isManager && mgrDesk ? mgrDesk : workerDesks[idx % workerDesks.length];
             if (!desk) return;
 
             const spriteKey = `koala-${agent.role_id || 'default'}`;
@@ -716,27 +737,27 @@ class OfficeScene extends Phaser.Scene {
                 this.anims.create({ key: `${texKey}-stretch`, frames: [{ key: texKey, frame: 7 * 8 + 2 }, { key: texKey, frame: 7 * 8 + 3 }], frameRate: 2, repeat: 2 });
             }
 
-            const sprite = this.add.sprite(desk.x * TILE + TILE / 2, desk.y * TILE + TILE / 2, texKey, 5 * 8 + 0);
+            const sprite = this.add.sprite(desk.x, desk.y, texKey, 5 * 8 + 0);
             sprite.setDepth(desk.y);
             sprite.play(`${texKey}-sit`);
 
             // Name label
-            const nameText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 8, agent.name || `Agent ${agent.id}`, {
+            const nameText = this.add.text(desk.x, desk.y - 20, agent.name || `Agent ${agent.id}`, {
                 fontSize: '10px', fontFamily: 'monospace', color: '#f0f0f5',
                 backgroundColor: 'rgba(10,10,15,0.8)', padding: { x: 4, y: 2 },
             }).setOrigin(0.5, 1).setDepth(100);
 
             // Status indicator dot
-            const statusDot = this.add.circle(desk.x * TILE + TILE / 2 + 30, desk.y * TILE - 8, 4, 0x3ECFA0).setDepth(101);
+            const statusDot = this.add.circle(desk.x + 40, desk.y - 20, 4, 0x3ECFA0).setDepth(101);
 
             // Speech bubble container (text that appears above koala)
-            const bubbleText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 24, '', {
+            const bubbleText = this.add.text(desk.x, desk.y - 34, '', {
                 fontSize: '9px', fontFamily: 'monospace', color: '#0a0a0f',
                 backgroundColor: '#3ECFA0', padding: { x: 5, y: 3 },
             }).setOrigin(0.5, 1).setDepth(102).setAlpha(0);
 
             // Thought bubble (smaller, dimmer)
-            const thoughtText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 38, '', {
+            const thoughtText = this.add.text(desk.x, desk.y - 48, '', {
                 fontSize: '8px', fontFamily: 'monospace', color: '#f0f0f5',
                 backgroundColor: 'rgba(42,42,56,0.9)', padding: { x: 4, y: 2 },
             }).setOrigin(0.5, 1).setDepth(102).setAlpha(0);
@@ -787,10 +808,10 @@ class OfficeScene extends Phaser.Scene {
         this.time.addEvent({ delay: 30000, callback: () => this._triggerRandomEvent(), loop: true });
 
         // ── Camera ──────────────────────────────────
-        this.cameras.main.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
-        // Auto-fit zoom: fill the canvas with the office
+        const BG_W2 = 768, BG_H2 = 576;
+        this.cameras.main.setBounds(0, 0, BG_W2, BG_H2);
         const cw = this.scale.width, ch = this.scale.height;
-        const worldW = MAP_W * TILE, worldH = MAP_H * TILE;
+        const worldW = BG_W2, worldH = BG_H2;
         const autoZoom = Math.max(cw / worldW, ch / worldH, 1);
         this.cameras.main.setZoom(Math.min(autoZoom, 2.5));
         this.cameras.main.centerOn(worldW / 2, worldH / 2);
@@ -837,8 +858,8 @@ class OfficeScene extends Phaser.Scene {
 
         // Dust motes floating in the air
         this._dustEmitter = this.add.particles(0, 0, 'particle', {
-            x: { min: TILE, max: (MAP_W - 1) * TILE },
-            y: { min: TILE, max: (MAP_H - 1) * TILE },
+            x: { min: 20, max: 750 },
+            y: { min: 20, max: 560 },
             lifespan: 10000,
             speed: { min: 1, max: 5 },
             angle: { min: 240, max: 300 },
@@ -851,7 +872,7 @@ class OfficeScene extends Phaser.Scene {
         this._dustEmitter.setDepth(150);
 
         // Coffee steam particles (near coffee machine)
-        this._steamEmitter = this.add.particles(17 * TILE + 16, 7 * TILE, 'particle', {
+        this._steamEmitter = this.add.particles(530, 185, 'particle', {
             lifespan: 2000,
             speed: { min: 3, max: 8 },
             angle: { min: 250, max: 290 },
@@ -864,7 +885,7 @@ class OfficeScene extends Phaser.Scene {
         this._steamEmitter.setDepth(55);
 
         // Server rack blinking LED emitter
-        this._serverLedEmitter = this.add.particles(13 * TILE + 16, 10 * TILE + 16, 'particle', {
+        this._serverLedEmitter = this.add.particles(452, 280, 'particle', {
             x: { min: -2, max: 2 },
             lifespan: 400,
             speed: 0,
@@ -884,19 +905,16 @@ class OfficeScene extends Phaser.Scene {
     _setupDayNight() {
         // Ambient lighting overlay
         this.dayNightOverlay = this.add.rectangle(
-            MAP_W * TILE / 2, MAP_H * TILE / 2,
-            MAP_W * TILE, MAP_H * TILE,
+            384, 288,
+            768, 576,
             0x000030, 0
         ).setDepth(200).setBlendMode(Phaser.BlendModes.MULTIPLY);
 
         // Window light beams (visible during day)
         this._windowLights = [];
-        for (let x = 3; x < MAP_W - 3; x += 4) {
-            const light = this.add.rectangle(
-                x * TILE + TILE / 2, 2 * TILE,
-                TILE, 3 * TILE,
-                0xfff8e0, 0
-            ).setDepth(199).setBlendMode(Phaser.BlendModes.ADD);
+        for (let wx = 80; wx < 700; wx += 120) {
+            const light = this.add.rectangle(wx, 50, 40, 80, 0xfff8e0, 0)
+                .setDepth(199).setBlendMode(Phaser.BlendModes.ADD);
             this._windowLights.push(light);
         }
 
@@ -985,7 +1003,7 @@ class OfficeScene extends Phaser.Scene {
 
         if (type === 'rain' || type === 'storm') {
             this._rainEmitter = this.add.particles(0, 0, 'particle', {
-                x: { min: 0, max: MAP_W * TILE },
+                x: { min: 0, max: 768 },
                 y: -10,
                 lifespan: 1500,
                 speedY: { min: 80, max: 120 },
@@ -1014,7 +1032,7 @@ class OfficeScene extends Phaser.Scene {
 
         if (type === 'snow') {
             this._snowEmitter = this.add.particles(0, 0, 'particle', {
-                x: { min: 0, max: MAP_W * TILE },
+                x: { min: 0, max: 768 },
                 y: -10,
                 lifespan: 4000,
                 speedY: { min: 15, max: 30 },
@@ -1034,8 +1052,8 @@ class OfficeScene extends Phaser.Scene {
 
     _flashLightning() {
         const flash = this.add.rectangle(
-            MAP_W * TILE / 2, MAP_H * TILE / 2,
-            MAP_W * TILE, MAP_H * TILE,
+            384, 288,
+            768, 576,
             0xffffff, 0.6
         ).setDepth(220).setBlendMode(Phaser.BlendModes.ADD);
 
@@ -1060,8 +1078,8 @@ class OfficeScene extends Phaser.Scene {
 
     _setupMonitorGlows() {
         this.koalas.forEach(k => {
-            const gx = k.desk.x * TILE + TILE + TILE / 2;
-            const gy = k.desk.y * TILE + TILE / 2;
+            const gx = k.desk.x + 26;
+            const gy = k.desk.y - 8;
             k._monitorGlow = this.add.rectangle(gx, gy, TILE, TILE, 0x0a3a20, 0.15)
                 .setDepth(k.desk.y - 1).setBlendMode(Phaser.BlendModes.ADD);
 
@@ -1147,7 +1165,7 @@ class OfficeScene extends Phaser.Scene {
                 } else if (action < 8) {
                     const other = this.koalas[Phaser.Math.Between(0, this.koalas.length - 1)];
                     if (other !== k && other.state !== 'walking' && other.state !== 'sleeping') {
-                        this._walkTo(k, other.desk.x, other.desk.y + 2, 'chatting');
+                        this._walkTo(k, Math.floor(other.desk.x / TILE), Math.floor(other.desk.y / TILE) + 2, 'chatting');
                         this._showBubble(k, this._pickMessage('chatting'));
                         this.time.delayedCall(2000, () => {
                             if (other.state === 'sitting') {
@@ -1298,7 +1316,7 @@ class OfficeScene extends Phaser.Scene {
 
         k.bubbleText.setText(text);
         k.bubbleText.x = k.sprite.x;
-        k.bubbleText.y = k.sprite.y - 24;
+        k.bubbleText.y = k.sprite.y - 34;
         this.tweens.killTweensOf(k.bubbleText);
         k.bubbleText.setAlpha(1);
         this.tweens.add({ targets: k.bubbleText, alpha: 0, duration: 600, delay: 3000 });
@@ -1307,7 +1325,7 @@ class OfficeScene extends Phaser.Scene {
     _showThought(k, text) {
         k.thoughtText.setText(text);
         k.thoughtText.x = k.sprite.x;
-        k.thoughtText.y = k.sprite.y - 38;
+        k.thoughtText.y = k.sprite.y - 48;
         this.tweens.killTweensOf(k.thoughtText);
         k.thoughtText.setAlpha(1);
     }
@@ -1378,6 +1396,12 @@ class OfficeScene extends Phaser.Scene {
     //  MOVEMENT / PATHFINDING
     // ════════════════════════════════════════════════════════
 
+    _walkToDesk(k) {
+        const tx = Math.floor(k.desk.x / TILE);
+        const ty = Math.floor(k.desk.y / TILE) + 1;
+        this._walkTo(k, tx, ty, 'sitting');
+    }
+
     _walkTo(k, targetX, targetY, nextState) {
         const startX = Math.floor(k.sprite.x / TILE);
         const startY = Math.floor(k.sprite.y / TILE);
@@ -1405,8 +1429,8 @@ class OfficeScene extends Phaser.Scene {
 
             if (k.state === 'sitting') {
                 k.sprite.play(`${k.texKey}-sit`);
-                k.sprite.x = k.desk.x * TILE + TILE / 2;
-                k.sprite.y = k.desk.y * TILE + TILE / 2;
+                k.sprite.x = k.desk.x;
+                k.sprite.y = k.desk.y;
             } else if (k.state === 'sleeping') {
                 k.sprite.play(`${k.texKey}-sleep`);
                 this._showBubble(k, 'Zzz...');
@@ -1415,37 +1439,37 @@ class OfficeScene extends Phaser.Scene {
                 this._showBubble(k, this._pickMessage('coffee'));
                 this.time.delayedCall(Phaser.Math.Between(4000, 8000), () => {
                     k.energy = Math.min(k.energy + 20, 100);
-                    this._walkTo(k, k.desk.x, k.desk.y + 1, 'sitting');
+                    this._walkToDesk(k);
                 });
             } else if (k.state === 'chatting') {
                 k.sprite.play(`${k.texKey}-idle`);
                 this.time.delayedCall(Phaser.Math.Between(4000, 10000), () => {
-                    this._walkTo(k, k.desk.x, k.desk.y + 1, 'sitting');
+                    this._walkToDesk(k);
                 });
             } else if (k.state === 'browsing') {
                 k.sprite.play(`${k.texKey}-idle`);
                 this._showBubble(k, this._pickMessage('browsing'));
                 this.time.delayedCall(Phaser.Math.Between(3000, 7000), () => {
-                    this._walkTo(k, k.desk.x, k.desk.y + 1, 'sitting');
+                    this._walkToDesk(k);
                 });
             } else if (k.state === 'resting') {
                 k.sprite.play(`${k.texKey}-sleep`);
                 this._showBubble(k, this._pickMessage('resting'));
                 this.time.delayedCall(Phaser.Math.Between(6000, 15000), () => {
                     k.energy = Math.min(k.energy + 30, 100);
-                    this._walkTo(k, k.desk.x, k.desk.y + 1, 'sitting');
+                    this._walkToDesk(k);
                 });
             } else if (k.state === 'playing') {
                 k.sprite.play(`${k.texKey}-celebrate`);
                 this._showBubble(k, this._pickMessage('playing'));
                 this.time.delayedCall(Phaser.Math.Between(5000, 10000), () => {
                     k.energy = Math.min(k.energy + 10, 100);
-                    this._walkTo(k, k.desk.x, k.desk.y + 1, 'sitting');
+                    this._walkToDesk(k);
                 });
             } else {
                 k.sprite.play(`${k.texKey}-idle`);
                 this.time.delayedCall(Phaser.Math.Between(3000, 8000), () => {
-                    this._walkTo(k, k.desk.x, k.desk.y + 1, 'sitting');
+                    this._walkToDesk(k);
                 });
             }
 
@@ -1481,13 +1505,13 @@ class OfficeScene extends Phaser.Scene {
 
     _syncLabels(k) {
         k.nameText.x = k.sprite.x;
-        k.nameText.y = k.sprite.y - 8;
-        k.statusDot.x = k.sprite.x + 30;
-        k.statusDot.y = k.sprite.y - 8;
+        k.nameText.y = k.sprite.y - 20;
+        k.statusDot.x = k.sprite.x + 40;
+        k.statusDot.y = k.sprite.y - 20;
         k.bubbleText.x = k.sprite.x;
-        k.bubbleText.y = k.sprite.y - 24;
+        k.bubbleText.y = k.sprite.y - 34;
         k.thoughtText.x = k.sprite.x;
-        k.thoughtText.y = k.sprite.y - 38;
+        k.thoughtText.y = k.sprite.y - 48;
     }
 
     // ════════════════════════════════════════════════════════
@@ -1514,8 +1538,8 @@ class OfficeScene extends Phaser.Scene {
         this._gridOverlay = this.add.graphics();
         this._gridOverlay.setDepth(300);
         this._gridOverlay.lineStyle(1, 0x3ECFA0, 0.15);
-        for (let x = 0; x <= MAP_W; x++) this._gridOverlay.lineBetween(x * TILE, 0, x * TILE, MAP_H * TILE);
-        for (let y = 0; y <= MAP_H; y++) this._gridOverlay.lineBetween(0, y * TILE, MAP_W * TILE, y * TILE);
+        for (let x = 0; x <= 24; x++) this._gridOverlay.lineBetween(x * TILE, 0, x * TILE, 576);
+        for (let y = 0; y <= 18; y++) this._gridOverlay.lineBetween(0, y * TILE, 768, y * TILE);
 
         // Ghost placement indicator
         this._layoutGhost = this.add.rectangle(0, 0, TILE, TILE, 0x3ECFA0, 0.3).setDepth(301).setVisible(false);
