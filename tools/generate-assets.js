@@ -83,83 +83,74 @@ function generateTileset() {
         c.fillRect(0, 0, S, S);
     });
 
-    // 1: wood floor — warm planks with grain
+    // 1: wood floor — warm planks with grain (BRIGHT)
     tile(1, 0, (c) => {
-        const base = '#3d3225';
-        c.fillStyle = base;
+        c.fillStyle = '#5c4a38';
         c.fillRect(0, 0, S, S);
         for (let y = 0; y < S; y += 8) {
-            const shade = y % 16 === 0 ? '#4a3e30' : '#352c20';
-            c.fillStyle = shade;
+            c.fillStyle = y % 16 === 0 ? '#6a5845' : '#50402e';
             c.fillRect(0, y, S, 6);
-            c.fillStyle = '#2e2518';
+            c.fillStyle = '#45362a';
             c.fillRect(0, y + 6, S, 1);
-            c.fillStyle = '#4f4235';
+            c.fillStyle = '#705a48';
             c.fillRect(0, y + 7, S, 1);
         }
-        // Subtle grain lines
-        c.globalAlpha = 0.08;
+        c.globalAlpha = 0.06;
         c.fillStyle = '#000';
         for (let x = 3; x < S; x += 7) { c.fillRect(x, 0, 1, S); }
-        c.globalAlpha = 0.04;
+        c.globalAlpha = 0.08;
         c.fillStyle = '#fff';
         for (let x = 5; x < S; x += 11) { c.fillRect(x, 0, 1, S); }
         c.globalAlpha = 1;
     });
 
-    // 2: tile floor (break room) — clean ceramic
+    // 2: tile floor (break room) — clean ceramic (BRIGHT)
     tile(2, 0, (c) => {
-        c.fillStyle = '#2e3a3a';
+        c.fillStyle = '#3e5555';
         c.fillRect(0, 0, S, S);
-        c.fillStyle = '#344242';
+        c.fillStyle = '#486060';
         c.fillRect(1, 1, S / 2 - 2, S / 2 - 2);
         c.fillRect(S / 2 + 1, S / 2 + 1, S / 2 - 2, S / 2 - 2);
-        c.fillStyle = '#303e3e';
+        c.fillStyle = '#425858';
         c.fillRect(S / 2 + 1, 1, S / 2 - 2, S / 2 - 2);
         c.fillRect(1, S / 2 + 1, S / 2 - 2, S / 2 - 2);
-        // Grout lines
-        c.fillStyle = '#222e2e';
+        c.fillStyle = '#344848';
         c.fillRect(0, S / 2 - 1, S, 2);
         c.fillRect(S / 2 - 1, 0, 2, S);
-        // Subtle shine
-        c.globalAlpha = 0.06;
+        c.globalAlpha = 0.1;
         c.fillStyle = '#fff';
         c.fillRect(3, 3, 6, 2);
         c.fillRect(S / 2 + 3, S / 2 + 3, 6, 2);
         c.globalAlpha = 1;
     });
 
-    // 3: carpet (lounge) — soft woven
+    // 3: carpet (lounge) — soft woven (BRIGHT)
     tile(3, 0, (c) => {
-        c.fillStyle = '#1e2840';
+        c.fillStyle = '#2e3860';
         c.fillRect(0, 0, S, S);
         for (let y = 0; y < S; y += 2) {
-            c.fillStyle = y % 4 === 0 ? '#222e4a' : '#1a2438';
+            c.fillStyle = y % 4 === 0 ? '#354270' : '#283858';
             c.fillRect(0, y, S, 2);
         }
-        // Cross-hatch texture
-        c.globalAlpha = 0.05;
+        c.globalAlpha = 0.08;
         c.fillStyle = '#fff';
         for (let x = 0; x < S; x += 4) { c.fillRect(x, 0, 1, S); }
         c.globalAlpha = 1;
     });
 
-    // 4: wall — dark with baseboard and shadow
+    // 4: wall — visible with baseboard
     tile(4, 0, (c) => {
-        // Main wall
         const grad = c.createLinearGradient(0, 0, 0, S);
-        grad.addColorStop(0, '#1a1a28');
-        grad.addColorStop(0.7, '#1e1e30');
-        grad.addColorStop(1, '#282840');
+        grad.addColorStop(0, '#282840');
+        grad.addColorStop(0.7, '#303050');
+        grad.addColorStop(1, '#3a3a5a');
         c.fillStyle = grad;
         c.fillRect(0, 0, S, S);
-        // Baseboard
-        c.fillStyle = '#303048';
+        c.fillStyle = '#404068';
         c.fillRect(0, S - 6, S, 6);
-        c.fillStyle = '#383858';
+        c.fillStyle = '#484878';
         c.fillRect(0, S - 3, S, 3);
-        // Top shadow
-        c.fillStyle = 'rgba(0,0,0,0.3)';
+        c.fillStyle = 'rgba(0,0,0,0.2)';
         c.fillRect(0, 0, S, 2);
     });
 
@@ -452,19 +443,19 @@ function generateTileset() {
 
     // ── Row 2 ────────────────────────────────────────
 
-    // 16: manager floor — dark premium wood
+    // 16: manager floor — premium dark wood (BRIGHT)
     tile(0, 2, (c) => {
-        c.fillStyle = '#28221a';
+        c.fillStyle = '#4a3e2e';
         c.fillRect(0, 0, S, S);
         for (let y = 0; y < S; y += 8) {
-            c.fillStyle = y % 16 === 0 ? '#302a20' : '#201c14';
+            c.fillStyle = y % 16 === 0 ? '#544838' : '#3e3428';
             c.fillRect(0, y, S, 6);
-            c.fillStyle = '#181410';
+            c.fillStyle = '#342a20';
             c.fillRect(0, y + 6, S, 1);
-            c.fillStyle = '#352e24';
+            c.fillStyle = '#5a4e3e';
             c.fillRect(0, y + 7, S, 1);
         }
-        c.globalAlpha = 0.04;
+        c.globalAlpha = 0.06;
         c.fillStyle = '#d4a830';
         c.fillRect(0, 0, S, S);
         c.globalAlpha = 1;
