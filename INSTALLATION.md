@@ -1,6 +1,6 @@
 # KoalaClaw Installation Guide
 
-> Deploy N specialized AI agents with an isometric office Web UI on a fresh Ubuntu 24.04 server.
+> Deploy N specialized AI agents with a pixel art living office Web UI on a fresh Ubuntu 24.04 server.
 > Includes 20 agent roles (with OrchestratorKoala), Wiro AI integration, workflow pipelines, monitoring, channel integrations, and gamification.
 
 ## Quick Install (Automated)
@@ -1726,12 +1726,11 @@ python3 admin-api.py &
 
 | Feature | Description |
 |---------|-------------|
-| Mission Control | Collapsible sidebar: Agents, Agent Files (Identity/Soul/Memory editor), Integrations (API keys), System (Restart All, Backup) |
-| Animated Office | Canvas overlay with pixel koalas, dust, steam, sparkles, screen glow, day/night tint; hover tooltips and desk click zoom |
+| Mission Control | Collapsible sidebar: Agents, Agent Files (Identity/Soul/Memory editor), Documents (RAG), Channels, Integrations (API keys), Wiro AI, System |
+| Pixel Art Living Office | Phaser 3 top-down pixel art office with animated koala NPCs, A* pathfinding, NPC AI (coffee breaks, chatting, resting, celebrating), particle effects (dust, steam, confetti), day/night cycle, weather system (rain/snow/storm), speech bubbles, and decoration layout editor with 27+ items |
 | Orchestrated Chat | 🎯 Orchestrate toggle routes messages through OrchestratorKoala; live delegation chain shows each agent working in real time (SSE streaming) |
-| Isometric Office | Visual representation of all agents at their desks |
+| Chat + Media | Send messages to any agent, attach images (📎), inline image/video/audio players, ⬇ download for all media |
 | Admin Panel | Agent list, status, skill toggles, quick actions |
-| Chat + Media | Send messages to any agent, attach images (📎), inline video/audio players, ⬇ download for all media |
 | Live Logs | Real-time, color-coded, filterable log stream |
 | Workflows | Chain agents together (Blog Post, Product Launch, etc.) |
 | Monitoring | CPU/RAM metrics, alert thresholds, cron jobs |

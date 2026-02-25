@@ -21,7 +21,7 @@
 
 <h1>🦞 KoalaClaw 🐨</h1>
 
-<h3>AI Agent Management Platform<br>Deploy, manage, and gamify OpenClaw agents with an isometric office UI.</h3>
+<h3>AI Agent Management Platform<br>Deploy, manage, and gamify OpenClaw agents with a pixel art living office UI.</h3>
 
 <br>
 
@@ -68,7 +68,7 @@ The installer handles **everything** — Docker, networking, reverse proxy, role
 
 ## 🎯 What is KoalaClaw?
 
-KoalaClaw is a full AI agent management platform built on [OpenClaw](https://openclaw.ai). It deploys N specialized AI agents behind a [Caddy](https://caddyserver.com) reverse proxy, each with a unique role, personality, and skill set. A web-based isometric office UI lets you manage, chat with, and monitor all agents in real time.
+KoalaClaw is a full AI agent management platform built on [OpenClaw](https://openclaw.ai). It deploys N specialized AI agents behind a [Caddy](https://caddyserver.com) reverse proxy, each with a unique role, personality, and skill set. A pixel art living office UI (Phaser 3) lets you manage, chat with, and monitor all agents in real time.
 
 ```
 Internet / LAN
@@ -77,7 +77,7 @@ Internet / LAN
      ├── :3002 → Caddy → 📣 MarketerKoala  (social media, campaigns)
      ├── :3003 → Caddy → 🧠 StrategyKoala  (planning, OKRs)
      ├── :300N → Caddy → 🐨 AnyKoala       (your choice of 20 roles)
-     └── :3099 → Admin API → 🎮 Web UI     (isometric office dashboard)
+     └── :3099 → Admin API → 🎮 Web UI     (pixel art living office dashboard)
 ```
 
 ---
@@ -87,22 +87,26 @@ Internet / LAN
 ### 20 Specialized Agent Roles
 Each agent gets a unique personality (IDENTITY.md), behavior rules (SOUL.md), pre-configured skills, desk decorations, and a gamification skill tree. Includes an **OrchestratorKoala** that delegates complex tasks to specialist agents.
 
-### Isometric Office Web UI
-A browser-based dashboard at `:3099` with:
-- **Mission Control sidebar** — collapsible panel (320px ↔ 60px) with Agents, Agent Files (Identity/Soul/Memory/Protocol editor), Documents (drag & drop upload for RAG), Channels (per-agent Telegram/WhatsApp/Slack/Discord config), Integrations (OpenAI, Anthropic, Wiro, etc.), Wiro AI status, and System (restart, backup)
-- **Animated office** — canvas overlay with procedural pixel koalas, dust particles, coffee steam, thinking sparkles, screen glow, and day/night tint
-- **Isometric office** — manager room at the top (OrchestratorKoala at a larger executive desk), glass divider, then open office with other agents at desks; hover tooltips and desk click zoom
-- **Live character animations** — idle, thinking, typing, browsing, talking, error, sleeping (DOM + canvas sprites)
-- **Admin panel** — agent list, status, skill toggles, quick actions
-- **Chat with media support** — talk to any agent, attach images (📎), generated images/videos/audio render inline with player controls and ⬇ download button
-- **Orchestrate mode** — toggle 🎯 in chat to route messages through OrchestratorKoala with live delegation chain
-- **Wiro AI skill** — agents with the `wiro-ai` skill can generate images/video/audio; they auto-discover models via Wiro API, read model docs, and build correct parameters
-- **Wiro AI status panel** — sidebar shows connection status, which agents have the skill, and a quick test input
-- **Settings page** — configure Wiro API keys, channel integrations, default model (⚙️)
-- **Live logs** — color-coded, filterable, real-time log stream
-- **Workflow pipelines** — chain agents together (Blog Post, Product Launch, Security Audit)
-- **Monitoring dashboard** — CPU/RAM per agent, alerts, cron jobs
-- **Gamification** — XP, levels (1-50), achievements, leaderboard, outfits, desk rewards
+### Pixel Art Living Office (Phaser 3)
+A browser-based dashboard at `:3099` with a fully animated pixel art office built on **Phaser 3**:
+- **Living office scene** — top-down pixel art office with manager room, open workspace, break room, and lounge; all assets generated procedurally at runtime (no external PNGs)
+- **Animated koala characters** — each agent has a unique pixel art koala with role-specific colors and accessories; 8 animation states (idle, walk, sit, sleep, coffee hold, wave, celebrate, stretch)
+- **NPC AI behavior** — koalas autonomously take coffee breaks, rest on couches, chat with colleagues, browse bookshelves, play ping pong, stretch, and celebrate; behavior driven by energy/mood system
+- **A* pathfinding** — koalas walk realistic paths through the office using EasyStar.js, avoiding furniture and walls
+- **Particle effects** — dust motes floating in air, coffee machine steam, server rack LED blinks, confetti on celebrations, heart particles on click
+- **Day/night cycle** — ambient lighting changes based on real clock; window light beams during daytime, dimmed overlay at night; monitor glows brighten after dark
+- **Weather system** — dynamic weather (clear, cloudy, rain, snow, storm) with particle effects; lightning flashes during storms that make koalas react
+- **Speech bubbles** — context-aware speech bubbles appear above koalas during activities; thought bubbles on hover show role and energy level
+- **Layout editor** — toggle "Layout" button to enter decoration mode; place/remove 27+ furniture items (plants, bookshelves, whiteboards, ping pong tables, bean bags, standing desks, trophy cases, and more); saved to localStorage
+- **Camera controls** — scroll wheel to zoom (1x-5x), click and drag to pan
+- **Agent interaction** — click a koala to see a wave animation with heart particles and speech bubble; clicking also selects the agent in the sidebar
+- **Random events** — group meetings, coffee runs with buddies, deep focus mode, spontaneous celebrations
+- **Status integration** — real-time agent status reflected in koala behavior (thinking, working, error, offline/sleeping) with color-coded status dots
+- **Mission Control sidebar** — collapsible panel with Agents, Agent Files, Documents (drag & drop for RAG), Channels (per-agent Telegram/WhatsApp/Slack/Discord), Integrations, Wiro AI status, and System
+- **Chat with media support** — talk to any agent, attach images (📎), generated images/videos/audio render inline with ⬇ download button
+- **Orchestrate mode** — toggle 🎯 in chat to route messages through OrchestratorKoala with live SSE delegation chain
+- **Wiro AI skill** — agents auto-discover models, suggest 2-3 options with cost/speed, generate images/video/audio
+- **Settings, Logs, Workflows, Monitoring, Gamification** — all fully integrated
 
 ### Wiro AI Skill (Smart Generation)
 Connect to [Wiro AI](https://wiro.ai) for 500+ generative models. Agents with the `wiro-ai` skill handle generation with a two-step flow:
@@ -216,8 +220,8 @@ Each role includes:
 
 The web UI runs on port `3099` and provides a complete management interface:
 
-### Isometric Office & Mission Control
-The office has a **manager room** at the top (OrchestratorKoala at a larger executive desk), a glass divider, and an **open office** area below with the other agents at desks. In the Mission Control sidebar, the orchestrator is marked with a **Manager** badge. Click any agent to see details, toggle skills, view logs, or open their OpenClaw Canvas. The **Mission Control** sidebar (collapse with ◀) lets you edit agent files (Identity, Soul, Memory, Protocol), manage API keys (OpenAI, Anthropic, Wiro, etc.), and run system actions (Restart All, Backup). The office view uses a canvas overlay for pixel-art style characters, ambient effects (dust, steam, sparkles), and day/night tint.
+### Pixel Art Living Office
+The office is a fully animated **Phaser 3** pixel art scene with a **manager room** (OrchestratorKoala), a **main workspace** with desks, a **break room** (coffee machine, fridge, vending machine, water cooler), and a **lounge** (couches, bean bags, side tables). Each agent has a unique pixel art koala character that autonomously moves, works, takes breaks, chats with colleagues, and sleeps. The office has a real-time **day/night cycle**, **weather system** (rain, snow, storms with lightning), floating **dust particles**, coffee machine **steam**, and server rack **LED blinks**. Click any koala to interact (wave + hearts), or use the **Layout** button to enter decoration mode and customize the office with 27+ furniture items. Camera supports zoom (1x-5x) and pan.
 
 ### Orchestrated Chat
 Enable the **🎯 Orchestrate** toggle in any agent's chat to route messages through OrchestratorKoala. For complex tasks, the orchestrator automatically delegates to specialist agents and shows a **live delegation chain** — you see each agent start working, finish, and can expand their individual responses. Simple questions are answered directly without unnecessary delegation.
@@ -316,7 +320,7 @@ GitHub repo:
 ├── ui/                       # Web UI frontend
 │   ├── index.html
 │   ├── css/                  # 9 CSS modules (main, chat, office, mission-control, etc.)
-│   └── js/                   # 11 JS modules (app, chat, office, mission-control, office-animator, etc.)
+│   └── js/                   # 11 JS modules (app, chat, office, office-game [Phaser 3], mission-control, etc.)
 ├── roles/                    # 20 role templates (incl. orchestrator-koala)
 │   └── <role-name>/
 │       ├── IDENTITY.md

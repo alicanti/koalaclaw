@@ -255,7 +255,7 @@ body.mc-collapsed .app-container {
     overflow: hidden;
 }
 
-.tab-content.active { display: flex; }
+.tab-content.active { display: flex; flex-direction: column; }
 
 /* Chat View */
 .chat-placeholder {
