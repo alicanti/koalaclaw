@@ -1700,7 +1700,12 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                     capture_output=True, text=True, timeout=30
                 )
                 out = (result.stdout or "") + (result.stderr or "")
-                return {"success": result.returncode == 0, "channel": name, "agent_id": agent_id, "message": out[:500]}
+                # Auto-approve any pending pairing requests
+                self._auto_approve_pairings(container, "telegram")
+                return {
+                    "success": result.returncode == 0, "channel": name, "agent_id": agent_id,
+                    "message": out[:300] + "\n\nTelegram bot added. Send a message to your bot on Telegram — pairing requests will be auto-approved.",
+                }
             except Exception as e:
                 return {"error": str(e)}
 
@@ -1734,6 +1739,32 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
                 return {"error": str(e)}
 
         return {"error": f"Unknown channel: {name}"}
+
+    def _auto_approve_pairings(self, container, channel):
+        """Auto-approve all pending pairing requests for a channel."""
+        def _do_approve():
+            import time as _time
+            for attempt in range(5):
+                _time.sleep(3 if attempt == 0 else 10)
+                try:
+                    list_result = subprocess.run(
+                        ["docker", "exec", container, "node", "openclaw.mjs", "pairing", "list", "--channel", channel],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    output = list_result.stdout or ""
+                    import re as _re
+                    codes = _re.findall(r'│\s*([A-Z0-9]{6,10})\s*│', output)
+                    for code in codes:
+                        subprocess.run(
+                            ["docker", "exec", container, "node", "openclaw.mjs", "pairing", "approve", channel, code, "--notify"],
+                            capture_output=True, text=True, timeout=10
+                        )
+                        print(f"[CHANNEL] Auto-approved pairing {code} for {channel} on {container}", file=sys.stderr, flush=True)
+                    if codes:
+                        break
+                except Exception:
+                    pass
+        threading.Thread(target=_do_approve, daemon=True).start()
 
     def _json_response(self, data, status=HTTPStatus.OK):
         """Send a JSON response."""

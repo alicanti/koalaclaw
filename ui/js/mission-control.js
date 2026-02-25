@@ -404,8 +404,15 @@ class MissionControl {
             } else if (res?.qr_url) {
                 if (textEl) textEl.innerHTML = `<a href="${this._esc(res.qr_url)}" target="_blank">Scan QR</a>`;
             } else {
-                if (textEl) textEl.textContent = res?.success ? 'Connected!' : (res?.message || 'Done');
-                this._pollChannelStatuses(this._channelsAgent);
+                const msg = res?.message || '';
+                if (textEl) {
+                    if (res?.success && name === 'telegram') {
+                        textEl.innerHTML = '<span style="color:#4caf50">Bot added! Send a message to your bot on Telegram — it will auto-pair.</span>';
+                    } else {
+                        textEl.textContent = res?.success ? 'Connected!' : (msg.substring(0, 150) || 'Done');
+                    }
+                }
+                setTimeout(() => this._pollChannelStatuses(this._channelsAgent), 5000);
             }
             if (tokenInput) tokenInput.value = '';
             if (appInput) appInput.value = '';
