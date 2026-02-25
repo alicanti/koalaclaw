@@ -470,23 +470,23 @@ const ROLE_COLORS = {
 // Tile IDs match the tileset: row*16+col, 1-indexed for Phaser
 
 const DECORATION_CATALOG = [
-    { id: 'plant', name: 'Plant', tileId: 12, blocking: false },
-    { id: 'bookshelf', name: 'Bookshelf', tileId: 11, blocking: true },
-    { id: 'couch', name: 'Couch', tileId: 10, blocking: true },
-    { id: 'coffeemachine', name: 'Coffee Machine', tileId: 9, blocking: true },
-    { id: 'fridge', name: 'Fridge', tileId: 17, blocking: true },
-    { id: 'vending', name: 'Vending Machine', tileId: 18, blocking: true },
-    { id: 'server', name: 'Server Rack', tileId: 13, blocking: true },
-    { id: 'watercooler', name: 'Water Cooler', tileId: 14, blocking: true },
-    { id: 'cabinet', name: 'Filing Cabinet', tileId: 19, blocking: true },
-    { id: 'whiteboard', name: 'Whiteboard', tileId: 22, blocking: true },
-    { id: 'beanbag', name: 'Bean Bag', tileId: 23, blocking: true },
-    { id: 'painting', name: 'Painting', tileId: 20, blocking: true },
-    { id: 'clock', name: 'Clock', tileId: 21, blocking: true },
-    { id: 'rug', name: 'Rug', tileId: 24, blocking: false },
-    { id: 'lamp', name: 'Floor Lamp', tileId: 25, blocking: false },
-    { id: 'cactus', name: 'Cactus', tileId: 26, blocking: false },
-    { id: 'trophy', name: 'Trophy Case', tileId: 27, blocking: true },
+    { id: 'plant', name: 'Plant', tileId: 21, blocking: false },
+    { id: 'bookshelf', name: 'Bookshelf', tileId: 20, blocking: true },
+    { id: 'couch', name: 'Couch', tileId: 19, blocking: true },
+    { id: 'coffeemachine', name: 'Coffee Machine', tileId: 18, blocking: true },
+    { id: 'fridge', name: 'Fridge', tileId: 34, blocking: true },
+    { id: 'vending', name: 'Vending Machine', tileId: 35, blocking: true },
+    { id: 'server', name: 'Server Rack', tileId: 22, blocking: true },
+    { id: 'watercooler', name: 'Water Cooler', tileId: 23, blocking: true },
+    { id: 'cabinet', name: 'Filing Cabinet', tileId: 36, blocking: true },
+    { id: 'whiteboard', name: 'Whiteboard', tileId: 39, blocking: true },
+    { id: 'beanbag', name: 'Bean Bag', tileId: 40, blocking: true },
+    { id: 'painting', name: 'Painting', tileId: 37, blocking: true },
+    { id: 'clock', name: 'Clock', tileId: 38, blocking: true },
+    { id: 'rug', name: 'Rug', tileId: 49, blocking: false },
+    { id: 'lamp', name: 'Floor Lamp', tileId: 50, blocking: false },
+    { id: 'cactus', name: 'Cactus', tileId: 51, blocking: false },
+    { id: 'trophy', name: 'Trophy Case', tileId: 52, blocking: true },
 ];
 
 // ── Speech bubble messages ──────────────────────────────
@@ -523,14 +523,24 @@ function generateMapData() {
         }
     }
 
+    // Tile IDs (Phaser 1-indexed, 16 cols per row):
+    // Row0: 1=void,2=wood,3=ceramic,4=carpet,5=wall,6=window,7=glass,8=desk
+    // Row1: 17=monitor,18=coffee,19=couch,20=bookshelf,21=plant,22=server,23=watercooler,24=door
+    // Row2: 33=mgrfloor,34=fridge,35=vending,36=cabinet,37=painting,38=clock,39=whiteboard,40=beanbag
+    // Row3: 49=rug,50=lamp,51=cactus,52=trophy
+    const T = { void:1, wood:2, ceramic:3, carpet:4, wall:5, window:6, glass:7, desk:8,
+                monitor:17, coffee:18, couch:19, bookshelf:20, plant:21, server:22, watercooler:23, door:24,
+                mgrfloor:33, fridge:34, vending:35, cabinet:36, painting:37, clock:38, whiteboard:39, beanbag:40,
+                rug:49, lamp:50, cactus:51, trophy:52 };
+
     // Manager room floor (top, rows 1-4)
-    fill(map, 1, 1, MAP_W - 2, 4, 16 + 1);
+    fill(map, 1, 1, MAP_W - 2, 4, T.mgrfloor);
     // Main work area (rows 6-16)
-    fill(map, 1, 6, 14, MAP_H - 2, 1 + 1);
+    fill(map, 1, 6, 14, MAP_H - 2, T.wood);
     // Break room (right side, rows 6-11)
-    fill(map, 16, 6, MAP_W - 2, 11, 2 + 1);
+    fill(map, 16, 6, MAP_W - 2, 11, T.ceramic);
     // Lounge (right side, rows 13-16)
-    fill(map, 16, 13, MAP_W - 2, MAP_H - 2, 3 + 1);
+    fill(map, 16, 13, MAP_W - 2, MAP_H - 2, T.carpet);
 
     // Walkable areas
     fill(collision, 1, 1, MAP_W - 2, 4, 0);
@@ -541,29 +551,29 @@ function generateMapData() {
     fill(collision, 16, 12, MAP_W - 2, 12, 0);
 
     // Outer walls
-    fill(map, 0, 0, MAP_W - 1, 0, 4 + 1);
-    fill(map, 0, 0, 0, MAP_H - 1, 4 + 1);
-    fill(map, MAP_W - 1, 0, MAP_W - 1, MAP_H - 1, 4 + 1);
-    fill(map, 0, MAP_H - 1, MAP_W - 1, MAP_H - 1, 4 + 1);
+    fill(map, 0, 0, MAP_W - 1, 0, T.wall);
+    fill(map, 0, 0, 0, MAP_H - 1, T.wall);
+    fill(map, MAP_W - 1, 0, MAP_W - 1, MAP_H - 1, T.wall);
+    fill(map, 0, MAP_H - 1, MAP_W - 1, MAP_H - 1, T.wall);
 
     // Windows on top wall
     for (let x = 3; x < MAP_W - 3; x += 4) {
-        if (x < MAP_W) map[0][x] = 5 + 1;
+        if (x < MAP_W) map[0][x] = T.window;
     }
 
     // Glass partition (manager room divider, row 5)
-    fill(map, 1, 5, MAP_W - 2, 5, 6 + 1);
-    map[5][7] = 15 + 1; // door
+    fill(map, 1, 5, MAP_W - 2, 5, T.glass);
+    map[5][7] = T.door;
     collision[5][7] = 0;
 
     // Wall between work area and break room (col 15)
-    for (let y = 6; y <= MAP_H - 2; y++) map[y][15] = 4 + 1;
-    map[9][15] = 15 + 1; // door
+    for (let y = 6; y <= MAP_H - 2; y++) map[y][15] = T.wall;
+    map[9][15] = T.door;
     collision[9][15] = 0;
 
     // Wall between break room and lounge (row 12)
-    fill(map, 16, 12, MAP_W - 2, 12, 4 + 1);
-    map[12][19] = 15 + 1; // door
+    fill(map, 16, 12, MAP_W - 2, 12, T.wall);
+    map[12][19] = T.door;
     collision[12][19] = 0;
 
     // Work desks (main area)
@@ -574,48 +584,48 @@ function generateMapData() {
     ];
     desks.forEach(d => {
         if (d.y < MAP_H && d.x < MAP_W) {
-            furniture[d.y][d.x] = 7 + 1;
+            furniture[d.y][d.x] = T.desk;
             collision[d.y][d.x] = 1;
             if (d.x + 1 < MAP_W) {
-                furniture[d.y][d.x + 1] = 8 + 1;
+                furniture[d.y][d.x + 1] = T.monitor;
                 collision[d.y][d.x + 1] = 1;
             }
         }
     });
 
     // Manager desk (larger)
-    furniture[3][10] = 7 + 1; collision[3][10] = 1;
-    furniture[3][11] = 8 + 1; collision[3][11] = 1;
-    furniture[3][12] = 7 + 1; collision[3][12] = 1;
+    furniture[3][10] = T.desk; collision[3][10] = 1;
+    furniture[3][11] = T.monitor; collision[3][11] = 1;
+    furniture[3][12] = T.desk; collision[3][12] = 1;
 
     // Break room items
-    furniture[7][17] = 9 + 1; collision[7][17] = 1;  // coffee machine
-    furniture[7][19] = 17 + 1; collision[7][19] = 1; // fridge
-    furniture[7][21] = 18 + 1; collision[7][21] = 1; // vending
-    furniture[9][17] = 14 + 1; collision[9][17] = 1; // water cooler
+    furniture[7][17] = T.coffee; collision[7][17] = 1;
+    furniture[7][19] = T.fridge; collision[7][19] = 1;
+    furniture[7][21] = T.vending; collision[7][21] = 1;
+    furniture[9][17] = T.watercooler; collision[9][17] = 1;
 
     // Lounge items
-    furniture[14][17] = 10 + 1; collision[14][17] = 1; // couch
-    furniture[14][19] = 10 + 1; collision[14][19] = 1; // couch
-    furniture[15][21] = 23 + 1; collision[15][21] = 1; // bean bag
+    furniture[14][17] = T.couch; collision[14][17] = 1;
+    furniture[14][19] = T.couch; collision[14][19] = 1;
+    furniture[15][21] = T.beanbag; collision[15][21] = 1;
 
     // Decorations
-    furniture[2][2] = 12 + 1;  // plant in manager room
-    furniture[2][MAP_W - 3] = 12 + 1; // plant
-    furniture[10][2] = 11 + 1; collision[10][2] = 1; // bookshelf
-    furniture[10][13] = 13 + 1; collision[10][13] = 1; // server rack
-    furniture[14][MAP_W - 3] = 12 + 1; // plant in lounge
-    furniture[7][MAP_W - 3] = 19 + 1; collision[7][MAP_W - 3] = 1; // filing cabinet
+    furniture[2][2] = T.plant;
+    furniture[2][MAP_W - 3] = T.plant;
+    furniture[10][2] = T.bookshelf; collision[10][2] = 1;
+    furniture[10][13] = T.server; collision[10][13] = 1;
+    furniture[14][MAP_W - 3] = T.plant;
+    furniture[7][MAP_W - 3] = T.cabinet; collision[7][MAP_W - 3] = 1;
 
     // Wall decorations
-    furniture[0][6] = 20 + 1;  // painting
-    furniture[0][12] = 20 + 1; // painting
-    furniture[0][18] = 21 + 1; // clock
+    furniture[0][6] = T.painting;
+    furniture[0][12] = T.painting;
+    furniture[0][18] = T.clock;
 
     // Extra decorations
-    furniture[2][6] = 25 + 1;  // lamp
-    furniture[15][17] = 24 + 1; // rug in lounge
-    furniture[2][MAP_W - 5] = 27 + 1; collision[2][MAP_W - 5] = 1; // trophy
+    furniture[2][6] = T.lamp;
+    furniture[15][17] = T.rug;
+    furniture[2][MAP_W - 5] = T.trophy; collision[2][MAP_W - 5] = 1;
 
     return { map, collision, furniture, desks };
 }
@@ -711,24 +721,24 @@ class OfficeScene extends Phaser.Scene {
             sprite.play(`${texKey}-sit`);
 
             // Name label
-            const nameText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 4, agent.name || `Agent ${agent.id}`, {
-                fontSize: '7px', fontFamily: 'monospace', color: '#f0f0f5',
-                backgroundColor: 'rgba(10,10,15,0.7)', padding: { x: 2, y: 1 },
+            const nameText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 8, agent.name || `Agent ${agent.id}`, {
+                fontSize: '10px', fontFamily: 'monospace', color: '#f0f0f5',
+                backgroundColor: 'rgba(10,10,15,0.8)', padding: { x: 4, y: 2 },
             }).setOrigin(0.5, 1).setDepth(100);
 
             // Status indicator dot
-            const statusDot = this.add.circle(desk.x * TILE + TILE / 2 + 20, desk.y * TILE - 4, 3, 0x3ECFA0).setDepth(101);
+            const statusDot = this.add.circle(desk.x * TILE + TILE / 2 + 30, desk.y * TILE - 8, 4, 0x3ECFA0).setDepth(101);
 
             // Speech bubble container (text that appears above koala)
-            const bubbleText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 16, '', {
-                fontSize: '5px', fontFamily: 'monospace', color: '#0a0a0f',
-                backgroundColor: '#3ECFA0', padding: { x: 3, y: 2 },
+            const bubbleText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 24, '', {
+                fontSize: '9px', fontFamily: 'monospace', color: '#0a0a0f',
+                backgroundColor: '#3ECFA0', padding: { x: 5, y: 3 },
             }).setOrigin(0.5, 1).setDepth(102).setAlpha(0);
 
             // Thought bubble (smaller, dimmer)
-            const thoughtText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 22, '', {
-                fontSize: '4px', fontFamily: 'monospace', color: '#f0f0f5',
-                backgroundColor: 'rgba(42,42,56,0.9)', padding: { x: 2, y: 1 },
+            const thoughtText = this.add.text(desk.x * TILE + TILE / 2, desk.y * TILE - 38, '', {
+                fontSize: '8px', fontFamily: 'monospace', color: '#f0f0f5',
+                backgroundColor: 'rgba(42,42,56,0.9)', padding: { x: 4, y: 2 },
             }).setOrigin(0.5, 1).setDepth(102).setAlpha(0);
 
             const koala = {
@@ -1288,7 +1298,7 @@ class OfficeScene extends Phaser.Scene {
 
         k.bubbleText.setText(text);
         k.bubbleText.x = k.sprite.x;
-        k.bubbleText.y = k.sprite.y - 16;
+        k.bubbleText.y = k.sprite.y - 24;
         this.tweens.killTweensOf(k.bubbleText);
         k.bubbleText.setAlpha(1);
         this.tweens.add({ targets: k.bubbleText, alpha: 0, duration: 600, delay: 3000 });
@@ -1297,7 +1307,7 @@ class OfficeScene extends Phaser.Scene {
     _showThought(k, text) {
         k.thoughtText.setText(text);
         k.thoughtText.x = k.sprite.x;
-        k.thoughtText.y = k.sprite.y - 22;
+        k.thoughtText.y = k.sprite.y - 38;
         this.tweens.killTweensOf(k.thoughtText);
         k.thoughtText.setAlpha(1);
     }
@@ -1471,13 +1481,13 @@ class OfficeScene extends Phaser.Scene {
 
     _syncLabels(k) {
         k.nameText.x = k.sprite.x;
-        k.nameText.y = k.sprite.y - 4;
-        k.statusDot.x = k.sprite.x + 20;
-        k.statusDot.y = k.sprite.y - 4;
+        k.nameText.y = k.sprite.y - 8;
+        k.statusDot.x = k.sprite.x + 30;
+        k.statusDot.y = k.sprite.y - 8;
         k.bubbleText.x = k.sprite.x;
-        k.bubbleText.y = k.sprite.y - 16;
+        k.bubbleText.y = k.sprite.y - 24;
         k.thoughtText.x = k.sprite.x;
-        k.thoughtText.y = k.sprite.y - 22;
+        k.thoughtText.y = k.sprite.y - 38;
     }
 
     // ════════════════════════════════════════════════════════
