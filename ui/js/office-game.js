@@ -6,15 +6,15 @@
  * particle effects, day/night cycle, speech bubbles, weather, decoration editor.
  */
 
-const TILE = 16;
-const MAP_W = 40;
-const MAP_H = 30;
-const CHAR_SIZE = 16;
+const TILE = 32;
+const MAP_W = 24;
+const MAP_H = 18;
+const CHAR_SIZE = 32;
 
 // ── Procedural Tileset Generator ────────────────────────
 
 function generateTileset() {
-    const cols = 16, rows = 8, size = TILE;
+    const cols = 16, rows = 4, size = TILE;
     const canvas = document.createElement('canvas');
     canvas.width = cols * size;
     canvas.height = rows * size;
@@ -28,285 +28,256 @@ function generateTileset() {
         ctx.restore();
     }
 
+    const S = size;
+
     // 0: empty/black
-    drawTile(0, 0, (c, s) => { c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, s, s); });
-    // 1: wood floor
-    drawTile(1, 0, (c, s) => {
-        c.fillStyle = '#2a2520'; c.fillRect(0, 0, s, s);
-        c.fillStyle = '#332e28'; c.fillRect(0, 0, s, 7);
-        c.fillStyle = '#1e1a16'; c.fillRect(0, 8, s, 1);
-    });
-    // 2: tile floor (break room)
-    drawTile(2, 0, (c, s) => {
-        c.fillStyle = '#1e2a2a'; c.fillRect(0, 0, s, s);
-        c.strokeStyle = '#2a3838'; c.lineWidth = 1;
-        c.strokeRect(0.5, 0.5, s - 1, s - 1);
-    });
-    // 3: carpet (lounge)
-    drawTile(3, 0, (c, s) => {
-        c.fillStyle = '#1a2030'; c.fillRect(0, 0, s, s);
-        for (let i = 0; i < 4; i++) { c.fillStyle = '#1e2438'; c.fillRect(i * 4, 0, 2, s); }
-    });
-    // 4: wall
-    drawTile(4, 0, (c, s) => {
-        c.fillStyle = '#1a1a24'; c.fillRect(0, 0, s, s);
-        c.fillStyle = '#222230'; c.fillRect(0, s - 4, s, 4);
-        c.fillStyle = '#2a2a38'; c.fillRect(0, s - 2, s, 2);
-    });
-    // 5: window
-    drawTile(5, 0, (c, s) => {
-        c.fillStyle = '#1a1a24'; c.fillRect(0, 0, s, s);
-        c.fillStyle = '#0a1520'; c.fillRect(2, 2, s - 4, s - 6);
-        c.fillStyle = '#1a3040'; c.fillRect(3, 3, s - 6, s - 8);
-        c.strokeStyle = '#2a2a38'; c.lineWidth = 1; c.strokeRect(2, 2, s - 4, s - 6);
-    });
-    // 6: glass partition
-    drawTile(6, 0, (c, s) => {
-        c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, s, s);
-        c.fillStyle = 'rgba(62,207,160,0.15)'; c.fillRect(0, s / 2 - 1, s, 3);
-        c.fillStyle = 'rgba(62,207,160,0.08)'; c.fillRect(0, 0, s, s);
-    });
-    // 7: desk top
-    drawTile(7, 0, (c, s) => {
-        c.fillStyle = '#3a3020'; c.fillRect(1, 2, s - 2, s - 4);
-        c.fillStyle = '#4a4030'; c.fillRect(2, 3, s - 4, s - 6);
-        c.fillStyle = '#2a2018'; c.fillRect(1, s - 3, s - 2, 1);
-    });
-    // 8: chair
-    drawTile(0, 1, (c, s) => {
-        c.fillStyle = '#2a3028'; c.fillRect(3, 3, s - 6, s - 6);
-        c.fillStyle = '#3a4038'; c.fillRect(4, 1, s - 8, 4);
-        c.fillStyle = '#1a2018'; c.fillRect(5, s - 4, s - 10, 3);
-    });
-    // 9: monitor
-    drawTile(1, 1, (c, s) => {
-        c.fillStyle = '#1a1a1a'; c.fillRect(2, 1, s - 4, s - 6);
-        c.fillStyle = '#0a2a20'; c.fillRect(3, 2, s - 6, s - 8);
-        c.fillStyle = '#1a1a1a'; c.fillRect(6, s - 4, 4, 2);
-        c.fillStyle = '#1a1a1a'; c.fillRect(4, s - 2, 8, 1);
-    });
-    // 10: coffee machine
-    drawTile(2, 1, (c, s) => {
-        c.fillStyle = '#3a3a3a'; c.fillRect(3, 2, s - 6, s - 4);
-        c.fillStyle = '#2a2a2a'; c.fillRect(4, 3, s - 8, s - 6);
-        c.fillStyle = '#ff6030'; c.fillRect(6, 5, 3, 2);
-        c.fillStyle = '#4a4a4a'; c.fillRect(3, s - 3, s - 6, 1);
-    });
-    // 11: couch
-    drawTile(3, 1, (c, s) => {
-        c.fillStyle = '#2a3548'; c.fillRect(1, 3, s - 2, s - 5);
-        c.fillStyle = '#344060'; c.fillRect(2, 4, s - 4, s - 7);
-        c.fillStyle = '#1e2838'; c.fillRect(1, 2, 3, s - 4);
-        c.fillStyle = '#1e2838'; c.fillRect(s - 4, 2, 3, s - 4);
-    });
-    // 12: bookshelf
-    drawTile(4, 1, (c, s) => {
-        c.fillStyle = '#3a2a1a'; c.fillRect(1, 0, s - 2, s);
-        c.fillStyle = '#2a1a0a'; c.fillRect(1, 5, s - 2, 1);
-        c.fillStyle = '#2a1a0a'; c.fillRect(1, 10, s - 2, 1);
-        const colors = ['#4a2020', '#204a20', '#20204a', '#4a4a20', '#4a204a'];
-        for (let i = 0; i < 5; i++) { c.fillStyle = colors[i]; c.fillRect(2 + i * 2, 1, 2, 4); }
-        for (let i = 0; i < 5; i++) { c.fillStyle = colors[4 - i]; c.fillRect(2 + i * 2, 6, 2, 4); }
-    });
-    // 13: plant
-    drawTile(5, 1, (c, s) => {
-        c.fillStyle = '#4a3020'; c.fillRect(5, s - 5, 6, 5);
-        c.fillStyle = '#1a5a30'; c.fillRect(4, s - 9, 8, 5);
-        c.fillStyle = '#2a7a40'; c.fillRect(5, s - 11, 6, 4);
-        c.fillStyle = '#3a8a50'; c.fillRect(6, s - 12, 4, 2);
-    });
-    // 14: fridge
-    drawTile(6, 1, (c, s) => {
-        c.fillStyle = '#d0d0d0'; c.fillRect(2, 1, s - 4, s - 2);
-        c.fillStyle = '#b0b0b0'; c.fillRect(3, 2, s - 6, 5);
-        c.fillStyle = '#b0b0b0'; c.fillRect(3, 8, s - 6, 6);
-        c.fillStyle = '#808080'; c.fillRect(s - 5, 4, 1, 3);
-        c.fillStyle = '#808080'; c.fillRect(s - 5, 10, 1, 3);
-    });
-    // 15: vending machine
-    drawTile(7, 1, (c, s) => {
-        c.fillStyle = '#2a2a4a'; c.fillRect(2, 1, s - 4, s - 2);
-        c.fillStyle = '#1a1a3a'; c.fillRect(3, 2, s - 6, s - 5);
-        c.fillStyle = '#ff4040'; c.fillRect(4, 3, 3, 2);
-        c.fillStyle = '#40ff40'; c.fillRect(8, 3, 3, 2);
-        c.fillStyle = '#4040ff'; c.fillRect(4, 6, 3, 2);
-    });
-    // 16: rug center
-    drawTile(0, 2, (c, s) => {
-        c.fillStyle = '#2a1830'; c.fillRect(0, 0, s, s);
-        c.fillStyle = '#3a2840'; c.fillRect(1, 1, s - 2, s - 2);
-    });
-    // 17: painting
-    drawTile(1, 2, (c, s) => {
-        c.fillStyle = '#4a3a1a'; c.fillRect(1, 1, s - 2, s - 2);
-        c.fillStyle = '#1a3a5a'; c.fillRect(2, 2, s - 4, 5);
-        c.fillStyle = '#3a6a3a'; c.fillRect(2, 7, s - 4, 4);
-        c.fillStyle = '#eac040'; c.fillRect(5, 3, 3, 2);
-    });
-    // 18: clock
-    drawTile(2, 2, (c, s) => {
-        c.fillStyle = '#e0e0e0'; c.beginPath(); c.arc(s / 2, s / 2, 5, 0, Math.PI * 2); c.fill();
-        c.fillStyle = '#1a1a1a'; c.beginPath(); c.arc(s / 2, s / 2, 4, 0, Math.PI * 2); c.fill();
-        c.strokeStyle = '#e0e0e0'; c.lineWidth = 1;
-        c.beginPath(); c.moveTo(s / 2, s / 2); c.lineTo(s / 2, s / 2 - 3); c.stroke();
-        c.beginPath(); c.moveTo(s / 2, s / 2); c.lineTo(s / 2 + 2, s / 2); c.stroke();
-    });
-    // 19: server rack
-    drawTile(3, 2, (c, s) => {
-        c.fillStyle = '#1a1a1a'; c.fillRect(2, 1, s - 4, s - 2);
-        for (let i = 0; i < 4; i++) {
-            c.fillStyle = '#2a2a2a'; c.fillRect(3, 2 + i * 3, s - 6, 2);
-            c.fillStyle = i % 2 === 0 ? '#3ECFA0' : '#ff4040'; c.fillRect(4, 3 + i * 3, 2, 1);
+    drawTile(0, 0, (c) => { c.fillStyle = '#0d1117'; c.fillRect(0, 0, S, S); });
+
+    // 1: wood floor — warm planks
+    drawTile(1, 0, (c) => {
+        c.fillStyle = '#3d3225'; c.fillRect(0, 0, S, S);
+        for (let y = 0; y < S; y += 8) {
+            c.fillStyle = y % 16 === 0 ? '#453a2c' : '#352c20';
+            c.fillRect(0, y, S, 7);
+            c.fillStyle = '#2a2218'; c.fillRect(0, y + 7, S, 1);
         }
-    });
-    // 20: water cooler
-    drawTile(4, 2, (c, s) => {
-        c.fillStyle = '#a0a0a0'; c.fillRect(4, 6, 8, 8);
-        c.fillStyle = '#6090c0'; c.fillRect(5, 1, 6, 6);
-        c.fillStyle = '#4070a0'; c.fillRect(6, 2, 4, 4);
-    });
-    // 21: door
-    drawTile(5, 2, (c, s) => {
-        c.fillStyle = '#3a2a18'; c.fillRect(2, 0, s - 4, s);
-        c.fillStyle = '#4a3a28'; c.fillRect(3, 1, s - 6, s - 2);
-        c.fillStyle = '#c0a020'; c.fillRect(s - 5, s / 2, 2, 2);
-    });
-    // 22: manager floor (darker wood)
-    drawTile(6, 2, (c, s) => {
-        c.fillStyle = '#1e1a15'; c.fillRect(0, 0, s, s);
-        c.fillStyle = '#28231c'; c.fillRect(0, 0, s, 7);
-        c.fillStyle = '#151210'; c.fillRect(0, 8, s, 1);
-    });
-    // 23: filing cabinet
-    drawTile(7, 2, (c, s) => {
-        c.fillStyle = '#808080'; c.fillRect(2, 1, s - 4, s - 2);
-        c.fillStyle = '#707070'; c.fillRect(3, 2, s - 6, 4);
-        c.fillStyle = '#707070'; c.fillRect(3, 7, s - 6, 4);
-        c.fillStyle = '#606060'; c.fillRect(6, 3, 4, 1);
-        c.fillStyle = '#606060'; c.fillRect(6, 8, 4, 1);
+        c.fillStyle = 'rgba(255,240,200,0.03)'; c.fillRect(0, 0, S, S);
     });
 
-    // Row 3: extra decorations for layout editor
-    // 24: whiteboard
-    drawTile(0, 3, (c, s) => {
-        c.fillStyle = '#e0e0e0'; c.fillRect(1, 1, s - 2, s - 3);
-        c.fillStyle = '#f5f5f5'; c.fillRect(2, 2, s - 4, s - 5);
-        c.fillStyle = '#3a3a3a'; c.fillRect(1, s - 2, s - 2, 2);
-        c.fillStyle = '#ff4040'; c.fillRect(3, 3, 4, 1);
-        c.fillStyle = '#4040ff'; c.fillRect(3, 5, 6, 1);
-        c.fillStyle = '#40a040'; c.fillRect(3, 7, 3, 1);
+    // 2: tile floor (break room) — clean tiles
+    drawTile(2, 0, (c) => {
+        c.fillStyle = '#2a3535'; c.fillRect(0, 0, S, S);
+        c.strokeStyle = '#354545'; c.lineWidth = 1;
+        c.strokeRect(1, 1, S / 2 - 1, S / 2 - 1);
+        c.strokeRect(S / 2, 1, S / 2 - 1, S / 2 - 1);
+        c.strokeRect(1, S / 2, S / 2 - 1, S / 2 - 1);
+        c.strokeRect(S / 2, S / 2, S / 2 - 1, S / 2 - 1);
     });
-    // 25: trash can
-    drawTile(1, 3, (c, s) => {
-        c.fillStyle = '#505050'; c.fillRect(4, 4, 8, 10);
-        c.fillStyle = '#606060'; c.fillRect(3, 3, 10, 2);
-        c.fillStyle = '#404040'; c.fillRect(5, 5, 6, 8);
+
+    // 3: carpet (lounge) — soft pattern
+    drawTile(3, 0, (c) => {
+        c.fillStyle = '#1e2840'; c.fillRect(0, 0, S, S);
+        for (let i = 0; i < S; i += 4) {
+            c.fillStyle = i % 8 === 0 ? '#222e48' : '#1a2438';
+            c.fillRect(i, 0, 3, S);
+        }
     });
-    // 26: meeting table
-    drawTile(2, 3, (c, s) => {
-        c.fillStyle = '#4a3828'; c.fillRect(0, 3, s, s - 6);
-        c.fillStyle = '#5a4838'; c.fillRect(1, 4, s - 2, s - 8);
-        c.fillStyle = '#3a2818'; c.fillRect(2, s - 3, 3, 3);
-        c.fillStyle = '#3a2818'; c.fillRect(s - 5, s - 3, 3, 3);
+
+    // 4: wall — dark with baseboard
+    drawTile(4, 0, (c) => {
+        c.fillStyle = '#1c1c28'; c.fillRect(0, 0, S, S);
+        c.fillStyle = '#242434'; c.fillRect(0, S - 8, S, 8);
+        c.fillStyle = '#2e2e40'; c.fillRect(0, S - 3, S, 3);
+        c.fillStyle = '#181824'; c.fillRect(0, 0, S, 2);
     });
-    // 27: lamp (floor)
-    drawTile(3, 3, (c, s) => {
-        c.fillStyle = '#3a3a3a'; c.fillRect(6, s - 3, 4, 3);
-        c.fillStyle = '#4a4a4a'; c.fillRect(7, 4, 2, s - 7);
-        c.fillStyle = '#f0d060'; c.fillRect(4, 1, 8, 4);
-        c.fillStyle = '#ffe080'; c.fillRect(5, 2, 6, 2);
+
+    // 5: window — glass with frame
+    drawTile(5, 0, (c) => {
+        c.fillStyle = '#1c1c28'; c.fillRect(0, 0, S, S);
+        c.fillStyle = '#0c1a28'; c.fillRect(4, 3, S - 8, S - 10);
+        c.fillStyle = '#142838'; c.fillRect(5, 4, S - 10, S - 12);
+        c.fillStyle = '#1c3848'; c.fillRect(6, 5, S - 12, S - 14);
+        c.strokeStyle = '#2e2e40'; c.lineWidth = 2; c.strokeRect(4, 3, S - 8, S - 10);
+        c.fillStyle = '#2e2e40'; c.fillRect(S / 2 - 1, 3, 2, S - 10);
     });
-    // 28: fire extinguisher
-    drawTile(4, 3, (c, s) => {
-        c.fillStyle = '#cc2020'; c.fillRect(5, 3, 6, 10);
-        c.fillStyle = '#aa1010'; c.fillRect(6, 4, 4, 8);
-        c.fillStyle = '#e0e0e0'; c.fillRect(6, 1, 4, 3);
-        c.fillStyle = '#808080'; c.fillRect(7, 0, 2, 2);
+
+    // 6: glass partition
+    drawTile(6, 0, (c) => {
+        c.fillStyle = '#0d1117'; c.fillRect(0, 0, S, S);
+        c.fillStyle = 'rgba(62,207,160,0.12)'; c.fillRect(0, 0, S, S);
+        c.fillStyle = 'rgba(62,207,160,0.25)'; c.fillRect(0, S / 2 - 2, S, 4);
+        c.fillStyle = '#2a2a38'; c.fillRect(0, S / 2 - 1, S, 1);
     });
-    // 29: printer
-    drawTile(5, 3, (c, s) => {
-        c.fillStyle = '#e0e0e0'; c.fillRect(2, 4, s - 4, 8);
-        c.fillStyle = '#c0c0c0'; c.fillRect(3, 5, s - 6, 6);
-        c.fillStyle = '#f0f0f0'; c.fillRect(4, 2, s - 8, 3);
-        c.fillStyle = '#3ECFA0'; c.fillRect(s - 5, 6, 2, 2);
+
+    // 7: desk
+    drawTile(7, 0, (c) => {
+        c.fillStyle = '#4a3c28'; c.fillRect(2, 4, S - 4, S - 8);
+        c.fillStyle = '#5a4c38'; c.fillRect(3, 5, S - 6, S - 10);
+        c.fillStyle = '#3a2e1c'; c.fillRect(2, S - 5, S - 4, 2);
+        c.fillStyle = '#3a2e1c'; c.fillRect(4, S - 4, 3, 4);
+        c.fillStyle = '#3a2e1c'; c.fillRect(S - 7, S - 4, 3, 4);
     });
-    // 30: bean bag
-    drawTile(6, 3, (c, s) => {
-        c.fillStyle = '#4a6080'; c.fillRect(2, 4, s - 4, s - 5);
-        c.fillStyle = '#5a7090'; c.fillRect(3, 3, s - 6, s - 5);
-        c.fillStyle = '#6a80a0'; c.fillRect(4, 5, s - 8, s - 8);
+
+    // 8: monitor on desk
+    drawTile(0, 1, (c) => {
+        c.fillStyle = '#1a1a22'; c.fillRect(6, 2, S - 12, S - 12);
+        c.fillStyle = '#0a2820'; c.fillRect(7, 3, S - 14, S - 14);
+        c.fillStyle = '#0e3828'; c.fillRect(8, 4, S - 16, S - 16);
+        c.fillStyle = '#1a1a22'; c.fillRect(S / 2 - 2, S - 10, 4, 4);
+        c.fillStyle = '#1a1a22'; c.fillRect(S / 2 - 4, S - 6, 8, 2);
     });
-    // 31: standing desk
-    drawTile(7, 3, (c, s) => {
-        c.fillStyle = '#606060'; c.fillRect(1, 5, 2, s - 5);
-        c.fillStyle = '#606060'; c.fillRect(s - 3, 5, 2, s - 5);
-        c.fillStyle = '#3a3020'; c.fillRect(0, 3, s, 3);
-        c.fillStyle = '#4a4030'; c.fillRect(1, 4, s - 2, 1);
-        c.fillStyle = '#1a1a1a'; c.fillRect(3, 1, s - 6, 3);
-        c.fillStyle = '#0a2a20'; c.fillRect(4, 2, s - 8, 1);
+
+    // 9: coffee machine
+    drawTile(1, 1, (c) => {
+        c.fillStyle = '#484848'; c.fillRect(6, 4, S - 12, S - 8);
+        c.fillStyle = '#383838'; c.fillRect(7, 5, S - 14, S - 10);
+        c.fillStyle = '#ff5020'; c.fillRect(10, 10, 4, 3);
+        c.fillStyle = '#585858'; c.fillRect(6, S - 5, S - 12, 2);
+        c.fillStyle = '#303030'; c.fillRect(8, 6, S - 16, 3);
     });
-    // Row 4: more extras
-    // 32: ping pong table
-    drawTile(0, 4, (c, s) => {
-        c.fillStyle = '#1a5a3a'; c.fillRect(1, 2, s - 2, s - 4);
-        c.fillStyle = '#2a6a4a'; c.fillRect(2, 3, s - 4, s - 6);
-        c.fillStyle = '#e0e0e0'; c.fillRect(s / 2, 2, 1, s - 4);
-        c.fillStyle = '#2a2a2a'; c.fillRect(3, s - 2, 3, 2);
-        c.fillStyle = '#2a2a2a'; c.fillRect(s - 6, s - 2, 3, 2);
+
+    // 10: couch
+    drawTile(2, 1, (c) => {
+        c.fillStyle = '#2e3e58'; c.fillRect(2, 6, S - 4, S - 10);
+        c.fillStyle = '#384868'; c.fillRect(3, 7, S - 6, S - 12);
+        c.fillStyle = '#243048'; c.fillRect(2, 4, 5, S - 8);
+        c.fillStyle = '#243048'; c.fillRect(S - 7, 4, 5, S - 8);
     });
-    // 33: coffee cup (small decoration)
-    drawTile(1, 4, (c, s) => {
-        c.fillStyle = '#e0d0c0'; c.fillRect(5, 6, 6, 6);
-        c.fillStyle = '#c0b0a0'; c.fillRect(6, 7, 4, 4);
-        c.fillStyle = '#6a4020'; c.fillRect(6, 7, 4, 3);
-        c.fillStyle = '#e0d0c0'; c.fillRect(11, 8, 2, 3);
-        c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(7, 5, 1, 2);
+
+    // 11: bookshelf
+    drawTile(3, 1, (c) => {
+        c.fillStyle = '#4a3520'; c.fillRect(2, 0, S - 4, S);
+        const colors = ['#6a2828', '#286a28', '#28286a', '#6a6a28', '#6a286a', '#286a6a'];
+        for (let shelf = 0; shelf < 3; shelf++) {
+            const sy = 2 + shelf * 10;
+            c.fillStyle = '#3a2510'; c.fillRect(2, sy + 8, S - 4, 2);
+            for (let i = 0; i < 6; i++) {
+                c.fillStyle = colors[(i + shelf) % 6];
+                c.fillRect(4 + i * 4, sy, 3, 8);
+            }
+        }
     });
-    // 34: potted cactus
-    drawTile(2, 4, (c, s) => {
-        c.fillStyle = '#8a5a30'; c.fillRect(4, s - 5, 8, 5);
-        c.fillStyle = '#2a8a30'; c.fillRect(6, 2, 4, s - 7);
-        c.fillStyle = '#3a9a40'; c.fillRect(3, 5, 3, 4);
-        c.fillStyle = '#3a9a40'; c.fillRect(s - 6, 3, 3, 5);
+
+    // 12: plant
+    drawTile(4, 1, (c) => {
+        c.fillStyle = '#6a4828'; c.fillRect(10, S - 10, 12, 10);
+        c.fillStyle = '#7a5838'; c.fillRect(11, S - 9, 10, 8);
+        c.fillStyle = '#1a6a30'; c.fillRect(6, S - 20, 20, 12);
+        c.fillStyle = '#2a8a40'; c.fillRect(8, S - 24, 16, 10);
+        c.fillStyle = '#3aaa50'; c.fillRect(10, S - 26, 12, 6);
+        c.fillStyle = '#4aba60'; c.fillRect(12, S - 28, 8, 4);
     });
-    // 35: trophy case
-    drawTile(3, 4, (c, s) => {
-        c.fillStyle = '#4a3a1a'; c.fillRect(1, 0, s - 2, s);
-        c.fillStyle = '#6a5a3a'; c.fillRect(2, 1, s - 4, s - 2);
-        c.fillStyle = '#ffd700'; c.fillRect(4, 3, 3, 4);
-        c.fillStyle = '#ffd700'; c.fillRect(5, 2, 1, 1);
-        c.fillStyle = '#c0c0c0'; c.fillRect(9, 4, 3, 3);
-        c.fillStyle = '#c0c0c0'; c.fillRect(10, 3, 1, 1);
-        c.fillStyle = '#cd7f32'; c.fillRect(4, 9, 3, 3);
+
+    // 13: server rack
+    drawTile(5, 1, (c) => {
+        c.fillStyle = '#1e1e1e'; c.fillRect(4, 2, S - 8, S - 4);
+        for (let i = 0; i < 5; i++) {
+            c.fillStyle = '#2a2a2a'; c.fillRect(5, 4 + i * 5, S - 10, 4);
+            c.fillStyle = i % 2 === 0 ? '#3ECFA0' : '#ff4040'; c.fillRect(7, 5 + i * 5, 3, 2);
+            c.fillStyle = '#444'; c.fillRect(S - 12, 5 + i * 5, 4, 2);
+        }
     });
-    // 36: AC unit (wall)
-    drawTile(4, 4, (c, s) => {
-        c.fillStyle = '#e0e0e0'; c.fillRect(1, 2, s - 2, 8);
-        c.fillStyle = '#c0c0c0'; c.fillRect(2, 3, s - 4, 6);
-        for (let i = 0; i < 4; i++) { c.fillStyle = '#a0a0a0'; c.fillRect(3, 4 + i * 2, s - 6, 1); }
-        c.fillStyle = '#3ECFA0'; c.fillRect(s - 4, 3, 2, 1);
+
+    // 14: water cooler
+    drawTile(6, 1, (c) => {
+        c.fillStyle = '#b0b0b0'; c.fillRect(8, 12, 16, 16);
+        c.fillStyle = '#6898c8'; c.fillRect(10, 2, 12, 12);
+        c.fillStyle = '#4878a8'; c.fillRect(12, 4, 8, 8);
+        c.fillStyle = '#88b8e8'; c.fillRect(13, 5, 6, 6);
     });
-    // 37: umbrella stand
-    drawTile(5, 4, (c, s) => {
-        c.fillStyle = '#3a3a3a'; c.fillRect(4, 8, 8, 6);
-        c.fillStyle = '#4a4a4a'; c.fillRect(5, 9, 6, 4);
-        c.fillStyle = '#2060c0'; c.fillRect(6, 2, 2, 7);
-        c.fillStyle = '#c02020'; c.fillRect(9, 3, 2, 6);
+
+    // 15: door
+    drawTile(7, 1, (c) => {
+        c.fillStyle = '#4a3820'; c.fillRect(4, 0, S - 8, S);
+        c.fillStyle = '#5a4830'; c.fillRect(6, 2, S - 12, S - 4);
+        c.fillStyle = '#d4a830'; c.fillRect(S - 10, S / 2 - 1, 3, 3);
     });
-    // 38: coat rack
-    drawTile(6, 4, (c, s) => {
-        c.fillStyle = '#5a4a3a'; c.fillRect(7, 4, 2, s - 4);
-        c.fillStyle = '#5a4a3a'; c.fillRect(5, s - 2, 6, 2);
-        c.fillStyle = '#3a3a5a'; c.fillRect(3, 2, 4, 3);
-        c.fillStyle = '#5a3a3a'; c.fillRect(9, 3, 4, 2);
-        c.fillStyle = '#5a4a3a'; c.fillRect(4, 1, 8, 2);
+
+    // 16: manager floor
+    drawTile(0, 2, (c) => {
+        c.fillStyle = '#28221a'; c.fillRect(0, 0, S, S);
+        for (let y = 0; y < S; y += 8) {
+            c.fillStyle = y % 16 === 0 ? '#302a20' : '#201c14';
+            c.fillRect(0, y, S, 7);
+            c.fillStyle = '#181410'; c.fillRect(0, y + 7, S, 1);
+        }
     });
-    // 39: small table
-    drawTile(7, 4, (c, s) => {
-        c.fillStyle = '#4a3828'; c.fillRect(3, 4, s - 6, 3);
-        c.fillStyle = '#5a4838'; c.fillRect(4, 5, s - 8, 1);
-        c.fillStyle = '#3a2818'; c.fillRect(4, 7, 2, s - 7);
-        c.fillStyle = '#3a2818'; c.fillRect(s - 6, 7, 2, s - 7);
+
+    // 17: fridge
+    drawTile(1, 2, (c) => {
+        c.fillStyle = '#d8d8d8'; c.fillRect(4, 2, S - 8, S - 4);
+        c.fillStyle = '#c0c0c0'; c.fillRect(6, 4, S - 12, 10);
+        c.fillStyle = '#c0c0c0'; c.fillRect(6, 16, S - 12, 10);
+        c.fillStyle = '#909090'; c.fillRect(S - 10, 8, 2, 5);
+        c.fillStyle = '#909090'; c.fillRect(S - 10, 20, 2, 5);
+    });
+
+    // 18: vending machine
+    drawTile(2, 2, (c) => {
+        c.fillStyle = '#2e2e58'; c.fillRect(4, 2, S - 8, S - 4);
+        c.fillStyle = '#1e1e48'; c.fillRect(6, 4, S - 12, S - 10);
+        c.fillStyle = '#ff4848'; c.fillRect(8, 6, 5, 4);
+        c.fillStyle = '#48ff48'; c.fillRect(16, 6, 5, 4);
+        c.fillStyle = '#4848ff'; c.fillRect(8, 12, 5, 4);
+        c.fillStyle = '#ffff48'; c.fillRect(16, 12, 5, 4);
+    });
+
+    // 19: filing cabinet
+    drawTile(3, 2, (c) => {
+        c.fillStyle = '#909090'; c.fillRect(4, 2, S - 8, S - 4);
+        c.fillStyle = '#808080'; c.fillRect(6, 4, S - 12, 8);
+        c.fillStyle = '#808080'; c.fillRect(6, 14, S - 12, 8);
+        c.fillStyle = '#707070'; c.fillRect(12, 6, 8, 2);
+        c.fillStyle = '#707070'; c.fillRect(12, 16, 8, 2);
+    });
+
+    // 20: painting
+    drawTile(4, 2, (c) => {
+        c.fillStyle = '#5a4a20'; c.fillRect(3, 3, S - 6, S - 8);
+        c.fillStyle = '#1a4a6a'; c.fillRect(5, 5, S - 10, 10);
+        c.fillStyle = '#3a7a3a'; c.fillRect(5, 15, S - 10, 6);
+        c.fillStyle = '#f0c848'; c.fillRect(10, 7, 6, 5);
+    });
+
+    // 21: clock
+    drawTile(5, 2, (c) => {
+        c.fillStyle = '#e8e8e8';
+        c.beginPath(); c.arc(S / 2, S / 2, 10, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#1a1a1a';
+        c.beginPath(); c.arc(S / 2, S / 2, 8, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#e8e8e8'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(S / 2, S / 2); c.lineTo(S / 2, S / 2 - 6); c.stroke();
+        c.beginPath(); c.moveTo(S / 2, S / 2); c.lineTo(S / 2 + 4, S / 2); c.stroke();
+    });
+
+    // 22-31: additional decoration tiles (simplified for 32px)
+    // 22: whiteboard
+    drawTile(6, 2, (c) => {
+        c.fillStyle = '#f0f0f0'; c.fillRect(2, 2, S - 4, S - 6);
+        c.fillStyle = '#fafafa'; c.fillRect(4, 4, S - 8, S - 10);
+        c.fillStyle = '#444'; c.fillRect(2, S - 4, S - 4, 3);
+        c.fillStyle = '#ff4040'; c.fillRect(6, 6, 8, 2);
+        c.fillStyle = '#4040ff'; c.fillRect(6, 10, 12, 2);
+    });
+
+    // 23: bean bag
+    drawTile(7, 2, (c) => {
+        c.fillStyle = '#4a6888'; c.fillRect(4, 8, S - 8, S - 10);
+        c.fillStyle = '#5a78a0'; c.fillRect(5, 6, S - 10, S - 10);
+        c.fillStyle = '#6a88b0'; c.fillRect(7, 9, S - 14, S - 16);
+    });
+
+    // Row 3: more items
+    // 24: rug
+    drawTile(0, 3, (c) => {
+        c.fillStyle = '#2e1e3a'; c.fillRect(0, 0, S, S);
+        c.fillStyle = '#3e2e4a'; c.fillRect(2, 2, S - 4, S - 4);
+        c.fillStyle = '#4e3e5a'; c.fillRect(4, 4, S - 8, S - 8);
+    });
+
+    // 25: lamp
+    drawTile(1, 3, (c) => {
+        c.fillStyle = '#444'; c.fillRect(13, S - 6, 6, 6);
+        c.fillStyle = '#555'; c.fillRect(14, 8, 4, S - 14);
+        c.fillStyle = '#f8d860'; c.fillRect(8, 2, 16, 8);
+        c.fillStyle = '#ffe888'; c.fillRect(10, 4, 12, 4);
+    });
+
+    // 26: cactus
+    drawTile(2, 3, (c) => {
+        c.fillStyle = '#9a6a38'; c.fillRect(8, S - 10, 16, 10);
+        c.fillStyle = '#2a9a38'; c.fillRect(12, 4, 8, S - 14);
+        c.fillStyle = '#3aaa48'; c.fillRect(6, 10, 6, 8);
+        c.fillStyle = '#3aaa48'; c.fillRect(S - 12, 6, 6, 10);
+    });
+
+    // 27: trophy
+    drawTile(3, 3, (c) => {
+        c.fillStyle = '#5a4a20'; c.fillRect(2, 0, S - 4, S);
+        c.fillStyle = '#7a6a40'; c.fillRect(4, 2, S - 8, S - 4);
+        c.fillStyle = '#ffd700'; c.fillRect(8, 5, 6, 8);
+        c.fillStyle = '#ffd700'; c.fillRect(10, 3, 2, 2);
+        c.fillStyle = '#c0c0c0'; c.fillRect(18, 8, 5, 6);
     });
 
     return canvas.toDataURL();
@@ -328,106 +299,124 @@ function generateKoalaSheet(bodyColor, accColor, detail) {
         const { facing = 'down', legOffset = 0, armUp = false, sitting = false, sleeping = false,
                 holdingCup = false, waving = false, stretching = false } = opts;
 
-        // Body
-        ctx.fillStyle = bodyColor;
+        const S = CHAR_SIZE;
+
         if (sleeping) {
-            ctx.fillRect(x + 2, y + 8, 12, 6);
-            ctx.fillStyle = '#1a1a1a'; ctx.fillRect(x + 10, y + 9, 2, 1);
-            ctx.fillStyle = '#e8a0a0'; ctx.fillRect(x + 3, y + 9, 1, 1);
+            ctx.fillStyle = bodyColor;
+            ctx.fillRect(x + 4, y + 16, 24, 10);
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(x + 22, y + 18, 3, 2);
+            ctx.fillStyle = '#e8a0a0';
+            ctx.fillRect(x + 6, y + 18, 2, 2);
             return;
         }
-        const bodyY = sitting ? y + 4 : y + 3;
-        ctx.fillRect(x + 4, bodyY, 8, 8);
+
+        const bodyY = sitting ? y + 10 : y + 8;
+
+        // Body
+        ctx.fillStyle = bodyColor;
+        ctx.fillRect(x + 8, bodyY, 16, 14);
 
         // Head
         ctx.fillStyle = bodyColor;
-        ctx.fillRect(x + 3, y, 10, 7);
+        ctx.fillRect(x + 6, y + 1, 20, 14);
 
-        // Ears
+        // Ears (fluffy)
         ctx.fillStyle = bodyColor;
-        ctx.fillRect(x + 2, y - 1, 3, 3);
-        ctx.fillRect(x + 11, y - 1, 3, 3);
+        ctx.fillRect(x + 3, y - 1, 7, 6);
+        ctx.fillRect(x + 22, y - 1, 7, 6);
         ctx.fillStyle = '#e8a0a0';
-        ctx.fillRect(x + 3, y, 1, 1);
-        ctx.fillRect(x + 12, y, 1, 1);
+        ctx.fillRect(x + 5, y + 1, 3, 3);
+        ctx.fillRect(x + 24, y + 1, 3, 3);
 
         // Eyes
         if (facing !== 'up') {
             ctx.fillStyle = '#1a1a1a';
+            const eyeY = y + 7;
             if (facing === 'left') {
-                ctx.fillRect(x + 4, y + 3, 2, 2);
-                ctx.fillRect(x + 8, y + 3, 2, 2);
+                ctx.fillRect(x + 8, eyeY, 3, 3);
+                ctx.fillRect(x + 16, eyeY, 3, 3);
             } else if (facing === 'right') {
-                ctx.fillRect(x + 6, y + 3, 2, 2);
-                ctx.fillRect(x + 10, y + 3, 2, 2);
+                ctx.fillRect(x + 13, eyeY, 3, 3);
+                ctx.fillRect(x + 21, eyeY, 3, 3);
             } else {
-                ctx.fillRect(x + 5, y + 3, 2, 2);
-                ctx.fillRect(x + 9, y + 3, 2, 2);
+                ctx.fillRect(x + 10, eyeY, 3, 3);
+                ctx.fillRect(x + 19, eyeY, 3, 3);
+            }
+            // Eye shine
+            ctx.fillStyle = '#ffffff';
+            if (facing === 'down') {
+                ctx.fillRect(x + 11, eyeY, 1, 1);
+                ctx.fillRect(x + 20, eyeY, 1, 1);
             }
         }
 
         // Nose
         if (facing === 'down') {
             ctx.fillStyle = '#2a2a2a';
-            ctx.fillRect(x + 7, y + 5, 2, 1);
+            ctx.fillRect(x + 14, y + 11, 4, 2);
         }
 
         // Clothing
         ctx.fillStyle = accColor;
-        ctx.fillRect(x + 5, bodyY + 1, 6, 4);
+        ctx.fillRect(x + 9, bodyY + 2, 14, 8);
 
-        // Detail (accessory)
+        // Detail badge
         if (detail && facing === 'down') {
             ctx.fillStyle = detail;
-            ctx.fillRect(x + 7, bodyY + 1, 2, 1);
+            ctx.fillRect(x + 14, bodyY + 3, 4, 3);
         }
 
         // Arms
         if (!sitting) {
             ctx.fillStyle = bodyColor;
             if (armUp || waving) {
-                ctx.fillRect(x + 2, bodyY - 2, 2, 4);
-                ctx.fillRect(x + 12, bodyY - (waving ? 4 : 2), 2, 4);
+                ctx.fillRect(x + 4, bodyY - 4, 4, 8);
+                ctx.fillRect(x + 24, bodyY - (waving ? 8 : 4), 4, 8);
             } else if (holdingCup) {
-                ctx.fillRect(x + 2, bodyY + 1, 2, 5);
-                ctx.fillRect(x + 12, bodyY - 1, 2, 4);
+                ctx.fillRect(x + 4, bodyY + 2, 4, 10);
+                ctx.fillRect(x + 24, bodyY - 2, 4, 8);
                 ctx.fillStyle = '#e0d0c0';
-                ctx.fillRect(x + 13, bodyY - 2, 2, 3);
+                ctx.fillRect(x + 26, bodyY - 4, 4, 5);
             } else if (stretching) {
-                ctx.fillRect(x + 1, bodyY - 3, 2, 3);
-                ctx.fillRect(x + 13, bodyY - 3, 2, 3);
+                ctx.fillRect(x + 2, bodyY - 6, 4, 6);
+                ctx.fillRect(x + 26, bodyY - 6, 4, 6);
             } else {
-                ctx.fillRect(x + 2, bodyY + 1, 2, 5);
-                ctx.fillRect(x + 12, bodyY + 1, 2, 5);
+                ctx.fillRect(x + 4, bodyY + 2, 4, 10);
+                ctx.fillRect(x + 24, bodyY + 2, 4, 10);
             }
         }
 
         // Legs
         if (!sitting) {
             ctx.fillStyle = '#2a2a3a';
-            ctx.fillRect(x + 5 + legOffset, bodyY + 7, 3, 3);
-            ctx.fillRect(x + 9 - legOffset, bodyY + 7, 3, 3);
+            ctx.fillRect(x + 10 + legOffset * 2, bodyY + 12, 5, 6);
+            ctx.fillRect(x + 18 - legOffset * 2, bodyY + 12, 5, 6);
+            // Shoes
+            ctx.fillStyle = '#1a1a2a';
+            ctx.fillRect(x + 10 + legOffset * 2, bodyY + 16, 5, 2);
+            ctx.fillRect(x + 18 - legOffset * 2, bodyY + 16, 5, 2);
         }
     }
 
-    // Row 0: idle down (4 frames with subtle breathing)
+    // Row 0: idle down
     for (let i = 0; i < 4; i++) drawKoala(i, 0, { facing: 'down' });
-    // Row 1: walk down (4 frames)
+    // Row 1: walk down
     for (let i = 0; i < 4; i++) drawKoala(i, 1, { facing: 'down', legOffset: i % 2 === 0 ? 1 : -1 });
-    // Row 2: walk up (4 frames)
+    // Row 2: walk up
     for (let i = 0; i < 4; i++) drawKoala(i, 2, { facing: 'up', legOffset: i % 2 === 0 ? 1 : -1 });
-    // Row 3: walk left (4 frames)
+    // Row 3: walk left
     for (let i = 0; i < 4; i++) drawKoala(i, 3, { facing: 'left', legOffset: i % 2 === 0 ? 1 : -1 });
-    // Row 4: walk right (4 frames)
+    // Row 4: walk right
     for (let i = 0; i < 4; i++) drawKoala(i, 4, { facing: 'right', legOffset: i % 2 === 0 ? 1 : -1 });
-    // Row 5: sit/work (4 frames)
+    // Row 5: sit/work
     for (let i = 0; i < 4; i++) drawKoala(i, 5, { facing: 'down', sitting: true });
-    // Row 6: sleep (2 frames) + coffee hold (1 frame) + wave (1 frame)
+    // Row 6: sleep (2) + coffee (1) + wave (1)
     drawKoala(0, 6, { sleeping: true });
     drawKoala(1, 6, { sleeping: true });
     drawKoala(2, 6, { facing: 'down', holdingCup: true });
     drawKoala(3, 6, { facing: 'down', waving: true });
-    // Row 7: celebrate (2 frames) + stretch (2 frames)
+    // Row 7: celebrate (2) + stretch (2)
     drawKoala(0, 7, { facing: 'down', armUp: true });
     drawKoala(1, 7, { facing: 'down', armUp: false });
     drawKoala(2, 7, { facing: 'down', stretching: true });
@@ -462,35 +451,26 @@ const ROLE_COLORS = {
 };
 
 // ── Decoration catalog for the layout editor ────────────
+// Tile IDs match the tileset: row*16+col, 1-indexed for Phaser
 
 const DECORATION_CATALOG = [
-    { id: 'plant', name: 'Plant', tileId: 13, blocking: false },
-    { id: 'bookshelf', name: 'Bookshelf', tileId: 12, blocking: true },
-    { id: 'couch', name: 'Couch', tileId: 11, blocking: true },
-    { id: 'coffeemachine', name: 'Coffee Machine', tileId: 10, blocking: true },
-    { id: 'fridge', name: 'Fridge', tileId: 14, blocking: true },
-    { id: 'vending', name: 'Vending Machine', tileId: 15, blocking: true },
-    { id: 'server', name: 'Server Rack', tileId: 19, blocking: true },
-    { id: 'watercooler', name: 'Water Cooler', tileId: 20, blocking: true },
-    { id: 'cabinet', name: 'Filing Cabinet', tileId: 23, blocking: true },
-    { id: 'whiteboard', name: 'Whiteboard', tileId: 24, blocking: true },
-    { id: 'trash', name: 'Trash Can', tileId: 25, blocking: false },
-    { id: 'meetingtable', name: 'Meeting Table', tileId: 26, blocking: true },
-    { id: 'lamp', name: 'Floor Lamp', tileId: 27, blocking: false },
-    { id: 'extinguisher', name: 'Fire Extinguisher', tileId: 28, blocking: false },
-    { id: 'printer', name: 'Printer', tileId: 29, blocking: true },
-    { id: 'beanbag', name: 'Bean Bag', tileId: 30, blocking: true },
-    { id: 'standingdesk', name: 'Standing Desk', tileId: 31, blocking: true },
-    { id: 'pingtable', name: 'Ping Pong Table', tileId: 32, blocking: true },
-    { id: 'cactus', name: 'Cactus', tileId: 34, blocking: false },
-    { id: 'trophy', name: 'Trophy Case', tileId: 35, blocking: true },
-    { id: 'acunit', name: 'AC Unit', tileId: 36, blocking: true },
-    { id: 'umbrella', name: 'Umbrella Stand', tileId: 37, blocking: false },
-    { id: 'coatrack', name: 'Coat Rack', tileId: 38, blocking: false },
-    { id: 'smalltable', name: 'Side Table', tileId: 39, blocking: true },
-    { id: 'painting', name: 'Painting', tileId: 17, blocking: true },
-    { id: 'clock', name: 'Clock', tileId: 18, blocking: true },
-    { id: 'rug', name: 'Rug', tileId: 16, blocking: false },
+    { id: 'plant', name: 'Plant', tileId: 12, blocking: false },
+    { id: 'bookshelf', name: 'Bookshelf', tileId: 11, blocking: true },
+    { id: 'couch', name: 'Couch', tileId: 10, blocking: true },
+    { id: 'coffeemachine', name: 'Coffee Machine', tileId: 9, blocking: true },
+    { id: 'fridge', name: 'Fridge', tileId: 17, blocking: true },
+    { id: 'vending', name: 'Vending Machine', tileId: 18, blocking: true },
+    { id: 'server', name: 'Server Rack', tileId: 13, blocking: true },
+    { id: 'watercooler', name: 'Water Cooler', tileId: 14, blocking: true },
+    { id: 'cabinet', name: 'Filing Cabinet', tileId: 19, blocking: true },
+    { id: 'whiteboard', name: 'Whiteboard', tileId: 22, blocking: true },
+    { id: 'beanbag', name: 'Bean Bag', tileId: 23, blocking: true },
+    { id: 'painting', name: 'Painting', tileId: 20, blocking: true },
+    { id: 'clock', name: 'Clock', tileId: 21, blocking: true },
+    { id: 'rug', name: 'Rug', tileId: 24, blocking: false },
+    { id: 'lamp', name: 'Floor Lamp', tileId: 25, blocking: false },
+    { id: 'cactus', name: 'Cactus', tileId: 26, blocking: false },
+    { id: 'trophy', name: 'Trophy Case', tileId: 27, blocking: true },
 ];
 
 // ── Speech bubble messages ──────────────────────────────
@@ -516,91 +496,110 @@ const WEATHER_TYPES = ['clear', 'cloudy', 'rain', 'snow', 'storm'];
 // ── Procedural Map Generator ────────────────────────────
 
 function generateMapData() {
+    // Map: 24 wide x 18 tall (32px tiles = 768x576 world)
     const map = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(0));
     const collision = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(1));
     const furniture = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(0));
 
     function fill(layer, x1, y1, x2, y2, val) {
-        for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) layer[y][x] = val;
+        for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) {
+            if (y >= 0 && y < MAP_H && x >= 0 && x < MAP_W) layer[y][x] = val;
+        }
     }
 
-    fill(map, 1, 1, MAP_W - 2, 7, 22 + 1);
-    fill(map, 1, 9, 22, MAP_H - 2, 1 + 1);
-    fill(map, 24, 9, MAP_W - 2, 18, 2 + 1);
-    fill(map, 24, 20, MAP_W - 2, MAP_H - 2, 3 + 1);
+    // Manager room floor (top, rows 1-4)
+    fill(map, 1, 1, MAP_W - 2, 4, 16 + 1);
+    // Main work area (rows 6-16)
+    fill(map, 1, 6, 14, MAP_H - 2, 1 + 1);
+    // Break room (right side, rows 6-11)
+    fill(map, 16, 6, MAP_W - 2, 11, 2 + 1);
+    // Lounge (right side, rows 13-16)
+    fill(map, 16, 13, MAP_W - 2, MAP_H - 2, 3 + 1);
 
-    fill(collision, 1, 1, MAP_W - 2, 7, 0);
-    fill(collision, 1, 9, 22, MAP_H - 2, 0);
-    fill(collision, 24, 9, MAP_W - 2, MAP_H - 2, 0);
-    fill(collision, 1, 8, MAP_W - 2, 8, 0);
-    fill(collision, 23, 9, 23, MAP_H - 2, 0);
-    fill(collision, 24, 19, MAP_W - 2, 19, 0);
+    // Walkable areas
+    fill(collision, 1, 1, MAP_W - 2, 4, 0);
+    fill(collision, 1, 6, 14, MAP_H - 2, 0);
+    fill(collision, 16, 6, MAP_W - 2, MAP_H - 2, 0);
+    fill(collision, 1, 5, MAP_W - 2, 5, 0);
+    fill(collision, 15, 6, 15, MAP_H - 2, 0);
+    fill(collision, 16, 12, MAP_W - 2, 12, 0);
 
+    // Outer walls
     fill(map, 0, 0, MAP_W - 1, 0, 4 + 1);
     fill(map, 0, 0, 0, MAP_H - 1, 4 + 1);
     fill(map, MAP_W - 1, 0, MAP_W - 1, MAP_H - 1, 4 + 1);
     fill(map, 0, MAP_H - 1, MAP_W - 1, MAP_H - 1, 4 + 1);
 
-    for (let x = 5; x < MAP_W - 5; x += 6) map[0][x] = 5 + 1;
+    // Windows on top wall
+    for (let x = 3; x < MAP_W - 3; x += 4) {
+        if (x < MAP_W) map[0][x] = 5 + 1;
+    }
 
-    fill(map, 1, 8, MAP_W - 2, 8, 6 + 1);
-    map[8][12] = 21 + 1;
+    // Glass partition (manager room divider, row 5)
+    fill(map, 1, 5, MAP_W - 2, 5, 6 + 1);
+    map[5][7] = 15 + 1; // door
+    collision[5][7] = 0;
 
-    for (let y = 9; y <= MAP_H - 2; y++) map[y][23] = 4 + 1;
-    map[14][23] = 21 + 1;
-    collision[14][23] = 0;
+    // Wall between work area and break room (col 15)
+    for (let y = 6; y <= MAP_H - 2; y++) map[y][15] = 4 + 1;
+    map[9][15] = 15 + 1; // door
+    collision[9][15] = 0;
 
-    fill(map, 24, 19, MAP_W - 2, 19, 4 + 1);
-    map[19][30] = 21 + 1;
-    collision[19][30] = 0;
+    // Wall between break room and lounge (row 12)
+    fill(map, 16, 12, MAP_W - 2, 12, 4 + 1);
+    map[12][19] = 15 + 1; // door
+    collision[12][19] = 0;
 
+    // Work desks (main area)
     const desks = [
-        { x: 4, y: 12 }, { x: 10, y: 12 }, { x: 16, y: 12 },
-        { x: 4, y: 18 }, { x: 10, y: 18 }, { x: 16, y: 18 },
-        { x: 4, y: 24 }, { x: 10, y: 24 },
+        { x: 3, y: 8 }, { x: 7, y: 8 }, { x: 11, y: 8 },
+        { x: 3, y: 12 }, { x: 7, y: 12 }, { x: 11, y: 12 },
+        { x: 3, y: 15 }, { x: 7, y: 15 },
     ];
     desks.forEach(d => {
-        furniture[d.y][d.x] = 7 + 1;
-        furniture[d.y][d.x + 1] = 9 + 1;
-        furniture[d.y + 1][d.x] = 0 + 1;
-        collision[d.y][d.x] = 1;
-        collision[d.y][d.x + 1] = 1;
+        if (d.y < MAP_H && d.x < MAP_W) {
+            furniture[d.y][d.x] = 7 + 1;
+            collision[d.y][d.x] = 1;
+            if (d.x + 1 < MAP_W) {
+                furniture[d.y][d.x + 1] = 8 + 1;
+                collision[d.y][d.x + 1] = 1;
+            }
+        }
     });
 
-    furniture[4][18] = 7 + 1;
-    furniture[4][19] = 9 + 1;
-    furniture[4][20] = 7 + 1;
-    collision[4][18] = 1; collision[4][19] = 1; collision[4][20] = 1;
+    // Manager desk (larger)
+    furniture[3][10] = 7 + 1; collision[3][10] = 1;
+    furniture[3][11] = 8 + 1; collision[3][11] = 1;
+    furniture[3][12] = 7 + 1; collision[3][12] = 1;
 
-    furniture[11][26] = 10 + 1; collision[11][26] = 1;
-    furniture[11][28] = 14 + 1; collision[11][28] = 1;
-    furniture[11][30] = 15 + 1; collision[11][30] = 1;
-    furniture[14][26] = 20 + 1; collision[14][26] = 1;
+    // Break room items
+    furniture[7][17] = 9 + 1; collision[7][17] = 1;  // coffee machine
+    furniture[7][19] = 17 + 1; collision[7][19] = 1; // fridge
+    furniture[7][21] = 18 + 1; collision[7][21] = 1; // vending
+    furniture[9][17] = 14 + 1; collision[9][17] = 1; // water cooler
 
-    furniture[22][26] = 11 + 1; collision[22][26] = 1;
-    furniture[22][28] = 11 + 1; collision[22][28] = 1;
-    furniture[25][32] = 11 + 1; collision[25][32] = 1;
-    furniture[23][30] = 16 + 1;
+    // Lounge items
+    furniture[14][17] = 10 + 1; collision[14][17] = 1; // couch
+    furniture[14][19] = 10 + 1; collision[14][19] = 1; // couch
+    furniture[15][21] = 23 + 1; collision[15][21] = 1; // bean bag
 
-    furniture[2][2] = 13 + 1;
-    furniture[2][MAP_W - 3] = 13 + 1;
-    furniture[15][2] = 12 + 1; collision[15][2] = 1;
-    furniture[15][20] = 19 + 1; collision[15][20] = 1;
-    furniture[21][MAP_W - 3] = 13 + 1;
-    furniture[10][32] = 23 + 1; collision[10][32] = 1;
+    // Decorations
+    furniture[2][2] = 12 + 1;  // plant in manager room
+    furniture[2][MAP_W - 3] = 12 + 1; // plant
+    furniture[10][2] = 11 + 1; collision[10][2] = 1; // bookshelf
+    furniture[10][13] = 13 + 1; collision[10][13] = 1; // server rack
+    furniture[14][MAP_W - 3] = 12 + 1; // plant in lounge
+    furniture[7][MAP_W - 3] = 19 + 1; collision[7][MAP_W - 3] = 1; // filing cabinet
 
-    furniture[0][10] = 17 + 1;
-    furniture[0][20] = 17 + 1;
-    furniture[0][30] = 18 + 1;
+    // Wall decorations
+    furniture[0][6] = 20 + 1;  // painting
+    furniture[0][12] = 20 + 1; // painting
+    furniture[0][18] = 21 + 1; // clock
 
-    // Extra default decorations
-    furniture[2][10] = 27 + 1; // lamp in manager room
-    furniture[16][2] = 28 + 1; // fire extinguisher
-    furniture[10][20] = 29 + 1; collision[10][20] = 1; // printer
-    furniture[26][26] = 30 + 1; collision[26][26] = 1; // bean bag
-    furniture[27][30] = 39 + 1; collision[27][30] = 1; // side table
-    furniture[24][34] = 34 + 1; // cactus
-    furniture[2][30] = 35 + 1; collision[2][30] = 1; // trophy case in manager room
+    // Extra decorations
+    furniture[2][6] = 25 + 1;  // lamp
+    furniture[15][17] = 24 + 1; // rug in lounge
+    furniture[2][MAP_W - 5] = 27 + 1; collision[2][MAP_W - 5] = 1; // trophy
 
     return { map, collision, furniture, desks };
 }
@@ -677,7 +676,7 @@ class OfficeScene extends Phaser.Scene {
 
         agents.forEach((agent, idx) => {
             const isManager = agent.role_id === 'orchestrator-koala';
-            const desk = isManager ? { x: 19, y: 5 } : desks[idx % desks.length];
+            const desk = isManager ? { x: 11, y: 3 } : desks[idx % desks.length];
             if (!desk) return;
 
             const spriteKey = `koala-${agent.role_id || 'default'}`;
@@ -772,8 +771,12 @@ class OfficeScene extends Phaser.Scene {
 
         // ── Camera ──────────────────────────────────
         this.cameras.main.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
-        this.cameras.main.setZoom(2);
-        this.cameras.main.centerOn(MAP_W * TILE / 2, MAP_H * TILE / 2);
+        // Auto-fit zoom: fill the canvas with the office
+        const cw = this.scale.width, ch = this.scale.height;
+        const worldW = MAP_W * TILE, worldH = MAP_H * TILE;
+        const autoZoom = Math.max(cw / worldW, ch / worldH, 1);
+        this.cameras.main.setZoom(Math.min(autoZoom, 2.5));
+        this.cameras.main.centerOn(worldW / 2, worldH / 2);
 
         // Camera drag
         this.input.on('pointermove', (p) => {
@@ -831,7 +834,7 @@ class OfficeScene extends Phaser.Scene {
         this._dustEmitter.setDepth(150);
 
         // Coffee steam particles (near coffee machine)
-        this._steamEmitter = this.add.particles(26 * TILE + 8, 11 * TILE, 'particle', {
+        this._steamEmitter = this.add.particles(17 * TILE + 16, 7 * TILE, 'particle', {
             lifespan: 2000,
             speed: { min: 3, max: 8 },
             angle: { min: 250, max: 290 },
@@ -844,7 +847,7 @@ class OfficeScene extends Phaser.Scene {
         this._steamEmitter.setDepth(55);
 
         // Server rack blinking LED emitter
-        this._serverLedEmitter = this.add.particles(15 * TILE + 20 * TILE, 15 * TILE, 'particle', {
+        this._serverLedEmitter = this.add.particles(13 * TILE + 16, 10 * TILE + 16, 'particle', {
             x: { min: -2, max: 2 },
             lifespan: 400,
             speed: 0,
@@ -871,10 +874,10 @@ class OfficeScene extends Phaser.Scene {
 
         // Window light beams (visible during day)
         this._windowLights = [];
-        for (let x = 5; x < MAP_W - 5; x += 6) {
+        for (let x = 3; x < MAP_W - 3; x += 4) {
             const light = this.add.rectangle(
-                x * TILE + TILE / 2, 3 * TILE,
-                TILE, 5 * TILE,
+                x * TILE + TILE / 2, 2 * TILE,
+                TILE, 3 * TILE,
                 0xfff8e0, 0
             ).setDepth(199).setBlendMode(Phaser.BlendModes.ADD);
             this._windowLights.push(light);
@@ -1097,7 +1100,7 @@ class OfficeScene extends Phaser.Scene {
                 return;
             }
             if (agentStatus === 'offline' && k.state !== 'sleeping') {
-                this._walkTo(k, 27, 23, 'sleeping');
+                this._walkTo(k, 18, 14, 'sleeping');
                 return;
             }
 
@@ -1113,16 +1116,16 @@ class OfficeScene extends Phaser.Scene {
                     k.interactionCooldown = now + 3000;
                     this.time.delayedCall(3000, () => {
                         if (k.energy < 20) {
-                            this._walkTo(k, 27, 23, 'resting');
+                            this._walkTo(k, 18, 14, 'resting');
                         } else {
-                            this._walkTo(k, 26, 12, 'coffee');
+                            this._walkTo(k, 17, 8, 'coffee');
                         }
                     });
                 } else if (action < 4) {
-                    this._walkTo(k, 26, 12, 'coffee');
+                    this._walkTo(k, 17, 8, 'coffee');
                     this._showBubble(k, this._pickMessage('coffee'));
                 } else if (action < 6) {
-                    this._walkTo(k, 27, 23, 'resting');
+                    this._walkTo(k, 18, 14, 'resting');
                     this._showBubble(k, this._pickMessage('resting'));
                 } else if (action < 8) {
                     const other = this.koalas[Phaser.Math.Between(0, this.koalas.length - 1)];
@@ -1136,14 +1139,14 @@ class OfficeScene extends Phaser.Scene {
                         });
                     }
                 } else if (action < 10) {
-                    this._walkTo(k, 3, 16, 'browsing');
+                    this._walkTo(k, 2, 10, 'browsing');
                     this._showBubble(k, this._pickMessage('browsing'));
                 } else if (action < 11) {
                     // Water cooler
-                    this._walkTo(k, 26, 15, 'coffee');
+                    this._walkTo(k, 17, 10, 'coffee');
                 } else if (action < 12) {
                     // Vending machine
-                    this._walkTo(k, 30, 12, 'coffee');
+                    this._walkTo(k, 21, 8, 'coffee');
                 } else if (action < 13) {
                     // Celebrate (random)
                     k.sprite.play(`${k.texKey}-celebrate`);
@@ -1232,7 +1235,7 @@ class OfficeScene extends Phaser.Scene {
                 break;
             case 1: // Group chat: multiple koalas walk to one spot
                 if (activeKoalas.length >= 3) {
-                    const meetX = 10, meetY = 16;
+                    const meetX = 6, meetY = 10;
                     const chatGroup = activeKoalas.slice(0, 3);
                     chatGroup.forEach((ck, i) => {
                         this.time.delayedCall(i * 1000, () => {
@@ -1243,16 +1246,16 @@ class OfficeScene extends Phaser.Scene {
                 }
                 break;
             case 2: // Someone goes to ping pong (if there's space in the lounge area)
-                this._walkTo(k, 28, 24, 'playing');
+                this._walkTo(k, 19, 15, 'playing');
                 this._showBubble(k, this._pickMessage('playing'));
                 break;
             case 3: // Coffee run for two
                 if (activeKoalas.length >= 2) {
                     const buddy = activeKoalas.find(b => b !== k);
                     if (buddy) {
-                        this._walkTo(k, 26, 12, 'coffee');
+                        this._walkTo(k, 17, 8, 'coffee');
                         this.time.delayedCall(1500, () => {
-                            this._walkTo(buddy, 26, 13, 'coffee');
+                            this._walkTo(buddy, 17, 9, 'coffee');
                             this._showBubble(buddy, 'Wait for me!');
                         });
                     }
