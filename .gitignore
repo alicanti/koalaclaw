@@ -31,3 +31,4 @@ tools/package-lock.json
 __pycache__/
 *.pyc
 .env
+raw-assets/
