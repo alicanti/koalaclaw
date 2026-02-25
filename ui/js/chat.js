@@ -310,9 +310,7 @@ class ChatManager {
                            autocomplete="off">
                     <button type="button" id="chat-search-btn" class="chat-search-btn" title="Search chat history">🔍</button>
                     <button type="button" id="chat-wiro-btn" class="chat-wiro-btn" title="Generate with Wiro AI">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path d="M2 6L6 18L9.5 8L12 18L15.5 8L18 18L22 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
+                        <img src="images/w.png" alt="W" width="20" height="20" style="object-fit:contain">
                     </button>
                     <button type="button" id="chat-send-btn" class="chat-send-btn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
