@@ -11,10 +11,27 @@ const MAP_W = 24;
 const MAP_H = 18;
 const CHAR_SIZE = 32;
 
-// ── Procedural Tileset Generator ────────────────────────
+// ── Assets loaded from pre-generated PNGs (ui/assets/) ──
+// To regenerate: cd tools && npm install && npm run generate
+//
+// Tileset: 16 cols x 4 rows of 32x32 tiles
+// Koalas:  8 cols x 8 rows of 32x32 frames per role
+// Particle: 8x8 soft glow
 
-function generateTileset() {
-    const cols = 16, rows = 4, size = TILE;
+/*--- REMOVED: generateTileset() and generateKoalaSheet() ---
+ * These functions have been replaced by build-time PNG generation.
+ * See tools/generate-assets.js for the source.
+ *--- END REMOVED ---*/
+
+// Stub kept so old references don't crash
+function generateTileset() { return 'assets/tileset.png'; }
+function generateKoalaSheet() { return 'assets/koala-default.png'; }
+
+/* Procedural drawing code removed — see tools/generate-assets.js
+   ~400 lines of tileset + koala sprite generation deleted.
+   Assets are now pre-built PNGs in ui/assets/ */
+
+/*
     const canvas = document.createElement('canvas');
     canvas.width = cols * size;
     canvas.height = rows * size;
@@ -422,8 +439,7 @@ function generateKoalaSheet(bodyColor, accColor, detail) {
     drawKoala(2, 7, { facing: 'down', stretching: true });
     drawKoala(3, 7, { facing: 'down' });
 
-    return canvas.toDataURL();
-}
+*/
 
 // ── Role Colors ─────────────────────────────────────────
 
@@ -610,31 +626,22 @@ class BootScene extends Phaser.Scene {
     constructor() { super('BootScene'); }
 
     preload() {
-        this.load.image('tiles', generateTileset());
+        this.load.image('tiles', 'assets/tileset.png');
+        this.load.image('particle', 'assets/particle.png');
 
-        // Generate particle texture
-        const pxCanvas = document.createElement('canvas');
-        pxCanvas.width = 4; pxCanvas.height = 4;
-        const pxCtx = pxCanvas.getContext('2d');
-        pxCtx.fillStyle = '#ffffff';
-        pxCtx.fillRect(0, 0, 4, 4);
-        this.load.image('particle', pxCanvas.toDataURL());
-
-        // Generate koala spritesheets via load.image (synchronous pipeline)
         const agents = window._officeAgents || [];
-        const generated = new Set();
+        const loaded = new Set();
         agents.forEach(a => {
-            const rc = ROLE_COLORS[a.role_id] || ROLE_COLORS['custom-koala'];
             const key = `koala-${a.role_id || 'default'}`;
-            if (!generated.has(key)) {
-                this.load.spritesheet(key, generateKoalaSheet(rc.body, rc.acc, rc.detail), {
+            if (!loaded.has(key)) {
+                this.load.spritesheet(key, `assets/${key}.png`, {
                     frameWidth: CHAR_SIZE, frameHeight: CHAR_SIZE
                 });
-                generated.add(key);
+                loaded.add(key);
             }
         });
-        if (!generated.size) {
-            this.load.spritesheet('koala-default', generateKoalaSheet('#8a8a8a', '#3a3a3a', '#3ECFA0'), {
+        if (!loaded.size) {
+            this.load.spritesheet('koala-default', 'assets/koala-default.png', {
                 frameWidth: CHAR_SIZE, frameHeight: CHAR_SIZE
             });
         }

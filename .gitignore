@@ -23,6 +23,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Node (tools)
+tools/node_modules/
+tools/package-lock.json
+
 # Python
 __pycache__/
 *.pyc

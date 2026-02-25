@@ -1,0 +1,10 @@
+{
+  "name": "koalaclaw-asset-tools",
+  "private": true,
+  "scripts": {
+    "generate": "node generate-assets.js"
+  },
+  "dependencies": {
+    "canvas": "^3.1.0"
+  }
+}
