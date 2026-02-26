@@ -323,8 +323,8 @@ class WiroClient:
             return None
 
         FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai",
-                       "stability-ai", "kuaishou", "luma", "minimax", "genmo", "runway",
-                       "pika", "haiper", "lightricks", "kling-ai", "seedance"}
+                       "stability-ai", "klingai", "minimax", "runway", "openai",
+                       "wan-ai", "pixverse", "elevenlabs", "qwen"}
 
         def _score(t):
             cats = t.get("categories") or []
@@ -377,8 +377,8 @@ class WiroClient:
             return []
 
         FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai",
-                       "stability-ai", "kuaishou", "luma", "minimax", "genmo", "runway",
-                       "pika", "haiper", "lightricks", "kling-ai", "seedance"}
+                       "stability-ai", "klingai", "minimax", "runway", "openai",
+                       "wan-ai", "pixverse", "elevenlabs", "qwen"}
 
         def _score(t):
             cats = t.get("categories") or []

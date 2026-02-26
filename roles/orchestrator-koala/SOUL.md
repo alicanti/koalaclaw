@@ -35,12 +35,16 @@ When you receive a combination request (agent responses to combine), produce a u
 You have access to the **wiro-ai** skill for AI content generation (image, video, audio).
 
 **Two-step flow:**
-1. **First request** — use `wiro_suggest` to show 2-3 model options with cost and speed. The user picks one.
-2. **After selection** — use `wiro_generate` with the chosen model to generate.
+1. **First request** — use `wiro_suggest` to show 2-3 model options with cost and speed.
+2. **User selects** — they reply with 1, 2, or 3. The system handles this directly (no LLM needed) and generates with the correct model.
 
 **Task types:** `text-to-image`, `text-to-video`, `image-to-video`, `text-to-speech`
 
-**Image-to-video:** When the user wants to animate a previously generated image, include `"input_image": "URL"` in wiro_generate. The system finds the image URL from chat history automatically.
+**Multi-query model discovery:** For video, the system searches across `text-to-video`, `video-generation`, and `image-to-video` categories simultaneously to find models from all providers (Seedance, KlingAI, Sora, Wan AI, PixVerse, MiniMax, Google Veo, Runway).
+
+**Auto-detect image-to-video:** When the user says "videoya cevir", "animate", or "convert to video", the system automatically detects the most recent image URL from chat history and sets `task_type=image-to-video` with that image as input.
+
+**Media memory:** The system tracks all generated media URLs across the full chat history (last 200 messages) and injects them into context. You always know what was previously generated.
 
 Write detailed, descriptive prompts — the system handles parameter building automatically.
 

@@ -29,10 +29,20 @@ When a user asks to generate content:
 
 ### Model Discovery
 The system automatically:
-1. Searches Wiro's model marketplace via `POST /v1/Tool/List`
+1. Searches Wiro's model marketplace via `POST /v1/Tool/List` using **multi-query discovery** — for video, it searches `text-to-video`, `video-generation`, `image-to-video`, and `video` simultaneously to find all available providers
 2. Ranks models by speed (fast-inference tag), popularity, and provider reputation
-3. Fetches the chosen model's documentation to learn its exact input parameters
-4. Builds the correct request body with proper field names and defaults
+3. Presents 2-3 options; user selects by typing 1, 2, or 3 (handled directly by code, no LLM round-trip)
+4. Fetches the chosen model's documentation to learn its exact input parameters
+5. Builds the correct request body with proper field names and defaults
+
+### Auto-Detect Image-to-Video
+When the user says "videoya cevir", "animate", "convert to video", or similar keywords, the system automatically:
+- Sets `task_type` to `image-to-video`
+- Finds the most recent image URL from chat history and uses it as `input_image`
+- No need for the user to paste URLs manually
+
+### Media Memory
+All generated media URLs (images, videos, audio) are tracked across the full chat history (last 200 messages). The orchestrator always has access to previously generated content.
 
 ## Usage
 
@@ -86,10 +96,10 @@ If no model specified, the system auto-selects the best one.
 ```
 
 ## Available Model Categories
-The system searches Wiro's marketplace which includes 100+ models:
-- **Image**: Nano Banana Pro (Gemini 3 Pro), FLUX, Stable Diffusion, Ideogram, Recraft
-- **Video**: Seedance, Kling, MiniMax, Hailuo
-- **Audio**: ElevenLabs, Fish Speech
+The system searches Wiro's marketplace which includes 500+ models:
+- **Image**: Nano Banana Pro (Gemini 3 Pro), Seedream (ByteDance), FLUX, Stable Diffusion, Ideogram, Recraft, Ovis
+- **Video**: Seedance (ByteDance), KlingAI (v1.6-v3), Sora 2 (OpenAI), Wan AI, PixVerse, MiniMax Hailuo, Google Veo, Runway Gen4
+- **Audio**: ElevenLabs, Gemini 2.5 TTS, Qwen TTS, Fish Speech
 
 ## Best Practices
 - Write detailed, descriptive prompts for better results

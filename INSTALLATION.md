@@ -45,13 +45,17 @@ If you skipped the Wiro key during install, add it via Settings (⚙️) or the 
 
 **How it works:** Agents with the `wiro-ai` skill (OrchestratorKoala, GenerativeKoala, DesignKoala) can generate images, videos, and audio. The flow is:
 1. You ask the agent to generate something (e.g. "draw a space cat")
-2. The agent searches Wiro's marketplace and **suggests 2-3 models** with name, estimated cost, and average generation time
-3. You pick a model by replying with a number (1, 2, or 3)
-4. The agent fetches the model's documentation (`llms-full.txt`) to learn its input parameters
+2. The system searches Wiro's marketplace using **multi-query discovery** (e.g. for video: searches `text-to-video`, `video-generation`, `image-to-video` simultaneously) and **suggests 2-3 models** with name, estimated cost, and average generation time
+3. You pick a model by replying with **1, 2, or 3** — this is handled directly by code (no LLM round-trip), guaranteeing the correct model is used
+4. The system fetches the model's documentation (`llms-full.txt`) to learn its input parameters
 5. Builds the correct request body, submits the task, and polls until complete
-6. Result appears inline in chat — images as `<img>`, videos as `<video>` player, audio as `<audio>` player — all with a **⬇ download button**
+6. Result appears inline in chat — images, videos, and audio render with player controls and a download button
 
-For **image-to-video**, the agent automatically uses the previously generated image as input — just say "convert this to video".
+**Auto-detect image-to-video:** Say "videoya cevir", "animate this", or "convert to video" and the system automatically finds the most recent image URL from chat history and uses it as input — no need to paste URLs.
+
+**Media memory:** All generated media URLs are tracked across the full chat history (last 200 messages). The agent always knows what was previously generated.
+
+**Supported video providers:** Seedance (ByteDance), KlingAI, Sora (OpenAI), Wan AI, PixVerse, MiniMax (Hailuo), Google Veo, Runway Gen4
 
 **Quick test:** Open the "Wiro AI" section in the sidebar — it shows connection status, which agents have the skill, and a test input.
 
@@ -59,6 +63,20 @@ For **image-to-video**, the agent automatically uses the previously generated im
 ```bash
 sudo koalaclaw skills add ./custom-skills/wiro-ai [agent-id]
 ```
+
+## Asset Generation
+
+Office visuals are pre-built as PNG files using Node.js scripts in `tools/`. To regenerate:
+
+```bash
+cd tools
+npm install          # installs 'canvas' package
+npm run generate     # generates koala sprite sheets + tileset
+node generate-office-bg.js    # generates office background (768x576)
+node generate-decorations.js  # generates 25 decoration sprites
+```
+
+Output goes to `ui/assets/`. These PNGs are committed to git — no build step needed for deployment.
 
 ## Post-Install: Image Upload
 
@@ -1727,7 +1745,7 @@ python3 admin-api.py &
 | Feature | Description |
 |---------|-------------|
 | Mission Control | Collapsible sidebar: Agents, Agent Files (Identity/Soul/Memory editor), Documents (RAG), Channels, Integrations (API keys), Wiro AI, System |
-| Pixel Art Living Office | Phaser 3 top-down pixel art office with animated koala NPCs, A* pathfinding, NPC AI (coffee breaks, chatting, resting, celebrating), particle effects (dust, steam, confetti), day/night cycle, weather system (rain/snow/storm), speech bubbles, and decoration layout editor with 27+ items |
+| Pixel Art Living Office | Phaser 3 office with pre-rendered 768x576 background, animated koala NPCs (32x32 sprites), A* pathfinding, NPC AI (coffee breaks, chatting, resting, celebrating), particle effects, day/night cycle, weather system, speech bubbles, and sprite-based layout editor with 25 decoration items |
 | Orchestrated Chat | 🎯 Orchestrate toggle routes messages through OrchestratorKoala; live delegation chain shows each agent working in real time (SSE streaming) |
 | Chat + Media | Send messages to any agent, attach images (📎), inline image/video/audio players, ⬇ download for all media |
 | Admin Panel | Agent list, status, skill toggles, quick actions |
