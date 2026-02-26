@@ -470,23 +470,31 @@ const ROLE_COLORS = {
 // Tile IDs match the tileset: row*16+col, 1-indexed for Phaser
 
 const DECORATION_CATALOG = [
-    { id: 'plant', name: 'Plant', tileId: 21, blocking: false },
-    { id: 'bookshelf', name: 'Bookshelf', tileId: 20, blocking: true },
-    { id: 'couch', name: 'Couch', tileId: 19, blocking: true },
-    { id: 'coffeemachine', name: 'Coffee Machine', tileId: 18, blocking: true },
-    { id: 'fridge', name: 'Fridge', tileId: 34, blocking: true },
-    { id: 'vending', name: 'Vending Machine', tileId: 35, blocking: true },
-    { id: 'server', name: 'Server Rack', tileId: 22, blocking: true },
-    { id: 'watercooler', name: 'Water Cooler', tileId: 23, blocking: true },
-    { id: 'cabinet', name: 'Filing Cabinet', tileId: 36, blocking: true },
-    { id: 'whiteboard', name: 'Whiteboard', tileId: 39, blocking: true },
-    { id: 'beanbag', name: 'Bean Bag', tileId: 40, blocking: true },
-    { id: 'painting', name: 'Painting', tileId: 37, blocking: true },
-    { id: 'clock', name: 'Clock', tileId: 38, blocking: true },
-    { id: 'rug', name: 'Rug', tileId: 49, blocking: false },
-    { id: 'lamp', name: 'Floor Lamp', tileId: 50, blocking: false },
-    { id: 'cactus', name: 'Cactus', tileId: 51, blocking: false },
-    { id: 'trophy', name: 'Trophy Case', tileId: 52, blocking: true },
+    { id: 'plant-small', name: 'Small Plant', asset: 'deco-plant-small', blocking: false },
+    { id: 'plant-large', name: 'Large Plant', asset: 'deco-plant-large', blocking: false },
+    { id: 'cactus', name: 'Cactus', asset: 'deco-cactus', blocking: false },
+    { id: 'couch', name: 'Couch', asset: 'deco-couch', blocking: true },
+    { id: 'beanbag', name: 'Bean Bag', asset: 'deco-beanbag', blocking: true },
+    { id: 'chair', name: 'Chair', asset: 'deco-chair', blocking: true },
+    { id: 'coffee-table', name: 'Coffee Table', asset: 'deco-coffee-table', blocking: true },
+    { id: 'small-table', name: 'Side Table', asset: 'deco-small-table', blocking: true },
+    { id: 'coffee-machine', name: 'Coffee Machine', asset: 'deco-coffee-machine', blocking: true },
+    { id: 'water-cooler', name: 'Water Cooler', asset: 'deco-water-cooler', blocking: true },
+    { id: 'vending', name: 'Vending Machine', asset: 'deco-vending', blocking: true },
+    { id: 'fridge', name: 'Fridge', asset: 'deco-fridge', blocking: true },
+    { id: 'microwave', name: 'Microwave', asset: 'deco-microwave', blocking: true },
+    { id: 'bookshelf', name: 'Bookshelf', asset: 'deco-bookshelf', blocking: true },
+    { id: 'filing-cabinet', name: 'Filing Cabinet', asset: 'deco-filing-cabinet', blocking: true },
+    { id: 'server-rack', name: 'Server Rack', asset: 'deco-server-rack', blocking: true },
+    { id: 'lamp', name: 'Floor Lamp', asset: 'deco-lamp', blocking: false },
+    { id: 'painting', name: 'Painting', asset: 'deco-painting', blocking: false },
+    { id: 'clock', name: 'Clock', asset: 'deco-clock', blocking: false },
+    { id: 'whiteboard', name: 'Whiteboard', asset: 'deco-whiteboard', blocking: true },
+    { id: 'rug', name: 'Rug', asset: 'deco-rug', blocking: false },
+    { id: 'trash-can', name: 'Trash Can', asset: 'deco-trash-can', blocking: false },
+    { id: 'ping-pong', name: 'Ping Pong', asset: 'deco-ping-pong', blocking: true },
+    { id: 'photocopier', name: 'Photocopier', asset: 'deco-photocopier', blocking: true },
+    { id: 'trophy', name: 'Trophy', asset: 'deco-trophy', blocking: false },
 ];
 
 // ── Speech bubble messages ──────────────────────────────
@@ -638,6 +646,10 @@ class BootScene extends Phaser.Scene {
     preload() {
         this.load.image('office-bg', 'assets/office-bg.png');
         this.load.image('particle', 'assets/particle.png');
+
+        DECORATION_CATALOG.forEach(d => {
+            this.load.image(d.asset, `assets/${d.asset}.png`);
+        });
 
         const agents = window._officeAgents || [];
         const loaded = new Set();
@@ -830,9 +842,9 @@ class OfficeScene extends Phaser.Scene {
         this._layoutMode = false;
         this._layoutSelectedItem = null;
         this._layoutGhost = null;
-        // Layout decorations disabled (background is pre-rendered, not tile-based)
-        this._userDecorations = [];
-        try { localStorage.removeItem('koalaclaw_office_decorations'); } catch(e) {}
+        this._decoSprites = [];
+        this._userDecorations = this._loadDecorations();
+        this._applyUserDecorations();
 
         // ── Monitor glow effects ────────────────────
         this._setupMonitorGlows();
@@ -1551,13 +1563,80 @@ class OfficeScene extends Phaser.Scene {
         this.input.off('pointerdown', this._onLayoutPointerDown, this);
     }
 
-    _onLayoutPointerMove() {}
-    _onLayoutPointerDown() {}
-    _placeDecoration() {}
-    _removeDecoration() {}
-    _saveDecorations() {}
-    _loadDecorations() { return []; }
-    _applyUserDecorations() {}
+    _onLayoutPointerMove(pointer) {
+        if (!this._layoutMode || !this._layoutGhost) return;
+        const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        this._layoutGhost.setPosition(wp.x, wp.y);
+        this._layoutGhost.setVisible(true);
+        const inBounds = wp.x > 10 && wp.x < 758 && wp.y > 10 && wp.y < 566;
+        this._layoutGhost.setFillStyle(inBounds ? 0x3ECFA0 : 0xff4040, 0.25);
+    }
+
+    _onLayoutPointerDown(pointer) {
+        if (!this._layoutMode) return;
+        const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        if (wp.x < 10 || wp.x > 758 || wp.y < 10 || wp.y > 566) return;
+
+        if (this._layoutSelectedItem) {
+            this._placeDecoration(wp.x, wp.y, this._layoutSelectedItem);
+        } else {
+            this._removeDecorationAt(wp.x, wp.y);
+        }
+    }
+
+    _placeDecoration(px, py, item) {
+        const sprite = this.add.image(px, py, item.asset).setDepth(50).setInteractive();
+        this._decoSprites.push(sprite);
+        const entry = { id: Date.now(), x: px, y: py, itemId: item.id, asset: item.asset };
+        this._userDecorations.push(entry);
+        sprite._decoEntry = entry;
+
+        if (this.textures.exists('particle')) {
+            const em = this.add.particles(px, py, 'particle', {
+                lifespan: 400, speed: { min: 10, max: 30 },
+                scale: { start: 0.2, end: 0 }, alpha: { start: 0.8, end: 0 },
+                tint: 0x3ECFA0, frequency: -1, quantity: 6, blendMode: 'ADD',
+            });
+            em.setDepth(180); em.explode(6);
+            this.time.delayedCall(500, () => em.destroy());
+        }
+    }
+
+    _removeDecorationAt(px, py) {
+        let closest = null, closestDist = 30;
+        this._decoSprites.forEach(s => {
+            const d = Phaser.Math.Distance.Between(px, py, s.x, s.y);
+            if (d < closestDist) { closest = s; closestDist = d; }
+        });
+        if (closest) {
+            this._decoSprites = this._decoSprites.filter(s => s !== closest);
+            if (closest._decoEntry) {
+                this._userDecorations = this._userDecorations.filter(d => d.id !== closest._decoEntry.id);
+            }
+            closest.destroy();
+        }
+    }
+
+    _saveDecorations() {
+        try { localStorage.setItem('koalaclaw_office_decos_v2', JSON.stringify(this._userDecorations)); } catch(e) {}
+    }
+
+    _loadDecorations() {
+        try {
+            const s = localStorage.getItem('koalaclaw_office_decos_v2');
+            return s ? JSON.parse(s) : [];
+        } catch(e) { return []; }
+    }
+
+    _applyUserDecorations() {
+        this._userDecorations.forEach(d => {
+            if (this.textures.exists(d.asset)) {
+                const sprite = this.add.image(d.x, d.y, d.asset).setDepth(50);
+                sprite._decoEntry = d;
+                this._decoSprites.push(sprite);
+            }
+        });
+    }
 
     // ════════════════════════════════════════════════════════
     //  UPDATE
