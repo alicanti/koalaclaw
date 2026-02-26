@@ -830,8 +830,9 @@ class OfficeScene extends Phaser.Scene {
         this._layoutMode = false;
         this._layoutSelectedItem = null;
         this._layoutGhost = null;
-        this._userDecorations = this._loadDecorations();
-        this._applyUserDecorations();
+        // Layout decorations disabled (background is pre-rendered, not tile-based)
+        this._userDecorations = [];
+        try { localStorage.removeItem('koalaclaw_office_decorations'); } catch(e) {}
 
         // ── Monitor glow effects ────────────────────
         this._setupMonitorGlows();
@@ -1550,101 +1551,13 @@ class OfficeScene extends Phaser.Scene {
         this.input.off('pointerdown', this._onLayoutPointerDown, this);
     }
 
-    _onLayoutPointerMove(pointer) {
-        if (!this._layoutMode || !this._layoutGhost) return;
-        const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-        const tx = Math.floor(worldPoint.x / TILE);
-        const ty = Math.floor(worldPoint.y / TILE);
-        if (tx >= 1 && tx < MAP_W - 1 && ty >= 1 && ty < MAP_H - 1) {
-            this._layoutGhost.setPosition(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
-            this._layoutGhost.setVisible(true);
-            const canPlace = this._collisionData[ty][tx] === 0 && this._furnitureData[ty][tx] === 0;
-            this._layoutGhost.setFillStyle(canPlace ? 0x3ECFA0 : 0xff4040, 0.3);
-        } else {
-            this._layoutGhost.setVisible(false);
-        }
-    }
-
-    _onLayoutPointerDown(pointer) {
-        if (!this._layoutMode) return;
-        if (pointer.rightButtonDown()) return;
-
-        const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-        const tx = Math.floor(worldPoint.x / TILE);
-        const ty = Math.floor(worldPoint.y / TILE);
-        if (tx < 1 || tx >= MAP_W - 1 || ty < 1 || ty >= MAP_H - 1) return;
-
-        if (this._layoutSelectedItem) {
-            if (this._collisionData[ty][tx] === 0 && this._furnitureData[ty][tx] === 0) {
-                this._placeDecoration(tx, ty, this._layoutSelectedItem);
-            }
-        } else {
-            // Remove mode: click on existing furniture to remove
-            if (this._furnitureData[ty][tx] > 0) {
-                this._removeDecoration(tx, ty);
-            }
-        }
-    }
-
-    _placeDecoration(tx, ty, item) {
-        const tileId = item.tileId + 1; // Phaser tilemap is 1-indexed
-        this._furnitureData[ty][tx] = tileId;
-        if (item.blocking) this._collisionData[ty][tx] = 1;
-
-        // Update the tilemap visually
-        this.furnitureLayer.putTileAt(tileId, tx, ty);
-
-        // Update pathfinding
-        this.easystar.setGrid(this._collisionData);
-
-        // Track user decoration
-        this._userDecorations.push({ x: tx, y: ty, itemId: item.id, tileId: tileId, blocking: item.blocking });
-
-        // Pop effect
-        if (this.textures.exists('particle')) {
-            const emitter = this.add.particles(tx * TILE + TILE / 2, ty * TILE + TILE / 2, 'particle', {
-                lifespan: 500, speed: { min: 10, max: 30 },
-                scale: { start: 0.2, end: 0 }, alpha: { start: 0.8, end: 0 },
-                tint: 0x3ECFA0, frequency: -1, quantity: 8, blendMode: 'ADD',
-            });
-            emitter.setDepth(180);
-            emitter.explode(8);
-            this.time.delayedCall(600, () => emitter.destroy());
-        }
-    }
-
-    _removeDecoration(tx, ty) {
-        this._furnitureData[ty][tx] = 0;
-        this._collisionData[ty][tx] = 0;
-        this.furnitureLayer.putTileAt(0, tx, ty);
-        this.easystar.setGrid(this._collisionData);
-
-        this._userDecorations = this._userDecorations.filter(d => d.x !== tx || d.y !== ty);
-    }
-
-    _saveDecorations() {
-        try {
-            localStorage.setItem('koalaclaw_office_decorations', JSON.stringify(this._userDecorations));
-        } catch (e) { /* ignore */ }
-    }
-
-    _loadDecorations() {
-        try {
-            const saved = localStorage.getItem('koalaclaw_office_decorations');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) { return []; }
-    }
-
-    _applyUserDecorations() {
-        this._userDecorations.forEach(d => {
-            if (d.x >= 1 && d.x < MAP_W - 1 && d.y >= 1 && d.y < MAP_H - 1) {
-                this._furnitureData[d.y][d.x] = d.tileId;
-                if (d.blocking) this._collisionData[d.y][d.x] = 1;
-                this.furnitureLayer.putTileAt(d.tileId, d.x, d.y);
-            }
-        });
-        this.easystar.setGrid(this._collisionData);
-    }
+    _onLayoutPointerMove() {}
+    _onLayoutPointerDown() {}
+    _placeDecoration() {}
+    _removeDecoration() {}
+    _saveDecorations() {}
+    _loadDecorations() { return []; }
+    _applyUserDecorations() {}
 
     // ════════════════════════════════════════════════════════
     //  UPDATE
