@@ -229,15 +229,24 @@ class WiroClient:
         """Search models by category and return grouped results."""
         search_map = {
             "image": "text-to-image",
-            "video": "text-to-video",
-            "audio": "text-to-speech",
+            "video": "text-to-video,video-generation,image-to-video",
+            "audio": "text-to-speech,text-to-audio",
         }
-        query = search_map.get((category or "").lower(), category or "text-to-image")
-        try:
-            raw = self.search_models(query=query, limit=12)
-        except Exception as e:
-            print(f"[WIRO] search_models error: {e}", file=sys.stderr, flush=True)
-            raw = []
+        queries = search_map.get((category or "").lower(), category or "text-to-image").split(",")
+        raw = []
+        seen_ids = set()
+        for query in queries:
+            try:
+                batch = self.search_models(query=query.strip(), limit=15)
+                for m in batch:
+                    mid = m.get("id")
+                    if mid and mid not in seen_ids:
+                        seen_ids.add(mid)
+                        raw.append(m)
+            except Exception as e:
+                print(f"[WIRO] list_models search '{query}' error: {e}", file=sys.stderr, flush=True)
+        if not raw:
+            print(f"[WIRO] list_models: no results for {queries}", file=sys.stderr, flush=True)
 
         models = []
         for t in raw:
@@ -292,21 +301,30 @@ class WiroClient:
         return inputs
 
     def find_best_model(self, task_type: str = "text-to-image") -> Optional[Dict[str, Any]]:
-        """Search and return the best fast model for a task type.
+        """Search and return the best fast model for a task type."""
+        queries = [task_type]
+        if "video" in task_type:
+            queries = [task_type, "video-generation", "image-to-video", "video"]
 
-        Prefers models tagged with 'fast-inference' or from known fast providers.
-        Falls back to first result if no fast model found.
-        """
-        try:
-            results = self.search_models(query=task_type, limit=10)
-        except Exception as e:
-            print(f"[WIRO] find_best_model search failed: {e}", file=sys.stderr, flush=True)
-            return None
+        results = []
+        seen_ids = set()
+        for q in queries:
+            try:
+                batch = self.search_models(query=q, limit=15)
+                for m in batch:
+                    mid = m.get("id")
+                    if mid and mid not in seen_ids:
+                        seen_ids.add(mid)
+                        results.append(m)
+            except Exception as e:
+                print(f"[WIRO] find_best_model search '{q}' failed: {e}", file=sys.stderr, flush=True)
         print(f"[WIRO] find_best_model: got {len(results)} results for '{task_type}'", file=sys.stderr, flush=True)
         if not results:
             return None
 
-        FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai", "stability-ai"}
+        FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai",
+                       "stability-ai", "kuaishou", "luma", "minimax", "genmo", "runway",
+                       "pika", "haiper", "lightricks", "kling-ai", "seedance"}
 
         def _score(t):
             cats = t.get("categories") or []
@@ -336,15 +354,31 @@ class WiroClient:
 
     def suggest_models(self, task_type: str = "text-to-image", count: int = 3) -> List[Dict[str, Any]]:
         """Return top N models with cost info for user selection."""
-        try:
-            results = self.search_models(query=task_type, limit=10)
-        except Exception as e:
-            print(f"[WIRO] suggest_models search failed: {e}", file=sys.stderr, flush=True)
-            return []
+        # Use multiple search queries for video to catch all providers
+        queries = [task_type]
+        if "video" in task_type:
+            queries = [task_type, "video-generation", "image-to-video", "video"]
+        elif "audio" in task_type or "speech" in task_type:
+            queries = [task_type, "text-to-speech", "text-to-audio", "audio"]
+
+        results = []
+        seen_ids = set()
+        for q in queries:
+            try:
+                batch = self.search_models(query=q, limit=15)
+                for m in batch:
+                    mid = m.get("id")
+                    if mid and mid not in seen_ids:
+                        seen_ids.add(mid)
+                        results.append(m)
+            except Exception as e:
+                print(f"[WIRO] suggest_models search '{q}' failed: {e}", file=sys.stderr, flush=True)
         if not results:
             return []
 
-        FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai", "stability-ai"}
+        FAST_OWNERS = {"google", "black-forest-labs", "bytedance", "ideogram", "recraft-ai",
+                       "stability-ai", "kuaishou", "luma", "minimax", "genmo", "runway",
+                       "pika", "haiper", "lightricks", "kling-ai", "seedance"}
 
         def _score(t):
             cats = t.get("categories") or []
