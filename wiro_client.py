@@ -105,14 +105,20 @@ def build_params_from_docs(inputs: List[Dict[str, Any]], prompt: str, input_imag
 
     prompt_field_names = {"prompt", "text", "input_text", "message", "query"}
     image_field_types = {"combinefileinput", "fileinput", "imageinput"}
+    image_field_names = {"inputimage", "inputimageurl", "input_image", "input_image_url",
+                         "image", "image_url", "imageurl", "ref_image",
+                         "reference_image", "init_image", "source_image"}
 
     for inp in inputs:
         name = inp["name"]
         field_type = inp["type"]
 
-        if field_type in image_field_types:
+        if field_type in image_field_types or name.lower() in image_field_names:
             if input_image and not image_field_found:
-                params[name] = [input_image]
+                if field_type in image_field_types:
+                    params[name] = [input_image]
+                else:
+                    params[name] = input_image
                 image_field_found = True
             continue
 
