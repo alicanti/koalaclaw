@@ -808,13 +808,8 @@ class OfficeScene extends Phaser.Scene {
         this.time.addEvent({ delay: 30000, callback: () => this._triggerRandomEvent(), loop: true });
 
         // ── Camera ──────────────────────────────────
-        const BG_W2 = 768, BG_H2 = 576;
-        this.cameras.main.setBounds(0, 0, BG_W2, BG_H2);
-        const cw = this.scale.width, ch = this.scale.height;
-        const worldW = BG_W2, worldH = BG_H2;
-        const autoZoom = Math.max(cw / worldW, ch / worldH, 1);
-        this.cameras.main.setZoom(Math.min(autoZoom, 2.5));
-        this.cameras.main.centerOn(worldW / 2, worldH / 2);
+        this.cameras.main.setBounds(0, 0, 768, 576);
+        this.cameras.main.centerOn(384, 288);
 
         // Camera drag
         this.input.on('pointermove', (p) => {
@@ -1803,15 +1798,15 @@ function initOfficeGame(agents) {
     const h = container.clientHeight || container.offsetHeight || 600;
 
     window._officeGame = new Phaser.Game({
-        type: Phaser.CANVAS,
+        type: Phaser.AUTO,
         parent: 'office-scene',
-        width: w,
-        height: h,
+        width: 768,
+        height: 576,
         pixelArt: true,
-        backgroundColor: '#0a0a0f',
+        backgroundColor: '#0d1117',
         scene: [BootScene, OfficeScene],
         scale: {
-            mode: Phaser.Scale.RESIZE,
+            mode: Phaser.Scale.FIT,
             autoCenter: Phaser.Scale.CENTER_BOTH,
         },
         render: {

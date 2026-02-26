@@ -1,19 +1,17 @@
 /* Pixel Art Office Scene — Phaser 3 Canvas */
 
 .office-scene {
-    flex: 1;
+    flex: 1 1 0%;
     width: 100%;
-    min-height: 400px;
-    background: #0a0a0f;
+    height: 100%;
+    min-height: 0;
+    background: #0d1117;
     position: relative;
     overflow: hidden;
-    image-rendering: pixelated;
 }
 
 .office-scene canvas {
     display: block;
-    width: 100% !important;
-    height: 100% !important;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
 }
