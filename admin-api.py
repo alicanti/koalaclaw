@@ -1256,26 +1256,32 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             for a in agents_roster
         )
 
-        # Find the most recent image/video URL from chat history for context
+        # Find ALL media URLs from chat history for context
+        import re as _re
+        all_media_urls = []
         recent_media_url = ""
         try:
-            history = load_chat_history(orch_id, limit=20)
-            for entry in reversed(history):
+            history = read_chat_history(orch_id, limit=200)
+            for entry in history:
                 content = entry.get("content", "")
-                import re as _re
-                media_match = _re.search(r'(https?://[^\s<>"]+\.(?:png|jpe?g|webp|gif|mp4|webm))\b', content)
-                if media_match:
-                    recent_media_url = media_match.group(1)
-                    break
+                # Match Wiro CDN URLs and common media extensions
+                urls = _re.findall(r'(https?://cdn[^\s<>"]+|https?://[^\s<>"]+\.(?:png|jpe?g|webp|gif|mp4|webm|mp3|wav|ogg))\b', content)
+                for u in urls:
+                    if u not in all_media_urls:
+                        all_media_urls.append(u)
+            if all_media_urls:
+                recent_media_url = all_media_urls[-1]
         except Exception:
             pass
 
         context_hint = ""
-        if recent_media_url:
+        if all_media_urls:
+            media_list = "\n".join(f"  - {u}" for u in all_media_urls[-10:])
             context_hint = (
-                f'\nRecent media in conversation: {recent_media_url}\n'
-                f'If the user refers to "this image/video" or "convert this", use this URL as input_image.\n'
-                f'For image-to-video: set task_type to "image-to-video" and include "input_image":"{recent_media_url}" in wiro_generate.\n'
+                f'\nMedia generated in this conversation ({len(all_media_urls)} total, showing last {min(10, len(all_media_urls))}):\n{media_list}\n'
+                f'Most recent: {recent_media_url}\n'
+                f'If the user refers to "this image/video", "convert this", "make this a video", etc., use the most recent relevant URL as input_image.\n'
+                f'For image-to-video: set task_type to "image-to-video" and include "input_image":"<URL>" in wiro_generate.\n'
             )
 
         # RAG: search uploaded documents for relevant context
@@ -1293,7 +1299,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
         # Check if user is selecting a previously suggested model
         model_selection = ""
         try:
-            history = load_chat_history(orch_id, limit=5)
+            history = read_chat_history(orch_id, limit=5)
             for entry in reversed(history):
                 if entry.get("role") == "assistant" and "wiro_model_options" in entry.get("content", ""):
                     model_selection = entry["content"]
@@ -1423,7 +1429,7 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             # If user selected a model from suggestions, recover prompt from history
             if not wiro_prompt or wiro_prompt == message:
                 try:
-                    hist = load_chat_history(orch_id, limit=5)
+                    hist = read_chat_history(orch_id, limit=5)
                     for entry in reversed(hist):
                         c = entry.get("content", "")
                         if "wiro_prompt:" in c:
