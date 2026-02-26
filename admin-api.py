@@ -1487,6 +1487,19 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             input_image = wiro_data.get("input_image", "")
             chosen_model = wiro_data.get("model", "")
 
+            # Auto-detect image-to-video: if user mentions "video" and we have a recent image
+            import re as _re_vid
+            msg_lower = message.lower()
+            video_keywords = ["videoya", "video", "animate", "canlandır", "hareketlendir", "çevir"]
+            if any(kw in msg_lower for kw in video_keywords) and recent_media_url:
+                is_image_url = _re_vid.search(r'\.(png|jpe?g|webp|gif)\b', recent_media_url)
+                if is_image_url and not input_image:
+                    input_image = recent_media_url
+                    print(f"[ORCH] Auto-detected image-to-video: input_image={input_image[:80]}", file=sys.stderr, flush=True)
+                if "video" not in task_type:
+                    task_type = "image-to-video"
+                    print(f"[ORCH] Auto-set task_type to image-to-video", file=sys.stderr, flush=True)
+
             # If user selected a model from suggestions, recover prompt from history
             if not wiro_prompt or wiro_prompt == message:
                 try:
