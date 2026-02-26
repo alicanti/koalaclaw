@@ -1487,6 +1487,15 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             input_image = wiro_data.get("input_image", "")
             chosen_model = wiro_data.get("model", "")
 
+            # Clean input_image: extract plain URL from any format
+            if input_image:
+                import re as _re_clean
+                if isinstance(input_image, list):
+                    input_image = input_image[0] if input_image else ""
+                input_image = str(input_image).strip().strip('"').strip("'").strip("[").strip("]").strip('"').strip("'")
+                url_match = _re_clean.search(r'(https?://[^\s<>"\'\]\[]+)', input_image)
+                input_image = url_match.group(1) if url_match else ""
+
             # Auto-detect image-to-video: if user mentions "video" and we have a recent image
             import re as _re_vid
             msg_lower = message.lower()

@@ -96,9 +96,18 @@ def build_params_from_docs(inputs: List[Dict[str, Any]], prompt: str, input_imag
 
     Strategy:
     - Find the prompt/text field and set it to the user's prompt
-    - If input_image provided, fill the first file-upload field with it
+    - If input_image provided, fill the first file-upload or image URL field with it
     - For other fields, use sensible defaults from the docs
     """
+    # Clean input_image to plain URL
+    if input_image:
+        if isinstance(input_image, list):
+            input_image = input_image[0] if input_image else ""
+        input_image = str(input_image).strip().strip('"').strip("'").strip("[").strip("]").strip('"').strip("'")
+        import re as _re_url
+        m = _re_url.search(r'(https?://[^\s<>"\'\]\[]+)', input_image)
+        input_image = m.group(1) if m else ""
+
     params: Dict[str, Any] = {}
     prompt_field_found = False
     image_field_found = False
