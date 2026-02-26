@@ -152,6 +152,9 @@ Each agent gets its own vector collections for persistent memory and document kn
 - **Per-agent isolation** — each agent has separate `agent_{id}_chat` and `agent_{id}_docs` collections
 - **Auto-provisioned** — collections created on install/add-agent, deleted on remove-agent
 
+### SearXNG Web Search (Built-in)
+Every agent gets **free, private web search** via a self-hosted [SearXNG](https://searxng.org) instance — no API key required. SearXNG aggregates results from Google, DuckDuckGo, Brave, Wikipedia, and more. Deployed automatically as a Docker container on the internal network. Agents can search the web, find current information, and verify facts without any external API subscriptions.
+
 ### Production-Ready Infrastructure
 - Auto-installs Docker CE + Compose v2
 - Pre-flight checks (OS, RAM, disk, ports, firewall, subnet)
@@ -159,6 +162,7 @@ Each agent gets its own vector collections for persistent memory and document kn
 - Unique 256-bit tokens per agent
 - Network isolation, static IPs, trusted proxies
 - Qdrant vector database for persistent memory and RAG
+- SearXNG metasearch engine for free web search (no API key)
 - Backup/restore, one-command updates
 - Browser relay (CDP proxy chain + Chrome extension) for Chromium automation
 - Auto-installs Node.js 22, OpenClaw CLI, and Chrome extension during setup

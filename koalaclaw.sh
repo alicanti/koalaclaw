@@ -823,6 +823,48 @@ _clone_repo() {
 }
 
 # ═══════════════════════════════════════
+# SEARXNG WEB SEARCH SETUP
+# ═══════════════════════════════════════
+_setup_searxng() {
+    _step "Setting up SearXNG web search engine..."
+    local searxng_dir="${INSTALL_DIR}/searxng"
+    mkdir -p "$searxng_dir"
+
+    local secret_key
+    secret_key=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p | tr -d '\n' | head -c 64)
+
+    cat > "${searxng_dir}/settings.yml" << SEARXNG_SETTINGS
+use_default_settings: true
+
+server:
+  secret_key: "${secret_key}"
+  bind_address: "0.0.0.0:8080"
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+  - name: brave
+    engine: brave
+    shortcut: br
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+SEARXNG_SETTINGS
+
+    _info "SearXNG config created at ${searxng_dir}/settings.yml"
+}
+
+# ═══════════════════════════════════════
 # ADMIN API (Web UI) SETUP
 # ═══════════════════════════════════════
 _setup_admin_api() {
@@ -1107,6 +1149,20 @@ AGENT_EOF2
 
 QDRANT_EOF
 
+    # SearXNG web search engine (no API key needed)
+    cat >> "$compose_file" << SEARXNG_EOF
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: koala-searxng
+    restart: unless-stopped
+    volumes:
+      - ./searxng:/etc/searxng
+    networks:
+      koala-net:
+        ipv4_address: 172.30.0.201
+
+SEARXNG_EOF
+
     # Caddy service
     cat >> "$compose_file" << CADDY_HEAD
   caddy:
@@ -1239,6 +1295,17 @@ cfg = {
                 'cdpPort': ${cdp_port},
                 'driver': 'extension',
                 'color': '#00AA00'
+            }
+        }
+    },
+    'tools': {
+        'web': {
+            'search': {
+                'enabled': True,
+                'provider': 'searxng',
+                'searxng': {
+                    'baseUrl': 'http://172.30.0.201:8080'
+                }
             }
         }
     }
@@ -1850,6 +1917,7 @@ cmd_install() {
     CREATED_AT="$(date -Iseconds)"
     _save_state
     _generate_compose
+    _setup_searxng
     _generate_caddyfile
     _generate_agent_configs
     _generate_credentials
@@ -1954,6 +2022,7 @@ cmd_add_agent() {
     _header "Regenerating Configuration"
     _save_state
     _generate_compose
+    _setup_searxng
     _generate_caddyfile
     _generate_agent_configs
     _generate_credentials
@@ -2049,6 +2118,7 @@ except Exception as e:
     # Regenerate
     _save_state
     _generate_compose
+    _setup_searxng
     _generate_caddyfile
     _generate_credentials
 

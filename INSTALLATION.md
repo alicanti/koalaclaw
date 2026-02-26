@@ -93,6 +93,23 @@ KoalaClaw includes a **Qdrant** vector database for persistent chat memory and d
 
 Qdrant runs as a Docker container (`koala-qdrant`) on the internal network at `172.30.0.200:6333`. Data is persisted in the `qdrant_data` Docker volume.
 
+## Post-Install: Web Search (SearXNG)
+
+KoalaClaw includes a self-hosted **SearXNG** metasearch engine that gives every agent free, private web search — no API key required.
+
+- **Automatic setup**: SearXNG is deployed as a Docker container (`koala-searxng`) during installation
+- **No configuration needed**: All agents are pre-configured with `tools.web.search.provider: "searxng"`
+- **Search sources**: Aggregates results from Google, DuckDuckGo, Brave, Wikipedia, and more
+- **Privacy**: All queries stay on your server — no external tracking
+- **Internal access**: Runs at `172.30.0.201:8080` on the Docker network
+
+Agents can use web search in conversations automatically. For example, ask an agent "what's the latest news about AI?" and it will search the web via SearXNG.
+
+To verify SearXNG is running:
+```bash
+docker exec koala-agent-1 wget -qO- "http://172.30.0.201:8080/search?q=test&format=json" | head -c 200
+```
+
 ## Manual Install (Step by Step)
 
 If you prefer to set things up manually, follow the sections below.
