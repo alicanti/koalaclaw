@@ -1296,7 +1296,68 @@ class AdminAPIHandler(SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
-        # Check if user is selecting a previously suggested model
+        # Direct model selection: if user typed a number (1, 2, 3), pick from previous suggestions
+        stripped_msg = message.strip()
+        if stripped_msg in ("1", "2", "3"):
+            try:
+                history = read_chat_history(orch_id, limit=10)
+                for entry in reversed(history):
+                    content = entry.get("content", "")
+                    if entry.get("role") == "assistant" and "wiro_model_options:" in content:
+                        import re as _re
+                        opts_match = _re.search(r'wiro_model_options:\s*(\[.*?\])', content)
+                        prompt_match = _re.search(r'wiro_prompt:\s*(.+?)-->', content)
+                        task_match = _re.search(r'wiro_task_type:\s*(\S+)', content)
+                        if opts_match:
+                            opts = json.loads(opts_match.group(1))
+                            idx = int(stripped_msg) - 1
+                            if 0 <= idx < len(opts):
+                                chosen = opts[idx]
+                                wiro_prompt = prompt_match.group(1).strip() if prompt_match else message
+                                task_type = task_match.group(1).strip() if task_match else "text-to-image"
+                                chosen_model = f"{chosen['owner']}/{chosen['project']}"
+                                input_image = ""
+                                if recent_media_url and "video" in task_type:
+                                    input_image = recent_media_url
+
+                                print(f"[ORCH] Direct model selection: {stripped_msg} -> {chosen_model}, prompt={wiro_prompt[:60]}, task={task_type}", file=sys.stderr, flush=True)
+                                self._sse_send("phase", {"phase": "generating", "message": f"Generating with {chosen.get('name', chosen_model)}..."})
+                                append_chat_history(orch_id, "user", message)
+
+                                client = get_wiro_client()
+                                if client and client.is_configured:
+                                    try:
+                                        owner, project = chosen_model.split("/", 1)
+                                        inputs = client.get_model_inputs(owner, project)
+                                        if inputs:
+                                            from wiro_client import build_params_from_docs
+                                            params = build_params_from_docs(inputs, wiro_prompt, input_image=input_image)
+                                        else:
+                                            params = {"prompt": wiro_prompt}
+                                            if input_image:
+                                                params["inputImage"] = [input_image]
+                                        result = client.generate(owner, project, params)
+                                        if result.get("output"):
+                                            out_url = result["output"]
+                                            answer = f"Generated with **{chosen.get('name', chosen_model)}**:\n\n{out_url}"
+                                        elif result.get("error"):
+                                            answer = f"Generation failed: {result['error']}"
+                                        else:
+                                            answer = f"Generation completed but no output URL returned."
+                                    except Exception as e:
+                                        answer = f"Generation error: {e}"
+                                else:
+                                    answer = "Wiro AI is not configured."
+
+                                append_chat_history(orch_id, "assistant", answer)
+                                self._sse_send("done", {"response": answer, "chain": [], "plan": f"generate with {chosen_model}"})
+                                self._sse_end()
+                                return
+                        break
+            except Exception as e:
+                print(f"[ORCH] Direct selection failed: {e}", file=sys.stderr, flush=True)
+
+        # Check if user is selecting a previously suggested model (for LLM fallback)
         model_selection = ""
         try:
             history = read_chat_history(orch_id, limit=5)
